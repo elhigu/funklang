@@ -13,6 +13,7 @@ import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, saveFileBytes } from './file-dialog';
+import { attachWheelStep } from './wheel';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -600,6 +601,8 @@ export function bootApp(root: HTMLElement): void {
     // playback rate moves. Replay so the user hears the new note.
     playAudition();
   });
+  attachWheelStep(noteSelect);
+  attachWheelStep(outputSelect);
 
   repaint();
   updateUndoRedoButtons();

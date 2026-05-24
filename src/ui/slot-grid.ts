@@ -8,6 +8,7 @@ import type { Slot } from '../patch/types';
 import { pickOp, OP_NAME } from './op-picker';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
+import { attachWheelStep } from './wheel';
 import { opByCode, resetSlotForOp } from '../dsp/op-metadata';
 import type { ParamDef } from '../dsp/op-metadata';
 
@@ -205,6 +206,7 @@ function makeVarSelect(opts: VarSelectOpts): HTMLSelectElement {
   });
   sel.addEventListener('click', (e) => e.stopPropagation());
   sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  attachWheelStep(sel);
   return sel;
 }
 
@@ -231,6 +233,7 @@ function makeEnumSelect(opts: EnumSelectOpts): HTMLSelectElement {
   });
   sel.addEventListener('click', (e) => e.stopPropagation());
   sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  attachWheelStep(sel);
   return sel;
 }
 
@@ -259,6 +262,7 @@ function makeRefSelect(opts: RefSelectOpts): HTMLSelectElement {
   });
   sel.addEventListener('click', (e) => e.stopPropagation());
   sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  attachWheelStep(sel);
   return sel;
 }
 
@@ -345,6 +349,7 @@ function renderParam(
       }
       sel.addEventListener('click', (e) => e.stopPropagation());
       sel.addEventListener('mousedown', (e) => e.stopPropagation());
+      attachWheelStep(sel);
       wrap.appendChild(sel);
 
       // Knob for the literal value (only meaningful when selector === 0).
@@ -505,6 +510,7 @@ function renderRow(
     model.setSlotParam(instrIdx, slotIdx, 'outVar', v);
   });
   sel.addEventListener('click', (e) => e.stopPropagation());
+  attachWheelStep(sel);
 
   const del = row.querySelector('.slot-del') as HTMLButtonElement;
   del.addEventListener('click', (e) => {
