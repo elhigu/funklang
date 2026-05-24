@@ -22,8 +22,8 @@ test('open loctro5, pick instrument 0, slot grid populates', async ({ page }) =>
   // The grid header should be present.
   await expect(page.locator('.grid-head').first()).toBeVisible();
 
-  // The audition label defaults to "instr N / final".
-  await expect(page.locator('#audition-label')).toContainText('final');
+  // The output label defaults to "instr N / final" (selection is "/ —").
+  await expect(page.locator('#output-label')).toContainText('final');
 
   // Picking another non-empty instrument changes the visible name.
   const beforeName = await page.locator('.instr-name-input').first().inputValue();
