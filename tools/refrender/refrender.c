@@ -228,13 +228,12 @@ static int load_akp(const char *path, Instr instrs[N_INSTRUMENTS],
                     imports[k].length = 0;
                     break;
                 }
-                /* Delta-decode in place (running prefix sum of signed
-                 * bytes) — mirrors main-binary.c lines 56-62. */
-                int8_t last = 0;
-                for (int n = 0; n < imports[k].length; n++) {
-                    last = (int8_t)(last + imports[k].data[n]);
-                    imports[k].data[n] = last;
-                }
+                /* NOTE: .akp stores imported samples as RAW bytes — Form1.cs
+                 * Save_Click writes `importedsample[l, k]` directly without
+                 * any delta encoding (see Form1.cs ~line 4597). The runtime
+                 * (main-binary.c lines 56-62) only delta-decodes the data
+                 * blob it loads from the .raw INCBIN export. So when reading
+                 * straight from .akp, no delta-decode is needed. */
             }
         }
     }
@@ -312,18 +311,22 @@ static int render_instrument(const Instr instrs[N_INSTRUMENTS],
 
     renderState[idx] = 1;
 
-    /* Eagerly render any source instruments referenced by clone slots so
-     * their byte buffers exist before the inner loop starts. */
+    /* Eagerly render any source instruments referenced by clone (17) or
+     * chordgen (18) slots so their byte buffers exist before the inner
+     * loop starts. In the real Amiga runtime this is implicit: all
+     * instruments are rendered in index order, so by the time instrument
+     * N runs, BaseAdr[0..N-1] are populated. We replicate that on demand
+     * since refrender only renders one instrument by default. */
     for (int j = 0; j < N_SLOTS; j++) {
         const Slot *s = &ins->slots[j];
-        if (s->fn == 17 && s->outVar > 0) {
-            int src = s->gain;
-            if (src >= 0 && src < N_INSTRUMENTS && src != idx) {
-                if (renderState[src] != 2) {
-                    if (render_instrument(instrs, imports, src, depth + 1, NULL) != 0) {
-                        renderState[idx] = 0;
-                        return 1;
-                    }
+        if (s->outVar == 0) continue;
+        if (s->fn != 17 && s->fn != 18) continue;
+        int src = s->gain;
+        if (src >= 0 && src < N_INSTRUMENTS && src != idx) {
+            if (renderState[src] != 2) {
+                if (render_instrument(instrs, imports, src, depth + 1, NULL) != 0) {
+                    renderState[idx] = 0;
+                    return 1;
                 }
             }
         }

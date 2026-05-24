@@ -40,15 +40,33 @@ export interface OpState {
   // cmb_flt_n / dly_cyc / reverb delay lines (24 channels × 2048 shorts).
   // Indexed as buffern[instance * 2048 + i]. We use a single flat Int16Array
   // to mirror C's `short buffern[24][2048]` row-major layout.
+  // - cmb_flt_n uses rows 0..15 (instance == slot j)
+  // - dly_cyc   uses rows 0..15 (instance == slot j)
+  // - reverb internally calls cmb_flt_n with instances 16..23 (shares
+  //   `buffern` AND the same cmb_flt_n_i[] index array)
   buffern: Int16Array;
   // cmb_flt_n local-static index `i[24]` — NOT cleared by clr_buf in C
   // (process-static), but for per-instrument renders we treat it as
   // per-OpState to match refrender's per-instrument reset behavior.
   cmb_flt_n_i: Int16Array;
+  // dly_cyc local-static index `i[16]` — separate from cmb_flt_n's i[].
+  dly_cyc_i: Int16Array;
 
   // adsr needs the enclosing instrument's sampleLength for its sustain-
   // segment comparison. Engine sets this before the per-tick loop.
   sampleLength: number;
+
+  // Pre-rendered source-instrument sample BYTES (8-bit Amiga truncation
+  // of v1, after the post-render two-zero patch). Used by clone (op 17)
+  // and chordgen (op 18). Keyed by source instrument index. Populated by
+  // the engine BEFORE the per-tick loop runs, by recursively rendering
+  // each referenced source instrument (Option A in the porting plan).
+  cloneBuffers: Map<number, Int8Array>;
+
+  // Imported-sample data, indexed 0..7. Engine copies a reference from
+  // the enclosing patch before the per-tick loop so imported_sample (op
+  // 20) can read without needing access to the full Patch object.
+  importedSamples: ReadonlyArray<{ data: Int8Array } | undefined>;
 }
 
 export type OpFn = (

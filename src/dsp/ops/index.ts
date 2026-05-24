@@ -19,6 +19,11 @@ import { op_distortion } from './distortion';
 import { op_sh } from './sh';
 import { op_onepole_flt } from './onepole_flt';
 import { op_adsr } from './adsr';
+import { op_dly_cyc } from './dly_cyc';
+import { op_reverb } from './reverb';
+import { op_chordgen } from './chordgen';
+import { op_clone } from './clone';
+import { op_imported_sample } from './imported_sample';
 
 export const OPS: Record<number, OpFn> = {
   1: op_vol,
@@ -31,11 +36,20 @@ export const OPS: Record<number, OpFn> = {
   8: op_envd,
   9: op_add,
   10: op_mul,
+  11: op_dly_cyc,
   12: op_cmb_flt_n,
+  13: op_reverb,
   14: op_ctrl,
   15: op_sv_flt_n,
   16: op_distortion,
+  17: op_clone,
+  18: op_chordgen,
   19: op_sh,
+  20: op_imported_sample,
   21: op_onepole_flt,
   23: op_adsr,
+  // Code 24 (vocoder) is intentionally a no-op: declared in Form1.cs but
+  // has no implementation in synthnodes.h. refrender.c case 24 returns 0.
+  // We register it explicitly so the engine doesn't drop the slot's tap.
+  24: () => 0,
 };

@@ -31,7 +31,14 @@ export function newOpState(): OpState {
     // cmb_flt_n: function-local static `i[24]`. refrender invokes once per
     // process so these start at 0; mirror that with a fresh array per render.
     cmb_flt_n_i: new Int16Array(24),
+    // dly_cyc: function-local static `i[16]`. Separate static from cmb_flt_n.
+    dly_cyc_i: new Int16Array(N_SLOTS_MAX),
     // Engine fills this in per render so adsr can compute sustainTicks.
     sampleLength: 0,
+    // Engine populates BEFORE per-tick loop with pre-rendered source bytes
+    // for any instrument referenced by clone (17) / chordgen (18) slots.
+    cloneBuffers: new Map<number, Int8Array>(),
+    // Engine fills with reference to patch.importedSamples for op 20.
+    importedSamples: [],
   };
 }

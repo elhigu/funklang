@@ -26,6 +26,19 @@ export function makePatch(sampleLength: number, slots: Slot[]): Patch {
   return p;
 }
 
+/** Build a patch with N instruments populated; each entry is { sampleLength, slots }. */
+export function makeMultiPatch(
+  ...instrs: ReadonlyArray<{ sampleLength: number; slots: Slot[] }>
+): Patch {
+  const p = emptyPatch();
+  for (let i = 0; i < instrs.length; i++) {
+    const ins = p.instruments[i]!;
+    ins.sampleLength = instrs[i]!.sampleLength;
+    ins.slots = instrs[i]!.slots;
+  }
+  return p;
+}
+
 export function runBoth(patch: Patch, idx = 0): { c: Int16Array; js: Int16Array } {
   const dir = mkdtempSync(join(tmpdir(), 'funklang-dsp-'));
   const path = join(dir, 'test.akp');
