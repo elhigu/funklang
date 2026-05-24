@@ -59,7 +59,7 @@ function readSrcByte(src: Int8Array | undefined, addr: number): number {
   return src[addr]!;     // Int8Array — already sign-extended on read
 }
 
-export const op_chordgen: OpFn = (state, _slotIdx, _vars, slot, t) => {
+export const op_chordgen: OpFn = (state, _slotIdx, vars, slot, t) => {
   const srcInst = slot.gain;
   const src = state.cloneBuffers.get(srcInst);
   // refrender.c case 18: if src missing/out-of-range → 0.
@@ -68,7 +68,11 @@ export const op_chordgen: OpFn = (state, _slotIdx, _vars, slot, t) => {
   const n1 = (slot.freq  << 24) >> 24;     // BYTE (signed int8)
   const n2 = (slot.width << 24) >> 24;
   const n3 = (slot.val1  << 24) >> 24;
-  const shift = slot.val2Value & 0xff;     // UBYTE
+  // shift: literal val2Value, OR variable[val2] when val2 > 0 (Form1.cs
+  // case 18 line 1338-1341). pickByte semantics.
+  const shift = (slot.val2 > 0 && slot.val2 <= 4)
+    ? (vars[slot.val2]! & 0xff)
+    : (slot.val2Value & 0xff);
 
   // First term: *(BYTE*)(BaseAdr + sample) << 7
   let buf = (readSrcByte(src, t) << 7) | 0;

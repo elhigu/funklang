@@ -8,6 +8,13 @@ export const AKI_MAGIC = AKP_MAGIC + 1; // 0x02CEDAA0 = 47110816
 
 export const N_INSTRUMENTS = 31;
 export const N_SLOTS_MAX = 20;
+/**
+ * UI-visible cap on slots per instrument. Klang's editor exposes 16 slots
+ * per instrument; the file format still allocates 20. Existing patches that
+ * already contain more than 16 filled slots are loaded (with a console
+ * warning) but the editor will not let the user insert beyond this.
+ */
+export const N_SLOTS_EDITABLE = 16;
 // 8, not 9 — the saver loops `for (int k = 0; k < 8; k++)` (see format-notes.md).
 export const N_IMPORTS = 8;
 

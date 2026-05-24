@@ -2,6 +2,7 @@
 // Mutations go through the model so subscribers (slot grid, viewer) update.
 
 import type { PatchModel } from '../patch/model';
+import { N_SLOTS_EDITABLE } from '../patch/types';
 
 export function renderInstrHeader(
   root: HTMLElement,
@@ -14,6 +15,8 @@ export function renderInstrHeader(
     return;
   }
   const num = String(instrIdx + 1).padStart(2, '0');
+  // Badge shows filled-slot count vs the UI cap, not the file-format cap.
+  const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
   root.innerHTML = `
     <div class="instr-header">
       <div class="instr-title">
@@ -28,7 +31,7 @@ export function renderInstrHeader(
           <input data-id="instr-loopofs" type="number" class="meta-num" value="${ins.loopOffset}" /></label>
         <label class="pair"><span class="k">loop len</span>
           <input data-id="instr-looplen" type="number" class="meta-num" value="${ins.loopLength}" /></label>
-        <span class="pair badge" data-id="slot-badge">${ins.slots.length}/20</span>
+        <span class="pair badge" data-id="slot-badge">${filled}/${N_SLOTS_EDITABLE}</span>
       </div>
     </div>
   `;

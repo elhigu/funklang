@@ -8,6 +8,14 @@ export interface RenderResult {
   sample: Int16Array;
   /** One Int16Array per slot, same length as sample; the output written by each slot per tick. */
   slotTaps: Int16Array[];
+  /**
+   * 8-bit Amiga sample bytes (v1 >> 8, bytes [0,1] zeroed). When the
+   * instrument has op22 in slot[15] the bytes also reflect the loop-
+   * generator crossfade applied to the tail. This is what clone (op 17)
+   * and chordgen (op 18) read when this instrument is a source.
+   * Length matches `sample.length`.
+   */
+  bytes: Int8Array;
 }
 
 export interface OpState {

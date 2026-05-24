@@ -117,6 +117,29 @@
     font-size: 11px;
   }
   .menu button:hover { color: var(--amber); background: var(--bg-2); }
+  .note-select-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    height: 100%;
+    border-right: 1px solid var(--grid-dim);
+    color: var(--fg-1);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .note-select-label { color: var(--fg-2); }
+  .note-select-wrap select {
+    background: var(--bg-2);
+    color: var(--amber);
+    border: 1px solid var(--grid);
+    font: inherit;
+    text-transform: none;
+    padding: 2px 4px;
+    cursor: pointer;
+  }
+  .note-select-wrap select:focus { outline: none; border-color: var(--amber); }
 
   .file-info {
     display: flex;

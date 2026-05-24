@@ -26,6 +26,7 @@ import type { Patch } from '../patch/types';
 import { OPS } from './ops/index';
 import { newOpState } from './state';
 import { toI16 } from './ops/_helpers';
+import { applyLoopGen, shouldRunLoopGen } from './ops/loop_gen';
 import type { RenderResult } from './types';
 
 export class CyclicCloneError extends Error {
@@ -107,14 +108,9 @@ export function renderInstrument(
     let bytes = _persistent.cloneCache.get(src);
     if (!bytes) {
       const srcResult = renderInstrument(patch, src, _resolving, _persistent);
-      // Truncate v1 → 8-bit (mirrors main-binary.c line 80-81 `v1 >>= 8`,
-      // then refrender.c lines 567-568 zero bytes 0 and 1).
-      bytes = new Int8Array(srcResult.sample.length);
-      for (let i = 0; i < srcResult.sample.length; i++) {
-        bytes[i] = (srcResult.sample[i]! >> 8) & 0xff;
-      }
-      if (bytes.length >= 1) bytes[0] = 0;
-      if (bytes.length >= 2) bytes[1] = 0;
+      // renderInstrument returns the post-truncation, post-loopgen bytes
+      // directly. We just re-zero bytes [0,1] defensively (also done inside).
+      bytes = srcResult.bytes;
       _persistent.cloneCache.set(src, bytes);
     }
     state.cloneBuffers.set(src, bytes);
@@ -179,6 +175,21 @@ export function renderInstrument(
   _persistent.noise_x2 = state.noise_x2;
   _persistent.noise_x3 = state.noise_x3;
 
+  // Produce the 8-bit Amiga sample bytes that downstream clone/chordgen
+  // ops (and the real hardware) would read. Mirrors main-binary.c lines
+  // 80-89: per-tick `v1>>=8` then `*BaseAdr = v1`, then post-loop
+  // `BaseAdr[0]=BaseAdr[1]=0`, then `if(samplename_flag=='l') loopgen(…)`.
+  const bytes = new Int8Array(sample.length);
+  for (let i = 0; i < sample.length; i++) {
+    bytes[i] = (sample[i]! >> 8) & 0xff;
+  }
+  if (bytes.length >= 1) bytes[0] = 0;
+  if (bytes.length >= 2) bytes[1] = 0;
+  // Op 22 — runs IFF slot[15].fn === 22 (Form1.cs line 1471, 4828).
+  if (shouldRunLoopGen(ins.slots)) {
+    applyLoopGen(bytes, ins.loopOffset, ins.loopLength);
+  }
+
   _resolving.delete(instrIdx);
-  return { sample, slotTaps };
+  return { sample, slotTaps, bytes };
 }

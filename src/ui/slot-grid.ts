@@ -2,7 +2,7 @@
 // hover-revealed delete. Knob params + waveform tap added by later sub-tasks.
 
 import type { PatchModel } from '../patch/model';
-import { N_SLOTS_MAX, emptySlot } from '../patch/types';
+import { N_SLOTS_EDITABLE, N_SLOTS_MAX, emptySlot } from '../patch/types';
 import type { Slot } from '../patch/types';
 import { pickOp, OP_NAME } from './op-picker';
 import { makeKnob } from './knob';
@@ -123,22 +123,59 @@ export interface SlotGridOptions {
 
 /**
  * Update all per-slot wave canvases inside `root` from `slotTaps`.
- * Order is positional (i-th outer slot row ↔ slotTaps[i]). Canvases nested
- * inside expanded clone blocks are skipped — they belong to the source
- * instrument and would need their own render result.
+ * Each rendered row carries `data-model-slot` with the source instrument's
+ * model slot index — we look up `slotTaps[modelIdx]` instead of the visible
+ * row position so that hidden op0 rows (which still occupy slotTaps[] for
+ * DSP `instance`-indexed state) don't cause a mismatch.
+ *
+ * Pass `{ recursive: true }` to also refresh canvases inside expanded clone
+ * blocks (one slot-grid per source instrument, found via `data-instr`).
  */
 export function updateSlotWaves(root: HTMLElement, slotTaps: Int16Array[]): void {
-  // Only look at the top-level .slots > .slot-wrap > .slot canvases.
   const slotsRoot = root.querySelector(':scope > .slots');
   if (!slotsRoot) return;
   const wraps = slotsRoot.querySelectorAll(':scope > .slot-wrap');
-  for (let i = 0; i < wraps.length; i++) {
-    const wrap = wraps[i] as HTMLElement;
-    const cv = wrap.querySelector(':scope > .slot canvas[data-wave]') as HTMLCanvasElement | null;
+  for (const w of Array.from(wraps)) {
+    const wrap = w as HTMLElement;
+    const slotEl = wrap.querySelector(':scope > .slot') as HTMLElement | null;
+    if (!slotEl) continue;
+    const idxStr = slotEl.dataset['modelSlot'];
+    if (idxStr === undefined) continue;
+    const modelIdx = parseInt(idxStr, 10);
+    if (!Number.isFinite(modelIdx)) continue;
+    const cv = slotEl.querySelector('canvas[data-wave]') as HTMLCanvasElement | null;
     if (!cv) continue;
-    const tap = slotTaps[i] ?? null;
+    const tap = slotTaps[modelIdx] ?? null;
     drawWaveform(cv, tap, { width: cv.width, height: cv.height });
   }
+}
+
+/**
+ * Find all expanded clone-block grid hosts inside `root` and return the
+ * source instrument index for each. Used by app.ts to refresh waveform
+ * canvases for clone-source instruments inside an outer instrument's grid.
+ */
+export function findExpandedCloneGrids(
+  root: HTMLElement,
+): Array<{ instrIdx: number; host: HTMLElement }> {
+  const out: Array<{ instrIdx: number; host: HTMLElement }> = [];
+  // Each recursive renderSlotGrid creates a `.slots[data-instr]` element.
+  // Skip the outermost (depth=0) which is handled by the regular path.
+  const hosts = root.querySelectorAll('.slots[data-instr]');
+  for (const h of Array.from(hosts)) {
+    const el = h as HTMLElement;
+    const depth = parseInt(el.dataset['depth'] ?? '0', 10);
+    if (depth === 0) continue;
+    const instrIdx = parseInt(el.dataset['instr'] ?? '-1', 10);
+    if (instrIdx < 0) continue;
+    // The "host" for updateSlotWaves is the renderSlotGrid root that
+    // contains this .slots child — that's the immediate parent of the
+    // `.slots` element when renderSlotGrid wrote into a dedicated host.
+    const host = el.parentElement;
+    if (!host) continue;
+    out.push({ instrIdx, host });
+  }
+  return out;
 }
 
 export function renderSlotGrid(
@@ -153,7 +190,12 @@ export function renderSlotGrid(
     return;
   }
   const depth = opts.depth ?? 0;
-  const full = ins.slots.length >= N_SLOTS_MAX;
+  // Filled = slots with a non-empty op. Empty (fn===0) slots exist in the
+  // model only because the on-disk file format pads to 20 and the DSP layer
+  // uses position-stable `instance` indices for per-slot state. Hide them
+  // from the editor entirely.
+  const filledCount = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
+  const full = filledCount >= N_SLOTS_EDITABLE;
 
   root.innerHTML = '';
   const head = document.createElement('div');
@@ -173,13 +215,23 @@ export function renderSlotGrid(
   slots.dataset['depth'] = String(depth);
   root.appendChild(slots);
 
-  // [+] at top
+  // Build the visible row list (model indices of non-empty slots).
+  const visibleIdx: number[] = [];
+  for (let i = 0; i < ins.slots.length; i++) {
+    if (ins.slots[i]!.fn !== 0) visibleIdx.push(i);
+  }
+
+  // [+] at top — inserts at model position 0.
   if (!full) slots.appendChild(makeInserter(model, instrIdx, 0));
 
-  for (let i = 0; i < ins.slots.length; i++) {
-    const slot = ins.slots[i]!;
-    slots.appendChild(renderRow(model, instrIdx, i, slot, opts));
-    if (!full) slots.appendChild(makeInserter(model, instrIdx, i + 1));
+  for (let r = 0; r < visibleIdx.length; r++) {
+    const modelIdx = visibleIdx[r]!;
+    const slot = ins.slots[modelIdx]!;
+    slots.appendChild(renderRow(model, instrIdx, modelIdx, r, slot, opts));
+    if (!full) {
+      // Insert position for "after this row" = modelIdx + 1.
+      slots.appendChild(makeInserter(model, instrIdx, modelIdx + 1));
+    }
   }
 }
 
@@ -195,6 +247,10 @@ function makeInserter(model: PatchModel, instrIdx: number, atIdx: number): HTMLE
     if (code == null) return;
     const ins = model.patch.instruments[instrIdx];
     if (!ins) return;
+    // UI cap: count of FILLED slots can't exceed N_SLOTS_EDITABLE.
+    const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
+    if (filled >= N_SLOTS_EDITABLE) return;
+    // Hard cap: the underlying array can't exceed the file-format cap.
     if (ins.slots.length >= N_SLOTS_MAX) return;
     const slot: Slot = { ...emptySlot(), fn: code, outVar: 1 };
     model.insertSlot(instrIdx, atIdx, slot);
@@ -206,6 +262,7 @@ function renderRow(
   model: PatchModel,
   instrIdx: number,
   slotIdx: number,
+  rowIdx: number,
   slot: Slot,
   opts: SlotGridOptions,
 ): HTMLElement {
@@ -214,10 +271,14 @@ function renderRow(
   const row = document.createElement('div');
   row.className = 'slot';
   row.dataset['slot'] = String(slotIdx);
+  row.dataset['modelSlot'] = String(slotIdx);
+  row.dataset['rowIdx'] = String(rowIdx);
   row.draggable = true;
   if (opts.auditionSlot === slotIdx) row.classList.add('audition', 'active');
 
-  const num = String(slotIdx + 1).padStart(2, '0');
+  // Display 1-based position by visible row, not by model index — empty
+  // slots are hidden so the user sees a contiguous 01..N numbering.
+  const num = String(rowIdx + 1).padStart(2, '0');
   const opLabel = OP_NAME[slot.fn] ?? `op${slot.fn}`;
 
   const isClone = slot.fn === 17;

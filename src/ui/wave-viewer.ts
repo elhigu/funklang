@@ -10,10 +10,16 @@ export interface WaveViewerOptions {
 }
 
 export interface WaveViewer {
-  /** Replace the sample shown; redraw with current view + loop region. */
+  /**
+   * Replace the sample shown; redraw with current view + loop region.
+   * Pass `showLoop: false` to suppress the loop band / drag handles —
+   * the meta line still reports `loop ofs+len` when the values are set.
+   */
   setSample(
     sample: Int16Array | null,
-    region?: { loopOffset: number; loopLength: number } | undefined,
+    region?:
+      | { loopOffset: number; loopLength: number; showLoop?: boolean | undefined }
+      | undefined,
   ): void;
   destroy(): void;
 }
@@ -48,6 +54,7 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
   let sample: Int16Array | null = null;
   let loopOffset = 0;
   let loopLength = 0;
+  let showLoop = true;
 
   // View window over `sample` in source-sample indices.
   let viewStart = 0;
@@ -66,13 +73,13 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
       height: H,
       start: viewStart,
       end: viewEnd,
-      loopRegion: loopLength > 0
+      loopRegion: (showLoop && loopLength > 0)
         ? { start: loopOffset, end: loopOffset + loopLength }
         : undefined,
     });
     meta.textContent =
       `len ${sample.length} · view ${viewStart}–${viewEnd}` +
-      (loopLength > 0 ? ` · loop ${loopOffset}+${loopLength}` : '');
+      ((showLoop && loopLength > 0) ? ` · loop ${loopOffset}+${loopLength}` : '');
   };
 
   const xToSample = (clientX: number): number => {
@@ -108,8 +115,8 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
   canvas.addEventListener('mousedown', (e) => {
     if (!sample) return;
     e.preventDefault();
-    // Edge-detect loop handles first.
-    if (loopLength > 0) {
+    // Edge-detect loop handles first (only when the loop band is visible).
+    if (showLoop && loopLength > 0) {
       const xL = sampleToX(loopOffset);
       const xR = sampleToX(loopOffset + loopLength);
       const rect = canvas.getBoundingClientRect();
@@ -179,6 +186,8 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
       if (region) {
         loopOffset = region.loopOffset;
         loopLength = region.loopLength;
+        // Default to visible (legacy callers don't pass the flag).
+        showLoop = region.showLoop !== false;
       }
       if (s && (wasEmpty || viewEnd <= viewStart || viewEnd > s.length)) {
         viewStart = 0;

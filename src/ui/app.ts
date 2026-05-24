@@ -1,22 +1,60 @@
 import { PatchModel } from '../patch/model';
-import { emptyPatch } from '../patch/types';
+import { emptyPatch, N_SLOTS_EDITABLE } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
 import { parseAki, serializeAki } from '../fileio/aki';
 import { renderInstrument, CyclicCloneError } from '../dsp/engine';
 import { Player } from '../audio/player';
+import { buildCloneGraph, allDependentsOf } from '../patch/clone-graph';
+import type { CloneGraph } from '../patch/clone-graph';
 import { renderSidebar } from './sidebar';
 import { renderInstrHeader } from './instr-header';
-import { renderSlotGrid, updateSlotWaves } from './slot-grid';
+import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, saveFileBytes } from './file-dialog';
+import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
-const SAMPLE_RATE = 22050;
 const DEBOUNCE_MS = 80;
+const NOTE_LS_KEY = 'funklang.previewNote';
 
 interface AuditionState {
   instrIdx: number;
   slotIdx: number | null; // null = play final output
+}
+
+function loadStoredNote(): string {
+  try {
+    const v = localStorage.getItem(NOTE_LS_KEY);
+    if (v && NOTE_LIST.includes(v)) return v;
+  } catch { /* localStorage unavailable */ }
+  return DEFAULT_NOTE;
+}
+
+function saveStoredNote(note: string): void {
+  try { localStorage.setItem(NOTE_LS_KEY, note); }
+  catch { /* localStorage unavailable */ }
+}
+
+function instrHasOp(model: PatchModel, instrIdx: number, op: number): boolean {
+  const ins = model.patch.instruments[instrIdx];
+  if (!ins) return false;
+  for (const s of ins.slots) if (s.fn === op) return true;
+  return false;
+}
+
+function warnPatchOver16Slots(model: PatchModel): void {
+  for (let i = 0; i < model.patch.instruments.length; i++) {
+    const ins = model.patch.instruments[i]!;
+    const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
+    if (filled > N_SLOTS_EDITABLE) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[funklang] instrument ${i + 1} "${ins.name}" has ${filled} filled slots ` +
+        `(editor cap is ${N_SLOTS_EDITABLE}); existing slots remain editable but ` +
+        `no new slots can be inserted until some are removed.`,
+      );
+    }
+  }
 }
 
 export function bootApp(root: HTMLElement): void {
@@ -27,6 +65,13 @@ export function bootApp(root: HTMLElement): void {
   // File System Access handle if open via FSA; undefined otherwise.
   let patchFileHandle: FileSystemFileHandle | undefined = undefined;
   let audition: AuditionState = { instrIdx: 0, slotIdx: null };
+  let previewNote: string = loadStoredNote();
+  // Reverse clone-dependency index. Rebuilt on structure changes.
+  let cloneGraph: CloneGraph = buildCloneGraph(model.patch);
+
+  const noteOptions = NOTE_LIST
+    .map((n) => `<option value="${n}"${n === previewNote ? ' selected' : ''}>${n}</option>`)
+    .join('');
 
   root.innerHTML = `
     <div class="app">
@@ -42,6 +87,10 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-play">▶&nbsp;PLAY</button>
           <button id="btn-stop">■&nbsp;STOP</button>
           <button id="btn-retrig">↻&nbsp;RETRIG</button>
+          <label class="note-select-wrap" title="Audition note (playback rate)">
+            <span class="note-select-label">NOTE</span>
+            <select id="note-select">${noteOptions}</select>
+          </label>
         </div>
         <div class="file-info">
           <span class="file-name" id="file-name">(no patch)</span>
@@ -78,6 +127,10 @@ export function bootApp(root: HTMLElement): void {
   let waveViewer: WaveViewer | null = null;
   let lastRender: { sample: Int16Array; slotTaps: Int16Array[] } | null = null;
   let cycleError: CyclicCloneError | null = null;
+
+  const rebuildCloneGraph = (): void => {
+    cloneGraph = buildCloneGraph(model.patch);
+  };
 
   const renderMain = (): void => {
     mainEl.innerHTML = '';
@@ -156,14 +209,40 @@ export function bootApp(root: HTMLElement): void {
     }
     if (gridHostEl && lastRender) {
       updateSlotWaves(gridHostEl, lastRender.slotTaps);
+      // Also refresh canvases inside any expanded clone-blocks (they show
+      // taps from the SOURCE instrument, not the outer one). Render each
+      // visible source instrument independently and update its canvases.
+      const expanded = findExpandedCloneGrids(gridHostEl);
+      // De-dup by instrIdx (same source may be expanded under multiple
+      // parents; we render once, then update each host).
+      const renderedBySrc = new Map<number, Int16Array[]>();
+      for (const { instrIdx: srcIdx, host } of expanded) {
+        let taps = renderedBySrc.get(srcIdx);
+        if (!taps) {
+          try {
+            taps = renderInstrument(model.patch, srcIdx).slotTaps;
+            renderedBySrc.set(srcIdx, taps);
+          } catch (err) {
+            // Cyclic clone in the recursive render — skip and leave the
+            // canvases blank rather than crashing the whole pass.
+            if (!(err instanceof CyclicCloneError)) throw err;
+            continue;
+          }
+        }
+        updateSlotWaves(host, taps);
+      }
     }
     if (waveViewer) {
       const target = (audition.instrIdx === activeIdx && audition.slotIdx != null && lastRender)
         ? (lastRender.slotTaps[audition.slotIdx] ?? null)
         : (lastRender ? lastRender.sample : null);
+      // Loop overlay only when the patch uses op22 (Loop Generator) somewhere
+      // in the active instrument. The user wants the band hidden otherwise.
+      const showLoop = instrHasOp(model, activeIdx, 22);
       waveViewer.setSample(target, {
         loopOffset: ins.loopOffset,
         loopLength: ins.loopLength,
+        showLoop,
       });
     }
     if (cycleError) {
@@ -185,7 +264,7 @@ export function bootApp(root: HTMLElement): void {
       ? (lastRender.slotTaps[audition.slotIdx] ?? lastRender.sample)
       : lastRender.sample;
     if (!sample || sample.length === 0) return;
-    player.play(sample, SAMPLE_RATE);
+    player.play(sample, noteRateHz(previewNote));
   };
 
   const updateAuditionLabel = (): void => {
@@ -201,12 +280,20 @@ export function bootApp(root: HTMLElement): void {
   };
 
   model.events.on((e) => {
-    if (e.instrIdx !== activeIdx && audition.instrIdx !== e.instrIdx) {
-      // Still re-render if a dependency might affect a clone-chain in active.
-      // For simplicity, schedule a re-render whenever the audition target's
-      // instrument is touched.
-      return;
+    // Structure changes can rewire the clone graph; rebuild before we decide
+    // which instruments are affected.
+    if (e.kind === 'structure') {
+      rebuildCloneGraph();
     }
+    // The active instrument re-renders whenever IT changes OR when any
+    // instrument it (transitively) clones changes. Audition target also
+    // matters because the user may be auditioning a different instrument
+    // than activeIdx — although currently the UI keeps them aligned.
+    const affectsActive =
+      e.instrIdx === activeIdx ||
+      audition.instrIdx === e.instrIdx ||
+      allDependentsOf(cloneGraph, e.instrIdx).has(activeIdx);
+    if (!affectsActive) return;
     if (e.kind === 'structure') {
       // Layout change → full DOM rebuild + sidebar refresh.
       renderMain();
@@ -222,9 +309,13 @@ export function bootApp(root: HTMLElement): void {
     patchFileName = f.name;
     patchFileHandle = undefined;
     nameEl.textContent = patchFileName;
-    activeIdx = model.patch.instruments.findIndex(ins => ins.slots.length > 0);
+    activeIdx = model.patch.instruments.findIndex(
+      (ins) => ins.slots.some((s) => s.fn !== 0),
+    );
     if (activeIdx < 0) activeIdx = 0;
     audition = { instrIdx: activeIdx, slotIdx: null };
+    rebuildCloneGraph();
+    warnPatchOver16Slots(model);
     renderMain();
     repaint();
   });
@@ -237,6 +328,7 @@ export function bootApp(root: HTMLElement): void {
     nameEl.textContent = '(no patch)';
     activeIdx = 0;
     audition = { instrIdx: 0, slotIdx: null };
+    rebuildCloneGraph();
     renderMain();
     repaint();
   });
@@ -278,6 +370,7 @@ export function bootApp(root: HTMLElement): void {
     const stem = f.name.replace(/\.aki$/i, '');
     if (!ins.name) ins.name = stem;
     model.patch.instruments[activeIdx] = ins;
+    rebuildCloneGraph();
     model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
     renderMain();
     repaint();
@@ -288,6 +381,15 @@ export function bootApp(root: HTMLElement): void {
     const bytes = serializeAki(ins);
     const stem = (ins.name || `instr_${activeIdx + 1}`).replace(/[^\w.-]+/g, '_');
     await saveFileBytes(bytes, `${stem}.aki`, '.aki');
+  });
+
+  const noteSelect = root.querySelector('#note-select') as HTMLSelectElement;
+  noteSelect.addEventListener('change', () => {
+    previewNote = noteSelect.value;
+    saveStoredNote(previewNote);
+    // No re-render needed — the sample data is unchanged, only the
+    // playback rate moves. Replay so the user hears the new note.
+    playAudition();
   });
 
   repaint();

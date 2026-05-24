@@ -519,9 +519,14 @@ static int render_instrument(const Instr instrs[N_INSTRUMENTS],
                         || sampleBytes[srcInst] == NULL) {
                     out = 0;
                 } else {
+                    /* shift: literal val2Value, OR variable[val2] when val2 > 0
+                     * (Form1.cs case 18 line 1338-1341). */
+                    UBYTE shift = (s->val2 > 0 && s->val2 <= 4)
+                            ? (UBYTE)v[s->val2]
+                            : (UBYTE)s->val2Value;
                     out = chordgen(smp, sampleBytes[srcInst],
                                    (BYTE)s->freq, (BYTE)s->width,
-                                   (BYTE)s->val1, (UBYTE)s->val2Value);
+                                   (BYTE)s->val1, shift);
                 }
                 break;
             }
@@ -591,6 +596,21 @@ static int render_instrument(const Instr instrs[N_INSTRUMENTS],
      * the same memory state. */
     if (total >= 1) sampleBytes[idx][0] = 0;
     if (total >= 2) sampleBytes[idx][1] = 0;
+
+    /* Op 22 — Loop Generator. main-binary.c lines 83-86: if slot[15] has
+     * fn==22 (which Form1.cs translates to samplename_flag=='l'), run
+     * loopgen() over the 8-bit sample buffer to crossfade the tail with
+     * the bytes `loopLength` before `loopOffset`. The repeat_offset /
+     * repeat_length values come from the per-instrument fields in the
+     * .akp, not from any slot field.
+     *
+     * This MUTATES sampleBytes[idx] in place; any downstream chordgen /
+     * clone reading from this source instrument will see the post-loopgen
+     * bytes. The pre-truncation v1 stream (`writeOut`) is unaffected. */
+    if (N_SLOTS > 15 && ins->slots[15].fn == 22) {
+        loopgen((WORD)ins->loopLength, (WORD)ins->loopOffset,
+                sampleBytes[idx]);
+    }
 
     renderState[idx] = 2;
     return 0;

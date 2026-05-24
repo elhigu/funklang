@@ -88,7 +88,7 @@ must replicate that quirk.
 | 19   | `sh`           | `short sh(BYTE instance, short val1, UBYTE step)`                              |
 | 20   | **imported**   | NOT a function; inline expression — see §6                                     |
 | 21   | `onepole_flt`  | `short onepole_flt(BYTE instance, short val, BYTE cutoff, BYTE mode)`          |
-| 22   | **loop cfg**   | NOT a render op; configures per-instrument loop offset/length only. Skipped during render. |
+| 22   | **loop_gen**   | NOT a per-tick op; a post-render side effect — see §6.5. When slot[15].fn===22, runs `loopgen(loopLength, loopOffset, BaseAdr)` once after the per-tick render to crossfade the tail of the 8-bit sample buffer with the bytes `loopLength` before `loopOffset`. The pre-truncation v1 stream is unaffected; only the bytes that downstream clone/chordgen ops read are modified. |
 | 23   | `adsr`         | `short adsr(BYTE inst, int attackAmount, int decayAmount, int sustainLevel, int sustainLength, int releaseAmount, int peak)` |
 | 24   | `vocoder`      | declared in Form1.cs (`arrayfunctiontext[24]`) but has **no case in the code generator** and no function in synthnodes.h — effectively a no-op in v1. |
 
@@ -141,6 +141,74 @@ out = (smp < ImpLength[gain]) ? (*(BYTE*)(BaseImpAdr[gain] + smp)) << 8 : 0;
 Imported samples are delta-decoded once at load (running prefix-sum of
 signed bytes — see `main-binary.c` lines 56-62 / `main-executable.c`
 509-515) before any rendering.
+
+### 6.5 Op 22 — Loop Generator (post-render side-effect)
+
+Op 22 is not a per-tick op. It is a flag: **when `arrayfunction[i, 15] == 22`**
+(Form1.cs line 1471), the runtime applies the Loop Generator after the
+instrument's per-tick render loop finishes. The trigger is hard-coded to
+**slot index 15** (the 16th slot). Op 22 in any other slot is silently
+ignored. There is no `case 22` in the per-tick switch — Form1.cs cases 18 → 19 → 20 → 21 → 23, skipping 22, and main-binary.c does likewise.
+
+Codegen path (Form1.cs save → main-binary.c run):
+
+1. Form1.cs line 4828: if `arrayfunction[i,15] == 22`, write
+   `samplename_flag[i] = 'l';` into Ilen.h.
+2. main-binary.c lines 83-86: after the per-tick loop, if
+   `samplename_flag[i] == 'l'` then call
+   `loopgen(repeat_length[i], repeat_offset[i], BaseAdr[i])`.
+3. `repeat_offset[i]` and `repeat_length[i]` are NOT slot fields — they
+   are per-instrument values stored separately in the .akp (the GUI's
+   `loopoffset[i]` / `looplength[i]` arrays — Form1.cs case 22 panel,
+   line 2105).
+
+The C function (synthnodes.h lines 200-219):
+
+```c
+void loopgen(WORD repeat_length, WORD repeat_offset, void* BaseAdr) {
+    BYTE* src1 = BaseAdr + repeat_offset;
+    BYTE* src2 = BaseAdr + repeat_offset - repeat_length;
+    int delta = divsw((32767 << 8), repeat_length);
+    int rampup = 0;
+    int rampdown = 32767 << 8;
+    for (smp = 0; smp < repeat_length; smp++) {
+        short a = rampup >> 8;
+        short b = rampdown >> 8;
+        BYTE s1 = src1[smp];
+        BYTE s2 = src2[smp];
+        BYTE blend = (mulsw(s1, b) + mulsw(s2, a)) >> 15;
+        src1[smp] = blend;
+        rampup += delta;
+        rampdown -= delta;
+    }
+}
+```
+
+It crossfades the `repeat_length` bytes starting at `repeat_offset` with
+the `repeat_length` bytes immediately preceding `repeat_offset`, ramping
+from "all-pre-loop" at the start of the loop region to "all-post-loop"
+at the end. The result makes the loop region wrap seamlessly into itself
+when the Amiga hardware loops the sample.
+
+**Critical**: loopgen modifies the post-truncation 8-bit bytes only. The
+pre-truncation `v1` stream that refrender writes is untouched. So
+loopgen's effect is **invisible to a one-instrument render** in the bit-
+exact harness — but it IS observable when ANY downstream op17 (clone) or
+op18 (chordgen) reads from the loop-generated instrument's byte buffer.
+164 instruments across the project's test fixtures use op22, and 99
+downstream slots read from them — so the integration coverage is real.
+
+**JS / refrender implementation**:
+- `funklang/src/dsp/ops/loop_gen.ts` — `applyLoopGen(bytes, off, len)`.
+- `funklang/src/dsp/engine.ts` — calls `applyLoopGen()` in the post-tick
+  block (after writing the 8-bit byte buffer, before returning); the
+  bytes are then handed to any caller that uses this instrument as a
+  clone/chordgen source via `RenderResult.bytes`.
+- `funklang/tools/refrender/refrender.c` — calls `loopgen()` in the
+  matching post-tick block of `render_instrument()`.
+- Tests: `funklang/tests/dsp/loop_gen.test.ts` covers (a) the trigger
+  predicate, (b) bytes mutation, (c) v1 stream is unaffected, and (d)
+  downstream chordgen sees the modified bytes and JS↔C still match.
 
 ## 7. Render driver (paraphrase of `main-binary.c::synth`)
 
@@ -214,7 +282,7 @@ Key observations driving the refrender design:
 | 19 sh          | `j` → instance ; `val1` (v1..v4) ; `gain`/`gainVal` → step                  |
 | 20 imported    | inline; `gain` → import index                                               |
 | 21 onepole_flt | `j` → instance ; `val1` (v1..v4) ; `freq`/`freqVal` → cutoff ; raw `gain` byte → mode |
-| 22 loop cfg    | (skipped; only sets per-instrument loopOffset/looplength)                   |
+| 22 loop_gen    | NO slot args (per-tick); post-render uses the instrument's `loopOffset`/`loopLength` fields. Trigger is hard-coded to slot index 15 only — see §6.5. |
 | 23 adsr        | `j` → instance ; pre-computed integers derived from val2Value/val1Value/freqVal/widthVal/gainVal — see Form1.cs lines 5491-5530. The harness must mirror that computation. |
 | 24 vocoder     | (no-op in v1)                                                               |
 
@@ -245,3 +313,45 @@ int    releaseAmt  = sustainVal                 / releaseTicks;
 The refrender harness performs this same computation at slot-dispatch
 time, once per render (cached per slot would also be valid but the
 overhead is trivial).
+
+## 10. Notes on op 18 (`chordgen`) — verification trace
+
+User feedback in v1 testing was that chordgen sounded different from
+real Klang. Cross-verification of three independent sources confirms our
+implementation:
+
+| Source                                              | n1 field             | n2 field             | n3 field             | shift field         | source idx           |
+|-----------------------------------------------------|----------------------|----------------------|----------------------|---------------------|----------------------|
+| synthnodes.h prototype                              | BYTE                 | BYTE                 | BYTE                 | UBYTE               | BaseAdr arg          |
+| Form1.cs case 18 (line 1333-1343)                   | `arrayfrequency`     | `arraywidth`         | `arrayval1`          | `arrayval2value`†   | `arraygain`          |
+| Form1.cs GUI panel binding (line 2056-2080)         | ComboBoxChordNote1   | ComboBoxChordNote2   | ComboBoxChordNote3   | ComboBoxChordShift  | ComboBoxChordSamplenr|
+| refrender.c case 18 (line 516-527)                  | `s->freq`            | `s->width`           | `s->val1`            | `s->val2Value`      | `s->gain`            |
+| funklang JS `op_chordgen` (`ops/chordgen.ts`)       | `slot.freq`          | `slot.width`         | `slot.val1`          | `slot.val2Value`    | `slot.gain`          |
+
+†When `arrayval2 > 0` the GUI uses `variable[arrayval2]` instead of the
+literal — meaning shift can be modulated by a v1..v4 variable. Both
+`ops/chordgen.ts` and `refrender.c case 18` implement this branch (added
+2026-05); prior to that revision both forced the literal path. No
+existing test patch exercises the variable branch but the implementation
+is now faithful to the GUI's semantics.
+
+The likely cause of the audio mismatch user reported is NOT chordgen
+itself but its INTERACTION with op 22 (loop_gen). In real Klang the
+loop generator writes to bytes that chordgen subsequently reads. Before
+the §6.5 fix, our renderer skipped op 22 entirely — so any chordgen
+reading from a loop-generated source saw the un-crossfaded bytes,
+which would sound subtly (or grossly) different. With op 22 wired in,
+99 chordgen/clone slots across the project's test patches now produce
+DIFFERENT v1 output than before, and JS still matches C bit-exact on
+all 403 paired renders.
+
+A residual concern remains: chordgen's transposed reads frequently go
+OUT OF BOUNDS of the source buffer (the `mulsw(sample, 483) >> 8` step
+can reach ≈ 1.9× the sample length). In real Amiga RAM, OOB reads see
+the NEXT instrument's bytes (everything lives in one contiguous
+ModAdr). Our refrender (and now our JS engine) over-allocates the
+byte buffer with a 64 KiB zero-padded tail and reads zeros for OOB —
+so JS↔C match, but neither matches actual Amiga playback for chord
+chains that bleed across instrument boundaries. Validating that path
+requires an Amiga emulator round-trip (e.g. running the generated
+Hatari/.adf through WinUAE and capturing audio).

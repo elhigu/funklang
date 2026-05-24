@@ -47,6 +47,12 @@ export const OPS: Record<number, OpFn> = {
   19: op_sh,
   20: op_imported_sample,
   21: op_onepole_flt,
+  // Code 22 (loop_gen) intentionally has NO per-tick op. It is a post-render
+  // side-effect: when slot[15] of an instrument has fn==22, the engine runs
+  // applyLoopGen() over the instrument's 8-bit byte buffer after all v1
+  // values have been written (mirrors main-binary.c lines 83-86 / Form1.cs
+  // lines 1471-1474). See src/dsp/ops/loop_gen.ts and the engine's post-
+  // render block in renderInstrument().
   23: op_adsr,
   // Code 24 (vocoder) is intentionally a no-op: declared in Form1.cs but
   // has no implementation in synthnodes.h. refrender.c case 24 returns 0.
