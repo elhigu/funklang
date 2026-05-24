@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>klang.web · editor mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-0: #0a0a0c;
+    --bg-1: #11111a;
+    --bg-2: #181826;
+    --bg-3: #1f1f30;
+    --fg-0: #e8dcc0;
+    --fg-1: #a59880;
+    --fg-2: #5e5444;
+    --amber: #ffb14e;
+    --amber-dim: #c4831e;
+    --amber-glow: rgba(255, 177, 78, 0.18);
+    --magenta: #ff2d92;
+    --magenta-glow: rgba(255, 45, 146, 0.25);
+    --cyan: #38e8ff;
+    --green: #7be17b;
+    --red: #ff4a5b;
+    --grid: #2a2a3c;
+    --grid-dim: #1d1d2a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg-0);
+    color: var(--fg-0);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* CRT scanline overlay across the entire viewport */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      rgba(0,0,0,0.18) 2px,
+      rgba(0,0,0,0.18) 3px
+    );
+    pointer-events: none;
+    z-index: 100;
+    mix-blend-mode: multiply;
+  }
+  /* Faint phosphor vignette */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.55) 100%);
+    pointer-events: none;
+    z-index: 101;
+  }
+
+  .app {
+    display: grid;
+    grid-template-rows: 44px 1fr 30px;
+    grid-template-columns: 240px 1fr;
+    grid-template-areas:
+      "header header"
+      "sidebar main"
+      "footer  footer";
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ─── header ────────────────────────────────────────────── */
+  header {
+    grid-area: header;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--grid);
+    display: grid;
+    grid-template-columns: 240px 1fr auto;
+    align-items: stretch;
+  }
+  .brand {
+    border-right: 1px solid var(--grid);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    font-family: 'Silkscreen', monospace;
+    color: var(--amber);
+    letter-spacing: 0.5px;
+  }
+  .brand .dot {
+    width: 8px; height: 8px;
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+    animation: pulse 1.4s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+  .menu {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .menu button {
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--grid-dim);
+    color: var(--fg-1);
+    font: inherit;
+    padding: 0 14px;
+    height: 100%;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+  .menu button:hover { color: var(--amber); background: var(--bg-2); }
+
+  .file-info {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 0 18px;
+    color: var(--fg-1);
+    font-size: 11px;
+    letter-spacing: 0.4px;
+  }
+  .file-info .file-name {
+    color: var(--fg-0);
+  }
+  .file-info .file-stats {
+    color: var(--amber-dim);
+  }
+
+  /* ─── sidebar : instrument list ─────────────────────────── */
+  .sidebar {
+    grid-area: sidebar;
+    background: var(--bg-1);
+    border-right: 1px solid var(--grid);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-title {
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    color: var(--amber-dim);
+    padding: 12px 14px 8px;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid var(--grid-dim);
+  }
+  .instr-list {
+    list-style: none;
+    flex: 1;
+  }
+  .instr-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 24px;
+    align-items: center;
+    padding: 5px 12px 5px 0;
+    border-bottom: 1px solid var(--grid-dim);
+    cursor: pointer;
+    color: var(--fg-1);
+    transition: background 60ms linear;
+    position: relative;
+  }
+  .instr-row:hover {
+    background: var(--bg-2);
+    color: var(--fg-0);
+  }
+  .instr-row.active {
+    background: var(--bg-3);
+    color: var(--amber);
+  }
+  .instr-row.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--amber);
+    box-shadow: 0 0 6px var(--amber);
+  }
+  .instr-row .num {
+    text-align: right;
+    padding: 0 10px;
+    color: var(--fg-2);
+    font-size: 11px;
+  }
+  .instr-row.active .num { color: var(--amber-dim); }
+  .instr-row .name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+  .instr-row.empty .name { color: var(--fg-2); font-style: italic; }
+  .instr-row .size {
+    font-size: 10px;
+    color: var(--fg-2);
+    text-align: right;
+  }
+
+  /* ─── main editor ───────────────────────────────────────── */
+  main {
+    grid-area: main;
+    overflow-y: auto;
+    background: var(--bg-0);
+    display: flex;
+    flex-direction: column;
+  }
+  .instr-header {
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--grid);
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 16px;
+  }
+  .instr-title {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .instr-title .label {
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    color: var(--amber-dim);
+    letter-spacing: 0.8px;
+  }
+  .instr-title .name {
+    font-family: 'Silkscreen', monospace;
+    font-size: 22px;
+    color: var(--amber);
+    letter-spacing: 1px;
+    text-shadow: 0 0 18px var(--amber-glow);
+  }
+  .instr-meta {
+    display: flex;
+    gap: 22px;
+    color: var(--fg-1);
+    font-size: 11px;
+    letter-spacing: 0.4px;
+  }
+  .instr-meta .pair {
+    display: flex;
+    gap: 8px;
+  }
+  .instr-meta .k { color: var(--fg-2); text-transform: uppercase; }
+  .instr-meta .v { color: var(--fg-0); }
+
+  /* slot grid header */
+  .grid-head {
+    display: grid;
+    grid-template-columns: 38px 56px 124px 1fr 220px;
+    gap: 1px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--grid);
+    padding: 6px 0;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .grid-head > div {
+    padding: 0 14px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+    color: var(--amber-dim);
+    letter-spacing: 0.8px;
+  }
+
+  /* slot rows */
+  .slots {
+    flex: 1;
+  }
+  .slot {
+    display: grid;
+    grid-template-columns: 38px 56px 124px 1fr 220px;
+    gap: 1px;
+    align-items: center;
+    border-bottom: 1px solid var(--grid-dim);
+    min-height: 44px;
+    position: relative;
+    cursor: pointer;
+    transition: background 60ms linear;
+  }
+  .slot:hover { background: var(--bg-1); }
+  .slot.active {
+    background: var(--bg-2);
+  }
+  .slot.audition::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--magenta);
+    box-shadow: 0 0 8px var(--magenta);
+  }
+  .slot.empty { color: var(--fg-2); min-height: 28px; }
+
+  .slot .col {
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+  }
+  .slot .col-num {
+    color: var(--fg-2);
+    font-size: 11px;
+    justify-content: flex-end;
+    position: relative;
+  }
+  .slot:not(.empty) .col-num {
+    cursor: grab;
+  }
+  .slot:not(.empty) .col-num::before {
+    content: '⋮⋮';
+    position: absolute;
+    left: 4px;
+    color: var(--fg-2);
+    opacity: 0;
+    transition: opacity 80ms linear;
+    letter-spacing: -3px;
+    font-size: 14px;
+  }
+  .slot:not(.empty):hover .col-num::before { opacity: 0.7; }
+  .slot.dragging { opacity: 0.35; }
+  .slot.drop-above {
+    box-shadow: inset 0 2px 0 0 var(--magenta);
+  }
+  .slot.drop-below {
+    box-shadow: inset 0 -2px 0 0 var(--magenta);
+  }
+  .slot.active .col-num { color: var(--amber-dim); }
+
+  .slot .col-out {
+    color: var(--cyan);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .slot.empty .col-out { color: var(--fg-2); }
+
+  .slot .col-op {
+    color: var(--amber);
+    letter-spacing: 0.3px;
+  }
+  .slot.empty .col-op { color: var(--fg-2); }
+
+  /* params: each param = label + bar + value */
+  .params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 6px 14px;
+  }
+  .param {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    user-select: none;
+  }
+  .param .pname {
+    color: var(--fg-1);
+    letter-spacing: 0.3px;
+    text-transform: lowercase;
+  }
+  .param .pbar {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--amber);
+    cursor: ns-resize;
+    letter-spacing: -1px;
+    user-select: none;
+  }
+  .param .pval {
+    color: var(--fg-0);
+    font-variant-numeric: tabular-nums;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* waveform canvas */
+  .wave-cell {
+    padding: 4px 14px 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  canvas.wave {
+    background: #050507;
+    border: 1px solid var(--grid-dim);
+    image-rendering: pixelated;
+    display: block;
+  }
+  .wave-cell .wave-meta {
+    font-size: 10px;
+    color: var(--fg-2);
+    text-align: right;
+    line-height: 1.2;
+  }
+
+  /* ─── footer / transport ────────────────────────────────── */
+  footer {
+    grid-area: footer;
+    background: var(--bg-1);
+    border-top: 1px solid var(--grid);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    padding: 0 14px;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--fg-1);
+  }
+  .transport {
+    display: flex;
+    gap: 1px;
+  }
+  .transport button {
+    background: var(--bg-2);
+    border: 1px solid var(--grid);
+    color: var(--fg-0);
+    font: inherit;
+    font-size: 13px;
+    padding: 3px 12px;
+    cursor: pointer;
+    letter-spacing: 0.4px;
+  }
+  .transport button:hover { background: var(--bg-3); color: var(--amber); }
+  .transport button.play.active { color: var(--green); border-color: var(--green); box-shadow: inset 0 0 8px rgba(123,225,123,0.2); }
+  .transport button.stop:hover { color: var(--red); border-color: var(--red); }
+
+  .footer-status {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+  }
+  .footer-status .k { color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .footer-status .v { color: var(--fg-0); font-variant-numeric: tabular-nums; }
+  .footer-status .audition {
+    color: var(--magenta);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .footer-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--fg-2);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  .footer-right .blink { animation: blink 1.2s infinite; color: var(--amber); }
+  @keyframes blink { 0%,49%{opacity:1;} 50%,100%{opacity:0;} }
+
+  /* scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; background: var(--bg-1); }
+  ::-webkit-scrollbar-thumb { background: var(--bg-3); border: 2px solid var(--bg-1); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--amber-dim); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <div class="dot"></div>
+      <span>KLANG.WEB</span>
+    </div>
+    <div class="menu">
+      <button>NEW</button>
+      <button>OPEN</button>
+      <button>SAVE</button>
+      <button>EXPORT&nbsp;.AKP</button>
+    </div>
+    <div class="file-info">
+      <span class="file-name" id="fileName">loctro5_3_chippisamplea.akp</span>
+      <span class="file-stats"><span id="instrCount">7</span>/31 INSTRUMENTS · 24,653 BYTES</span>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="sidebar-title">PATCH · INSTRUMENTS</div>
+    <ul class="instr-list" id="instrList"></ul>
+  </aside>
+
+  <main>
+    <div class="instr-header">
+      <div class="instr-title">
+        <span class="label">INSTRUMENT</span>
+        <span class="label" id="instrNum">01</span>
+        <span class="name" id="instrName">saw saw</span>
+      </div>
+      <div class="instr-meta">
+        <div class="pair"><span class="k">length</span><span class="v" id="metaLen">4096</span></div>
+        <div class="pair"><span class="k">loop ofs</span><span class="v" id="metaLoopOfs">0</span></div>
+        <div class="pair"><span class="k">loop len</span><span class="v" id="metaLoopLen">0</span></div>
+        <div class="pair"><span class="k">final</span><span class="v" id="metaFinal" style="color:var(--cyan)">v4</span></div>
+      </div>
+    </div>
+
+    <div class="grid-head">
+      <div style="text-align:right">#</div>
+      <div>OUT</div>
+      <div>FUNCTION</div>
+      <div>PARAMETERS</div>
+      <div>WAVEFORM</div>
+    </div>
+
+    <div class="slots" id="slots"></div>
+  </main>
+
+  <footer>
+    <div class="transport">
+      <button class="play" id="btnPlay">▶ PLAY</button>
+      <button class="stop" id="btnStop">■ STOP</button>
+      <button id="btnRetrig">↻ RETRIG</button>
+    </div>
+    <div class="footer-status">
+      <div><span class="k">audition →</span> <span class="audition" id="auditionSlot">slot 07 · v4</span></div>
+      <div><span class="k">rate</span> <span class="v">22050 Hz</span></div>
+      <div><span class="k">format</span> <span class="v">8-bit signed (Paula)</span></div>
+    </div>
+    <div class="footer-right">
+      <span class="blink">●</span>
+      <span>READY</span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+/* ────────────────────────────────────────────────────────────
+   mockup data — represents what would come from a real .akp
+   parse. Realistic-ish structure: 7 used instruments + 24 empty.
+   Each instrument has up to 20 slots; each slot has:
+     out: 'v1'|'v2'|'v3'|'v4'
+     op:  function name
+     params: { name: { val, max } }
+   We don't run real DSP — waveforms are drawn from synthesized
+   shapes based on op + params, just enough to look alive.
+   ──────────────────────────────────────────────────────────── */
+
+const PATCH = [
+  { name: 'saw saw',        len: 4096, loopOfs: 0,    loopLen: 0, final: 'v4', slots: [
+      { out:'v1', op:'osc_saw',     params:{ freq:{v:2048,max:32767}, gain:{v:80,max:255} } },
+      { out:'v2', op:'osc_saw',     params:{ freq:{v:4096,max:32767}, gain:{v:64,max:255} } },
+      { out:'v3', op:'add',         params:{ val1:{v:0,max:0}, val2:{v:0,max:0} }, mix:['v1','v2'] },
+      { out:'v3', op:'enva',        params:{ attack:{v:14,max:255}, gain:{v:120,max:255} } },
+      { out:'v3', op:'envd',        params:{ decay:{v:32,max:255}, sustain:{v:96,max:255}, gain:{v:100,max:255} } },
+      { out:'v3', op:'onepole_flt', params:{ freq:{v:180,max:255}, gain:{v:255,max:255} } },
+      { out:'v4', op:'vol',         params:{ gain:{v:110,max:255} } },
+  ]},
+  { name: 'pulse pad',      len: 8192, loopOfs: 1024, loopLen: 2048, final: 'v4', slots: [
+      { out:'v1', op:'osc_pulse',   params:{ freq:{v:1024,max:32767}, gain:{v:90,max:255}, duty:{v:32,max:63} } },
+      { out:'v2', op:'osc_pulse',   params:{ freq:{v:1030,max:32767}, gain:{v:90,max:255}, duty:{v:48,max:63} } },
+      { out:'v3', op:'add',         params:{}, mix:['v1','v2'] },
+      { out:'v3', op:'sv_flt_n',    params:{ freq:{v:120,max:255}, res:{v:180,max:255}, mode:{v:0,max:3} } },
+      { out:'v3', op:'reverb',      params:{ time:{v:160,max:255}, mix:{v:90,max:255} } },
+      { out:'v4', op:'vol',         params:{ gain:{v:100,max:255} } },
+  ]},
+  { name: 'kick',           len: 2048, loopOfs: 0, loopLen: 0, final: 'v4', slots: [
+      { out:'v1', op:'osc_sine',    params:{ freq:{v:512,max:32767}, gain:{v:200,max:255} } },
+      { out:'v2', op:'enva',        params:{ attack:{v:4,max:255}, gain:{v:255,max:255} }, mix:['v1'] },
+      { out:'v2', op:'envd',        params:{ decay:{v:28,max:255}, sustain:{v:0,max:255}, gain:{v:255,max:255} } },
+      { out:'v3', op:'distortion',  params:{ gain:{v:48,max:255} }, mix:['v2'] },
+      { out:'v4', op:'vol',         params:{ gain:{v:200,max:255} } },
+  ]},
+  { name: 'hat',            len: 1024, loopOfs: 0, loopLen: 0, final: 'v4', slots: [
+      { out:'v1', op:'osc_noise',   params:{ gain:{v:90,max:255} } },
+      { out:'v1', op:'enva',        params:{ attack:{v:2,max:255}, gain:{v:255,max:255} } },
+      { out:'v1', op:'envd',        params:{ decay:{v:18,max:255}, sustain:{v:0,max:255}, gain:{v:255,max:255} } },
+      { out:'v2', op:'sv_flt_n',    params:{ freq:{v:230,max:255}, res:{v:100,max:255}, mode:{v:2,max:3} }, mix:['v1'] },
+      { out:'v4', op:'vol',         params:{ gain:{v:80,max:255} } },
+  ]},
+  { name: 'snare',          len: 2048, loopOfs: 0, loopLen: 0, final: 'v4', slots: [
+      { out:'v1', op:'osc_noise',   params:{ gain:{v:160,max:255} } },
+      { out:'v2', op:'osc_tri',     params:{ freq:{v:800,max:32767}, gain:{v:140,max:255} } },
+      { out:'v3', op:'add',         params:{}, mix:['v1','v2'] },
+      { out:'v3', op:'envd',        params:{ decay:{v:36,max:255}, sustain:{v:8,max:255}, gain:{v:255,max:255} } },
+      { out:'v4', op:'vol',         params:{ gain:{v:130,max:255} } },
+  ]},
+  { name: 'bass',           len: 8192, loopOfs: 2048, loopLen: 1024, final: 'v4', slots: [
+      { out:'v1', op:'osc_saw',     params:{ freq:{v:512,max:32767}, gain:{v:140,max:255} } },
+      { out:'v1', op:'sv_flt_n',    params:{ freq:{v:60,max:255}, res:{v:160,max:255}, mode:{v:0,max:3} } },
+      { out:'v2', op:'enva',        params:{ attack:{v:6,max:255}, gain:{v:255,max:255} }, mix:['v1'] },
+      { out:'v2', op:'envd',        params:{ decay:{v:80,max:255}, sustain:{v:120,max:255}, gain:{v:255,max:255} } },
+      { out:'v4', op:'vol',         params:{ gain:{v:128,max:255} } },
+  ]},
+  { name: 'fm bell',        len: 4096, loopOfs: 0, loopLen: 0, final: 'v4', slots: [
+      { out:'v1', op:'osc_sine',    params:{ freq:{v:880,max:32767}, gain:{v:60,max:255} } },
+      { out:'v2', op:'osc_sine',    params:{ freq:{v:2200,max:32767}, gain:{v:90,max:255} } },
+      { out:'v3', op:'mul',         params:{}, mix:['v1','v2'] },
+      { out:'v3', op:'enva',        params:{ attack:{v:2,max:255}, gain:{v:255,max:255} } },
+      { out:'v3', op:'envd',        params:{ decay:{v:50,max:255}, sustain:{v:20,max:255}, gain:{v:255,max:255} } },
+      { out:'v4', op:'vol',         params:{ gain:{v:110,max:255} } },
+  ]},
+];
+
+/* ─── tiny waveform synthesizer for the per-slot mini canvases ───
+   Not the real Klang DSP — that's what we'll port for real later.
+   This just produces shapes that visually match the operator type. */
+function renderSlotWave(canvas, slot, sampleLen=128) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#050507';
+  ctx.fillRect(0,0,W,H);
+
+  // zero line
+  ctx.fillStyle = '#2a2a3c';
+  ctx.fillRect(0, H/2|0, W, 1);
+
+  // synth shape
+  const data = new Float32Array(W);
+  const p = slot.params || {};
+  const freq = (p.freq?.v ?? 1024) / 32767;
+  const gain = (p.gain?.v ?? 128) / 255;
+  const duty = (p.duty?.v ?? 32) / 63;
+  const cycles = Math.max(0.5, freq * 14);
+  switch (slot.op) {
+    case 'osc_saw':
+      for (let x=0;x<W;x++) data[x] = (((x/W)*cycles) % 1) * 2 - 1;
+      break;
+    case 'osc_tri':
+      for (let x=0;x<W;x++) {
+        const t = ((x/W)*cycles) % 1;
+        data[x] = t < 0.5 ? t*4 - 1 : 3 - t*4;
+      }
+      break;
+    case 'osc_sine':
+      for (let x=0;x<W;x++) data[x] = Math.sin((x/W)*cycles*Math.PI*2);
+      break;
+    case 'osc_pulse':
+      for (let x=0;x<W;x++) {
+        const t = ((x/W)*cycles) % 1;
+        data[x] = t < duty ? -1 : 1;
+      }
+      break;
+    case 'osc_noise':
+      for (let x=0;x<W;x++) data[x] = Math.random()*2-1;
+      break;
+    case 'enva':
+      for (let x=0;x<W;x++) data[x] = Math.min(1, x / (W*0.3)) * Math.sin(x*0.6);
+      break;
+    case 'envd':
+      for (let x=0;x<W;x++) data[x] = Math.exp(-x/(W*0.4)) * Math.sin(x*0.5);
+      break;
+    case 'add':
+      for (let x=0;x<W;x++) data[x] = 0.5*Math.sin((x/W)*8*Math.PI*2) + 0.5*Math.sin((x/W)*5*Math.PI*2);
+      break;
+    case 'mul':
+      for (let x=0;x<W;x++) data[x] = Math.sin((x/W)*3*Math.PI*2) * Math.sin((x/W)*17*Math.PI*2);
+      break;
+    case 'vol':
+      for (let x=0;x<W;x++) data[x] = Math.sin((x/W)*4*Math.PI*2) * 0.9;
+      break;
+    case 'distortion':
+      for (let x=0;x<W;x++) {
+        const s = Math.sin((x/W)*4*Math.PI*2)*3;
+        data[x] = Math.tanh(s);
+      }
+      break;
+    case 'sv_flt_n':
+    case 'onepole_flt':
+      for (let x=0;x<W;x++) data[x] = Math.sin((x/W)*5*Math.PI*2) * 0.8;
+      break;
+    case 'reverb':
+      for (let x=0;x<W;x++) data[x] = Math.sin((x/W)*4*Math.PI*2) * Math.exp(-x/W*0.5) * 0.7;
+      break;
+    default:
+      for (let x=0;x<W;x++) data[x] = 0;
+  }
+
+  // amber phosphor stroke
+  ctx.strokeStyle = '#ffb14e';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x=0;x<W;x++) {
+    const y = H/2 - data[x] * gain * (H/2 - 2);
+    if (x===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // faint glow underline (two pass)
+  ctx.globalAlpha = 0.25;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1;
+}
+
+/* ─── unicode-bar "knob" renderer ─────────────────────────────── */
+function bar(val, max, width = 6) {
+  const ratio = Math.max(0, Math.min(1, val/max));
+  const filled = Math.round(ratio * width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+/* ─── state ───────────────────────────────────────────────────── */
+let activeInstr = 0;
+let activeSlot = 6; // 0-indexed; default = last slot of saw saw (v4 output)
+let isPlaying = false;
+
+/* ─── render functions ────────────────────────────────────────── */
+function renderInstrList() {
+  const list = document.getElementById('instrList');
+  list.innerHTML = '';
+  for (let i = 0; i < 31; i++) {
+    const inst = PATCH[i];
+    const li = document.createElement('li');
+    li.className = 'instr-row' + (inst ? '' : ' empty') + (i === activeInstr ? ' active' : '');
+    const num = String(i+1).padStart(2,'0');
+    const name = inst ? inst.name : '—';
+    const size = inst ? (inst.len >= 1024 ? (inst.len/1024).toFixed(1)+'K' : inst.len) : '';
+    li.innerHTML = `
+      <span class="num">${num}</span>
+      <span class="name">${name}</span>
+      <span class="size">${size}</span>
+    `;
+    li.addEventListener('click', () => {
+      if (!inst) return;
+      activeInstr = i;
+      activeSlot = inst.slots.length - 1;
+      renderAll();
+    });
+    list.appendChild(li);
+  }
+}
+
+function renderInstr() {
+  const inst = PATCH[activeInstr];
+  document.getElementById('instrNum').textContent = String(activeInstr+1).padStart(2,'0');
+  document.getElementById('instrName').textContent = inst.name;
+  document.getElementById('metaLen').textContent = inst.len.toLocaleString();
+  document.getElementById('metaLoopOfs').textContent = inst.loopOfs;
+  document.getElementById('metaLoopLen').textContent = inst.loopLen;
+  document.getElementById('metaFinal').textContent = inst.final;
+}
+
+function renderSlots() {
+  const inst = PATCH[activeInstr];
+  const container = document.getElementById('slots');
+  container.innerHTML = '';
+
+  for (let i = 0; i < 20; i++) {
+    const slot = inst.slots[i];
+    const row = document.createElement('div');
+    const isAudition = i === activeSlot && slot;
+    row.className = 'slot' + (slot ? '' : ' empty') + (isAudition ? ' audition active' : '');
+    if (slot) {
+      row.addEventListener('click', () => {
+        activeSlot = i;
+        renderSlots();
+        updateAuditionStatus();
+      });
+      // drag-to-reorder
+      row.draggable = true;
+      row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', String(i));
+        e.dataTransfer.effectAllowed = 'move';
+        row.classList.add('dragging');
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        document.querySelectorAll('.slot.drop-above,.slot.drop-below')
+          .forEach(el => el.classList.remove('drop-above','drop-below'));
+      });
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = row.getBoundingClientRect();
+        const above = (e.clientY - rect.top) < rect.height / 2;
+        row.classList.toggle('drop-above', above);
+        row.classList.toggle('drop-below', !above);
+      });
+      row.addEventListener('dragleave', () => {
+        row.classList.remove('drop-above', 'drop-below');
+      });
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const rect = row.getBoundingClientRect();
+        const above = (e.clientY - rect.top) < rect.height / 2;
+        let to = above ? i : i + 1;
+        if (from === to || from === to - 1) return;
+        const slots = PATCH[activeInstr].slots;
+        if (from >= slots.length) return;
+        const [moved] = slots.splice(from, 1);
+        if (to > from) to -= 1;
+        slots.splice(Math.min(to, slots.length), 0, moved);
+        activeSlot = Math.min(to, slots.length - 1);
+        renderSlots();
+        updateAuditionStatus();
+      });
+    }
+
+    const num = String(i+1).padStart(2,'0');
+
+    if (!slot) {
+      row.innerHTML = `
+        <div class="col col-num">${num}</div>
+        <div class="col col-out">·</div>
+        <div class="col col-op">— empty —</div>
+        <div class="col"></div>
+        <div class="col wave-cell"></div>
+      `;
+    } else {
+      const paramsHtml = Object.entries(slot.params || {}).map(([name, p]) => `
+        <div class="param" data-slot="${i}" data-param="${name}">
+          <span class="pname">${name}</span>
+          <span class="pbar">${bar(p.v, p.max || 255)}</span>
+          <span class="pval">${p.v}</span>
+        </div>
+      `).join('') || (slot.mix
+        ? `<div class="param"><span class="pname">inputs</span><span class="pval" style="color:var(--cyan)">${slot.mix.join(' + ')}</span></div>`
+        : '');
+
+      row.innerHTML = `
+        <div class="col col-num">${num}</div>
+        <div class="col col-out">${slot.out}</div>
+        <div class="col col-op">${slot.op}</div>
+        <div class="col"><div class="params">${paramsHtml}</div></div>
+        <div class="col wave-cell">
+          <canvas class="wave" width="160" height="32"></canvas>
+          <div class="wave-meta">→ ${slot.out}<br><span style="color:var(--fg-2)">tap</span></div>
+        </div>
+      `;
+      const canvas = row.querySelector('canvas');
+      renderSlotWave(canvas, slot);
+
+      // attach knob drag
+      row.querySelectorAll('.param').forEach(p => {
+        const pname = p.dataset.param;
+        const param = slot.params[pname];
+        if (!param) return;
+        const bar_el = p.querySelector('.pbar');
+        const val_el = p.querySelector('.pval');
+        bar_el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          const startY = e.clientY;
+          const startV = param.v;
+          const max = param.max || 255;
+          const onMove = (ev) => {
+            const dy = startY - ev.clientY;
+            const newV = Math.max(0, Math.min(max, Math.round(startV + dy * (max/120))));
+            param.v = newV;
+            bar_el.textContent = bar(newV, max);
+            val_el.textContent = newV;
+            renderSlotWave(canvas, slot);
+          };
+          const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+      });
+    }
+    container.appendChild(row);
+  }
+}
+
+function updateAuditionStatus() {
+  const inst = PATCH[activeInstr];
+  const slot = inst.slots[activeSlot];
+  const el = document.getElementById('auditionSlot');
+  if (slot) {
+    el.textContent = `slot ${String(activeSlot+1).padStart(2,'0')} · ${slot.out}`;
+  } else {
+    el.textContent = '—';
+  }
+}
+
+function renderAll() {
+  renderInstrList();
+  renderInstr();
+  renderSlots();
+  updateAuditionStatus();
+  document.getElementById('instrCount').textContent = PATCH.filter(Boolean).length;
+}
+
+/* transport */
+document.getElementById('btnPlay').addEventListener('click', (e) => {
+  isPlaying = !isPlaying;
+  e.target.classList.toggle('active', isPlaying);
+  e.target.textContent = isPlaying ? '▶ PLAYING' : '▶ PLAY';
+});
+document.getElementById('btnStop').addEventListener('click', (e) => {
+  isPlaying = false;
+  const p = document.getElementById('btnPlay');
+  p.classList.remove('active');
+  p.textContent = '▶ PLAY';
+});
+document.getElementById('btnRetrig').addEventListener('click', () => {
+  // visual blip
+  const dot = document.querySelector('.brand .dot');
+  dot.style.background = 'var(--magenta)';
+  dot.style.boxShadow = '0 0 10px var(--magenta)';
+  setTimeout(() => {
+    dot.style.background = 'var(--amber)';
+    dot.style.boxShadow = '0 0 8px var(--amber)';
+  }, 180);
+});
+
+renderAll();
+</script>
+</body>
+</html>
