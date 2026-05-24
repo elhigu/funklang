@@ -12,7 +12,7 @@ import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
-import { openFileBytes, saveFileBytes } from './file-dialog';
+import { openFileBytes, openFileWithHandle, saveFileBytes, saveToHandle } from './file-dialog';
 import { attachWheelStep } from './wheel';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
@@ -105,9 +105,6 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-export">EXPORT&nbsp;.AKI</button>
           <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶&nbsp;UNDO</button>
           <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷&nbsp;REDO</button>
-          <button id="btn-play">▶&nbsp;PLAY</button>
-          <button id="btn-stop">■&nbsp;STOP</button>
-          <button id="btn-retrig">↻&nbsp;RETRIG</button>
           <label class="note-select-wrap" title="Audition note (playback rate)">
             <span class="note-select-label">NOTE</span>
             <select id="note-select">${noteOptions}</select>
@@ -115,6 +112,7 @@ export function bootApp(root: HTMLElement): void {
           <label class="output-select-wrap" title="Which signal is sent to the audio output">
             <span class="output-select-label">OUTPUT</span>
             <select id="output-select"></select>
+            <button id="btn-audio-toggle" class="audio-toggle on" title="Audio on — click to mute (changes still re-render). Spacebar replays.">●</button>
           </label>
         </div>
         <div class="file-info">
@@ -389,7 +387,10 @@ export function bootApp(root: HTMLElement): void {
     gridHostEl.prepend(banner);
   };
 
+  let audioEnabled = true;
+
   const playAudition = (): void => {
+    if (!audioEnabled) return;
     if (!lastRender) return;
     // Playback ALWAYS uses outputTarget (never selection).
     const sample = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null)
@@ -397,6 +398,16 @@ export function bootApp(root: HTMLElement): void {
       : lastRender.sample;
     if (!sample || sample.length === 0) return;
     player.play(sample, noteRateHz(previewNote));
+  };
+
+  /** Replay whatever's already rendered (does not re-run DSP). Used by spacebar. */
+  const retriggerAudio = (): void => {
+    if (!audioEnabled) return;
+    if (!lastRender) {
+      // Nothing rendered yet — produce one and play.
+      runRender();
+    }
+    playAudition();
   };
 
   const updateLabels = (): void => {
@@ -475,21 +486,39 @@ export function bootApp(root: HTMLElement): void {
     updateUndoRedoButtons();
   });
 
-  // Keyboard shortcuts: Ctrl+Z / Ctrl+Shift+Z (and Cmd on Mac).
+  // Keyboard shortcuts: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y / Ctrl+S / Ctrl+Shift+S
+  // (and Cmd on Mac). Ctrl+S intercepts ALWAYS so it overrides the browser's
+  // "save page" dialog even when focus is inside an input.
   document.addEventListener('keydown', (ev) => {
-    // Don't hijack typing in text inputs / textareas.
     const target = ev.target as HTMLElement | null;
-    if (target) {
-      const tag = target.tagName;
-      const editable = (target as HTMLElement).isContentEditable;
-      if (editable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-        // Allow undo INSIDE text fields too — native browser undo works there
-        // and we don't want to fight it.
-        return;
-      }
+    const inField = !!target && (
+      (target as HTMLElement).isContentEditable ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT'
+    );
+
+    // Spacebar: replay the latest sound. Skip when typing in a field so the
+    // user can put spaces in instrument names etc.
+    if ((ev.key === ' ' || ev.code === 'Space') && !inField) {
+      ev.preventDefault();
+      retriggerAudio();
+      return;
     }
+
     const mod = ev.ctrlKey || ev.metaKey;
     if (!mod) return;
+
+    // Save shortcut wins over everything — intercept regardless of focus.
+    if (ev.key === 's' || ev.key === 'S') {
+      ev.preventDefault();
+      if (ev.shiftKey) void savePatchAs();
+      else void savePatch();
+      return;
+    }
+
+    // For undo/redo, leave native behavior alone inside text inputs.
+    if (inField) return;
     if (ev.key === 'z' || ev.key === 'Z') {
       if (ev.shiftKey) {
         ev.preventDefault();
@@ -504,15 +533,34 @@ export function bootApp(root: HTMLElement): void {
     }
   });
 
+  // Warn before refresh/close when there's a patch in play. The browser
+  // will show its own generic "Changes you made may not be saved" prompt.
+  window.addEventListener('beforeunload', (ev) => {
+    const hasWork = patchFileName !== '' || model.patch.instruments.some(
+      (ins) => ins.slots.length > 0,
+    );
+    if (hasWork) {
+      ev.preventDefault();
+      // returnValue is the legacy way to trigger the prompt; required by
+      // some browsers even though they ignore the string content.
+      ev.returnValue = '';
+    }
+  });
+
   undoBtn.addEventListener('click', () => history.undo());
   redoBtn.addEventListener('click', () => history.redo());
 
-  hidden.addEventListener('change', async () => {
-    const f = hidden.files?.[0];
-    if (!f) return;
-    model.patch = parseAkp(new Uint8Array(await f.arrayBuffer()));
-    patchFileName = f.name;
-    patchFileHandle = undefined;
+  // Shared "I've just got a new patch" wiring — used by both the FSA
+  // open path (which gives us a write-back handle) and the hidden input
+  // fallback (Playwright / Firefox; no handle).
+  const adoptPatch = (
+    name: string,
+    bytes: Uint8Array,
+    handle: FileSystemFileHandle | undefined,
+  ): void => {
+    model.patch = parseAkp(bytes);
+    patchFileName = name;
+    patchFileHandle = handle;
     nameEl.textContent = patchFileName;
     activeIdx = model.patch.instruments.findIndex(
       (ins) => ins.slots.some((s) => s.fn !== 0),
@@ -521,14 +569,25 @@ export function bootApp(root: HTMLElement): void {
     selection = { instrIdx: activeIdx, slotIdx: null };
     outputTarget = { instrIdx: activeIdx, slotIdx: null };
     rebuildCloneGraph();
-    // Re-emit reset so HistoryManager rebaselines on the new patch.
     model.events.emit({ instrIdx: -1, kind: 'reset' });
     warnPatchOver16Slots(model);
     renderMain();
     repaint();
+  };
+
+  hidden.addEventListener('change', async () => {
+    const f = hidden.files?.[0];
+    if (!f) return;
+    adoptPatch(f.name, new Uint8Array(await f.arrayBuffer()), undefined);
   });
 
-  (root.querySelector('#btn-open') as HTMLButtonElement).addEventListener('click', () => hidden.click());
+  (root.querySelector('#btn-open') as HTMLButtonElement).addEventListener('click', async () => {
+    // Prefer the FSA picker so we can save back silently; fall back to the
+    // hidden input if FSA isn't available (the helper handles the fallback).
+    const opened = await openFileWithHandle('.akp', 'Klang patch');
+    if (!opened) return;
+    adoptPatch(opened.name, opened.bytes, opened.handle);
+  });
   (root.querySelector('#btn-new') as HTMLButtonElement).addEventListener('click', () => {
     model.patch = emptyPatch();
     patchFileName = '';
@@ -542,36 +601,65 @@ export function bootApp(root: HTMLElement): void {
     renderMain();
     repaint();
   });
-  (root.querySelector('#btn-play') as HTMLButtonElement).addEventListener('click', () => {
-    runRender();
-    playAudition();
+  // Single audio toggle replaces PLAY/STOP/RETRIG. Green = on (changes
+  // auto-replay, spacebar replays). Red = muted (re-renders still happen so
+  // waveforms stay live, but nothing is sent to the speakers).
+  const audioToggle = root.querySelector('#btn-audio-toggle') as HTMLButtonElement;
+  const updateAudioToggle = (): void => {
+    audioToggle.classList.toggle('on',  audioEnabled);
+    audioToggle.classList.toggle('off', !audioEnabled);
+    audioToggle.title = audioEnabled
+      ? 'Audio on — click to mute (changes still re-render). Spacebar replays.'
+      : 'Audio muted — click to unmute.';
+  };
+  audioToggle.addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    if (!audioEnabled) player.stop();
+    updateAudioToggle();
   });
-  (root.querySelector('#btn-stop') as HTMLButtonElement).addEventListener('click', () => player.stop());
-  (root.querySelector('#btn-retrig') as HTMLButtonElement).addEventListener('click', () => {
-    runRender();
-    playAudition();
-  });
+  updateAudioToggle();
 
-  (root.querySelector('#btn-save-as') as HTMLButtonElement).addEventListener('click', async () => {
-    const bytes = serializeAkp(model.patch);
-    const name = patchFileName || 'patch.akp';
-    await saveFileBytes(bytes, name, '.akp');
-  });
-  (root.querySelector('#btn-save') as HTMLButtonElement).addEventListener('click', async () => {
+  // Save current patch. If we have a write-back handle (FSA-opened or
+  // captured from a previous SAVE AS), write silently — no dialog. Only
+  // when no handle is available (Firefox / Safari, or fresh patch never
+  // saved) do we fall back to a picker / download.
+  const savePatch = async (): Promise<void> => {
     const bytes = serializeAkp(model.patch);
     if (patchFileHandle) {
       try {
-        const buf = new ArrayBuffer(bytes.byteLength);
-        new Uint8Array(buf).set(bytes);
-        const w = await patchFileHandle.createWritable();
-        await w.write(new Uint8Array(buf));
-        await w.close();
+        await saveToHandle(patchFileHandle, bytes);
         return;
-      } catch { /* fall through */ }
+      } catch { /* fall through to picker fallback */ }
     }
     const name = patchFileName || 'patch.akp';
-    await saveFileBytes(bytes, name, '.akp');
-  });
+    const newHandle = await saveFileBytes(bytes, name, '.akp');
+    if (newHandle) {
+      patchFileHandle = newHandle;
+      // Refresh the display name to match what they picked.
+      try {
+        const f = await newHandle.getFile();
+        patchFileName = f.name;
+        nameEl.textContent = patchFileName;
+      } catch { /* ignore */ }
+    }
+  };
+
+  const savePatchAs = async (): Promise<void> => {
+    const bytes = serializeAkp(model.patch);
+    const name = patchFileName || 'patch.akp';
+    const newHandle = await saveFileBytes(bytes, name, '.akp');
+    if (newHandle) {
+      patchFileHandle = newHandle;
+      try {
+        const f = await newHandle.getFile();
+        patchFileName = f.name;
+        nameEl.textContent = patchFileName;
+      } catch { /* ignore */ }
+    }
+  };
+
+  (root.querySelector('#btn-save-as') as HTMLButtonElement).addEventListener('click', () => { void savePatchAs(); });
+  (root.querySelector('#btn-save') as HTMLButtonElement).addEventListener('click', () => { void savePatch(); });
   (root.querySelector('#btn-import') as HTMLButtonElement).addEventListener('click', async () => {
     const f = await openFileBytes('.aki');
     if (!f) return;
