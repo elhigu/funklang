@@ -250,6 +250,42 @@
   }
   .instr-meta .k { color: var(--fg-2); text-transform: uppercase; }
   .instr-meta .v { color: var(--fg-0); }
+  .instr-meta .badge {
+    color: var(--amber);
+    border: 1px solid var(--grid);
+    padding: 2px 8px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+  }
+  .instr-meta .badge.full {
+    color: var(--red);
+    border-color: var(--red);
+  }
+  .instr-name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--grid-dim);
+    color: var(--amber);
+    font-family: 'Silkscreen', monospace;
+    font-size: 22px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 18px var(--amber-glow);
+    padding: 2px 4px;
+    min-width: 120px;
+    outline: none;
+  }
+  .instr-name-input:focus { border-bottom-color: var(--amber); }
+  .meta-num {
+    background: var(--bg-0);
+    border: 1px solid var(--grid-dim);
+    color: var(--fg-0);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 2px 5px;
+    width: 78px;
+    outline: none;
+  }
+  .meta-num:focus { border-color: var(--amber); }
 
   /* slot grid header */
   .grid-head {
@@ -455,6 +491,207 @@
   }
   .footer-right .blink { animation: blink 1.2s infinite; color: var(--amber); }
   @keyframes blink { 0%,49%{opacity:1;} 50%,100%{opacity:0;} }
+
+  /* slot insertion targets */
+  .slot-insert {
+    height: 6px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 80ms linear, height 80ms linear;
+    overflow: visible;
+  }
+  .slot-insert:hover { opacity: 1; height: 22px; }
+  .slot-insert-btn {
+    background: transparent;
+    color: var(--magenta);
+    border: 1px dashed var(--magenta);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 1px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .slot-insert-btn:hover { background: var(--magenta-glow); }
+
+  .slot-del {
+    background: transparent;
+    color: var(--fg-2);
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 6px;
+    margin-left: 6px;
+    opacity: 0;
+    transition: opacity 80ms linear, color 80ms linear;
+  }
+  .slot:hover .slot-del { opacity: 1; }
+  .slot-del:hover { color: var(--red); }
+
+  .out-select {
+    background: transparent;
+    border: 1px solid var(--grid-dim);
+    color: var(--cyan);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 1px 3px;
+    outline: none;
+  }
+  .out-select:focus { border-color: var(--amber); }
+
+  /* op picker modal */
+  .op-picker-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .op-picker {
+    background: var(--bg-1);
+    border: 1px solid var(--amber);
+    box-shadow: 0 0 32px var(--amber-glow);
+    padding: 18px;
+    width: min(560px, 92vw);
+    max-height: 86vh;
+    overflow-y: auto;
+  }
+  .op-picker-title {
+    font-family: 'Silkscreen', monospace;
+    color: var(--amber);
+    font-size: 14px;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .op-picker-group { margin-bottom: 14px; }
+  .op-picker-group-title {
+    font-family: 'Silkscreen', monospace;
+    color: var(--amber-dim);
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
+  }
+  .op-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 4px;
+  }
+  .op-picker-btn {
+    background: var(--bg-2);
+    border: 1px solid var(--grid);
+    color: var(--fg-0);
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 8px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .op-picker-btn:hover {
+    background: var(--bg-3);
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+
+  /* clone-block container */
+  .clone-block {
+    border: 1px dashed var(--cyan);
+    margin: 4px 14px 8px 38px;
+    padding: 6px;
+    background: rgba(56, 232, 255, 0.04);
+  }
+  .clone-block-title {
+    color: var(--cyan);
+    font-size: 11px;
+    margin-bottom: 4px;
+    letter-spacing: 0.4px;
+  }
+  .clone-toggle {
+    background: transparent;
+    border: 1px solid var(--grid);
+    color: var(--cyan);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    padding: 0 5px;
+    margin-right: 4px;
+  }
+  .clone-toggle:hover { border-color: var(--cyan); }
+  .cycle-chip {
+    color: var(--red);
+    border: 1px solid var(--red);
+    padding: 1px 6px;
+    font-size: 10px;
+    margin-left: 6px;
+  }
+
+  /* knob */
+  .knob {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    user-select: none;
+  }
+  .knob .klabel {
+    color: var(--fg-1);
+    text-transform: lowercase;
+    letter-spacing: 0.3px;
+  }
+  .knob .kbar {
+    display: inline-block;
+    width: 6ch;
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--amber);
+    cursor: ns-resize;
+    letter-spacing: -1px;
+    outline: none;
+  }
+  .knob .kbar:focus { color: var(--amber); text-shadow: 0 0 6px var(--amber-glow); }
+  .knob .kval {
+    color: var(--fg-0);
+    font-variant-numeric: tabular-nums;
+    min-width: 44px;
+    text-align: right;
+    cursor: text;
+  }
+  .knob .kval.out-of-range { color: var(--red); }
+  .knob input.kedit {
+    background: var(--bg-0);
+    border: 1px solid var(--amber);
+    color: var(--fg-0);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 0 3px;
+    width: 60px;
+    outline: none;
+    text-align: right;
+  }
+
+  /* wave-viewer (instrument-level) */
+  .wave-viewer {
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--grid);
+    padding: 8px 14px;
+  }
+  .wave-viewer canvas {
+    display: block;
+    background: #050507;
+    border: 1px solid var(--grid-dim);
+    width: 100%;
+    image-rendering: pixelated;
+    cursor: grab;
+  }
+  .wave-viewer canvas:active { cursor: grabbing; }
+  .wave-viewer-meta {
+    font-size: 10px;
+    color: var(--fg-2);
+    margin-top: 3px;
+  }
 
   /* scrollbars */
   ::-webkit-scrollbar { width: 10px; height: 10px; background: var(--bg-1); }
