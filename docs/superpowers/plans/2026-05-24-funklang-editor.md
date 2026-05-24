@@ -77,13 +77,13 @@ npm --version     # expect 10.x or higher
 
 If not present, abort and tell the user to install Node 20 LTS. Do not proceed.
 
-- [ ] **Step 2:** Verify a C compiler is available (needed later for `refrender`):
+- [ ] **Step 2:** Verify a C compiler is available (needed later for `refrender`). On NixOS systems `gcc` is not on PATH by default; use `nix-shell -p gcc`:
 
 ```bash
-gcc --version
+gcc --version 2>/dev/null || nix-shell -p gcc --run 'gcc --version' | head -1
 ```
 
-Expect output starting with `gcc`. If missing, abort and tell the user.
+Expect output starting with `gcc`. Remember whether `gcc` is direct or wrapped — use the same wrapper in Task 4.2's Makefile invocation.
 
 ---
 
