@@ -1,124 +1,36 @@
 // Slot-grid component: filled rows only, with [+] insertion targets and
-// hover-revealed delete. Knob params + waveform tap added by later sub-tasks.
+// hover-revealed delete. Per-op param rendering is strictly driven by the
+// OP_DEFS registry in funklang/src/dsp/op-metadata.ts.
 
 import type { PatchModel } from '../patch/model';
-import { N_SLOTS_EDITABLE, N_SLOTS_MAX, emptySlot } from '../patch/types';
+import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot } from '../patch/types';
 import type { Slot } from '../patch/types';
 import { pickOp, OP_NAME } from './op-picker';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
-
-/** Per-op param surface: ordered list of slot fields to expose as knobs. */
-interface KnobSpec {
-  field: keyof Slot;
-  label: string;
-  min: number;
-  max: number;
-}
-
-const I16_MIN = -32768;
-const I16_MAX = 32767;
-const U8_MAX = 255;
-
-function knobSpecForOp(fn: number): KnobSpec[] {
-  // Generic surface: freqVal (i16), gainVal (u8), widthVal (u8),
-  // val1Value (i16), val2Value (i16). Tuned per op where helpful.
-  switch (fn) {
-    case 1: // vol
-      return [{ field: 'gainVal', label: 'gain', min: 0, max: U8_MAX }];
-    case 2: case 3: case 4: // osc_saw/tri/sine
-      return [
-        { field: 'freqVal', label: 'freq', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-      ];
-    case 5: // osc_pulse
-      return [
-        { field: 'freqVal', label: 'freq', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-        { field: 'widthVal', label: 'duty', min: 0, max: U8_MAX },
-      ];
-    case 6: // osc_noise
-      return [{ field: 'gainVal', label: 'gain', min: 0, max: U8_MAX }];
-    case 7: // enva
-      return [
-        { field: 'val1Value', label: 'attack', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-      ];
-    case 8: // envd
-      return [
-        { field: 'val1Value', label: 'decay', min: I16_MIN, max: I16_MAX },
-        { field: 'val2Value', label: 'sustain', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-      ];
-    case 9: case 10: // add / mul
-      return [{ field: 'val2Value', label: 'val2', min: I16_MIN, max: I16_MAX }];
-    case 11: // dly_cyc
-      return [
-        { field: 'freqVal', label: 'delay', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-      ];
-    case 12: // cmb_flt_n
-      return [
-        { field: 'freqVal', label: 'delay', min: I16_MIN, max: I16_MAX },
-        { field: 'val2Value', label: 'fbk', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-      ];
-    case 13: // reverb
-      return [
-        { field: 'val2Value', label: 'fbk', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-      ];
-    case 15: // sv_flt_n
-      return [
-        { field: 'freqVal', label: 'cutoff', min: I16_MIN, max: I16_MAX },
-        { field: 'val2Value', label: 'res', min: I16_MIN, max: I16_MAX },
-        { field: 'gain', label: 'mode', min: 0, max: U8_MAX },
-      ];
-    case 16: // distortion
-      return [{ field: 'gainVal', label: 'gain', min: 0, max: U8_MAX }];
-    case 17: // clone
-      return [
-        { field: 'freqVal', label: 'transpose', min: I16_MIN, max: I16_MAX },
-        { field: 'gain', label: 'srcInstr', min: 0, max: U8_MAX },
-        { field: 'gainVal', label: 'reverse', min: 0, max: U8_MAX },
-        { field: 'val2Value', label: 'offset', min: I16_MIN, max: I16_MAX },
-      ];
-    case 19: // sh
-      return [{ field: 'gainVal', label: 'step', min: 0, max: U8_MAX }];
-    case 20: // imported
-      return [{ field: 'gain', label: 'import', min: 0, max: U8_MAX }];
-    case 21: // onepole_flt
-      return [
-        { field: 'freqVal', label: 'cutoff', min: I16_MIN, max: I16_MAX },
-        { field: 'gain', label: 'mode', min: 0, max: U8_MAX },
-      ];
-    case 23: // adsr
-      return [
-        { field: 'val2Value', label: 'attack', min: I16_MIN, max: I16_MAX },
-        { field: 'val1Value', label: 'decay', min: I16_MIN, max: I16_MAX },
-        { field: 'widthVal', label: 'sustain', min: 0, max: U8_MAX },
-        { field: 'freqVal', label: 'release', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'peak', min: 0, max: U8_MAX },
-      ];
-    default:
-      // Generic fallback: expose the five common value fields.
-      return [
-        { field: 'freqVal', label: 'freq', min: I16_MIN, max: I16_MAX },
-        { field: 'gainVal', label: 'gain', min: 0, max: U8_MAX },
-        { field: 'widthVal', label: 'width', min: 0, max: U8_MAX },
-        { field: 'val1Value', label: 'val1', min: I16_MIN, max: I16_MAX },
-        { field: 'val2Value', label: 'val2', min: I16_MIN, max: I16_MAX },
-      ];
-  }
-}
+import { opByCode, resetSlotForOp } from '../dsp/op-metadata';
+import type { ParamDef } from '../dsp/op-metadata';
 
 export interface SlotGridOptions {
   /** Recursion depth for clone expansion (0 = top level). */
   depth?: number | undefined;
-  /** Currently auditioned slot (or null for instrument-final output). */
-  auditionSlot?: number | null | undefined;
-  /** Called when user clicks a slot row to audition it. */
-  onAudition?: ((slotIdx: number) => void) | undefined;
+  /**
+   * Currently EDIT-SELECTED slot. Set by single-clicking a slot row.
+   * Used purely for visual highlighting + as the keyboard/hover focus.
+   * Changing knob values does NOT touch this — it's the user's "I'm
+   * looking at this slot" indicator.
+   */
+  selectedSlot?: number | null | undefined;
+  /**
+   * Slot whose tap is currently the AUDIO PLAYBACK TARGET. Set explicitly
+   * via the per-row speaker button (or the header dropdown). Drawn with a
+   * magenta `►` glyph in the # column — independent of the selection.
+   */
+  outputSlot?: number | null | undefined;
+  /** Called when user clicks a slot row to make it the edit selection. */
+  onSelect?: ((slotIdx: number) => void) | undefined;
+  /** Called when user clicks the per-row speaker button to retarget output. */
+  onSetOutput?: ((slotIdx: number) => void) | undefined;
 }
 
 /**
@@ -258,6 +170,276 @@ function makeInserter(model: PatchModel, instrIdx: number, atIdx: number): HTMLE
   return row;
 }
 
+// ── Parameter widgets ────────────────────────────────────────────────────
+
+interface VarSelectOpts {
+  /** Current value (0..4). */
+  value: number;
+  /** When `allowNone`, option 0 shows as "—"; otherwise "v0" (unusual). */
+  allowNone: boolean;
+  title?: string | undefined;
+  onChange: (v: number) => void;
+}
+function makeVarSelect(opts: VarSelectOpts): HTMLSelectElement {
+  const sel = document.createElement('select');
+  sel.className = 'param-var-select';
+  if (opts.title) sel.title = opts.title;
+  const noneLabel = opts.allowNone ? '—' : 'v0';
+  const labels: ReadonlyArray<{ value: number; text: string }> = [
+    { value: 0, text: noneLabel },
+    { value: 1, text: 'v1' },
+    { value: 2, text: 'v2' },
+    { value: 3, text: 'v3' },
+    { value: 4, text: 'v4' },
+  ];
+  for (const o of labels) {
+    const optEl = document.createElement('option');
+    optEl.value = String(o.value);
+    optEl.textContent = o.text;
+    if (o.value === opts.value) optEl.selected = true;
+    sel.appendChild(optEl);
+  }
+  sel.addEventListener('change', () => {
+    const v = parseInt(sel.value, 10);
+    if (Number.isFinite(v)) opts.onChange(v);
+  });
+  sel.addEventListener('click', (e) => e.stopPropagation());
+  sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  return sel;
+}
+
+interface EnumSelectOpts {
+  value: number;
+  options: ReadonlyArray<{ value: number; label: string }>;
+  title?: string | undefined;
+  onChange: (v: number) => void;
+}
+function makeEnumSelect(opts: EnumSelectOpts): HTMLSelectElement {
+  const sel = document.createElement('select');
+  sel.className = 'param-enum-select';
+  if (opts.title) sel.title = opts.title;
+  for (const o of opts.options) {
+    const optEl = document.createElement('option');
+    optEl.value = String(o.value);
+    optEl.textContent = o.label;
+    if (o.value === opts.value) optEl.selected = true;
+    sel.appendChild(optEl);
+  }
+  sel.addEventListener('change', () => {
+    const v = parseInt(sel.value, 10);
+    if (Number.isFinite(v)) opts.onChange(v);
+  });
+  sel.addEventListener('click', (e) => e.stopPropagation());
+  sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  return sel;
+}
+
+interface RefSelectOpts {
+  value: number;
+  count: number;
+  /** Label provider — defaults to `${i+1}. <name>`. */
+  labelFor: (idx: number) => string;
+  title?: string | undefined;
+  onChange: (v: number) => void;
+}
+function makeRefSelect(opts: RefSelectOpts): HTMLSelectElement {
+  const sel = document.createElement('select');
+  sel.className = 'param-ref-select';
+  if (opts.title) sel.title = opts.title;
+  for (let i = 0; i < opts.count; i++) {
+    const optEl = document.createElement('option');
+    optEl.value = String(i);
+    optEl.textContent = opts.labelFor(i);
+    if (i === opts.value) optEl.selected = true;
+    sel.appendChild(optEl);
+  }
+  sel.addEventListener('change', () => {
+    const v = parseInt(sel.value, 10);
+    if (Number.isFinite(v)) opts.onChange(v);
+  });
+  sel.addEventListener('click', (e) => e.stopPropagation());
+  sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  return sel;
+}
+
+/**
+ * Render a single ParamDef as a DOM element (which the slot-grid appends
+ * into the per-row .params host). Each widget is wired to model.setSlotParam.
+ */
+function renderParam(
+  model: PatchModel,
+  instrIdx: number,
+  slotIdx: number,
+  slot: Slot,
+  param: ParamDef,
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'param';
+
+  const writeValue = (v: number): void => {
+    model.setSlotParam(instrIdx, slotIdx, param.field, v);
+  };
+
+  switch (param.type.kind) {
+    case 'const-int': {
+      const knob = makeKnob({
+        label: param.type.label,
+        value: slot[param.field] as number,
+        min: param.type.min,
+        max: param.type.max,
+        defaultValue: 0,
+        onChange: writeValue,
+      });
+      knob.el.addEventListener('mousedown', (e) => e.stopPropagation());
+      knob.el.addEventListener('click', (e) => e.stopPropagation());
+      knob.el.addEventListener('dblclick', (e) => e.stopPropagation());
+      wrap.appendChild(knob.el);
+      break;
+    }
+
+    case 'var-source': {
+      const label = document.createElement('span');
+      label.className = 'pname';
+      label.textContent = param.type.label;
+      wrap.appendChild(label);
+      const sel = makeVarSelect({
+        value: slot[param.field] as number,
+        allowNone: param.type.allowNone ?? true,
+        title: param.type.label,
+        onChange: writeValue,
+      });
+      wrap.appendChild(sel);
+      break;
+    }
+
+    case 'var-or-const': {
+      const selFieldKey = param.selector;
+      if (!selFieldKey) {
+        // Misconfigured — fail loud during dev.
+        wrap.textContent = `${param.type.label}: missing selector`;
+        break;
+      }
+      const label = document.createElement('span');
+      label.className = 'pname';
+      label.textContent = param.type.label;
+      wrap.appendChild(label);
+
+      // Selector dropdown: "const" | v1..v4.
+      const sel = document.createElement('select');
+      sel.className = 'param-mode-select';
+      sel.title = `${param.type.label}: source`;
+      const modes: ReadonlyArray<{ value: number; text: string }> = [
+        { value: 0, text: 'const' },
+        { value: 1, text: 'v1' },
+        { value: 2, text: 'v2' },
+        { value: 3, text: 'v3' },
+        { value: 4, text: 'v4' },
+      ];
+      const curSelector = slot[selFieldKey] as number;
+      for (const m of modes) {
+        const optEl = document.createElement('option');
+        optEl.value = String(m.value);
+        optEl.textContent = m.text;
+        if (m.value === curSelector) optEl.selected = true;
+        sel.appendChild(optEl);
+      }
+      sel.addEventListener('click', (e) => e.stopPropagation());
+      sel.addEventListener('mousedown', (e) => e.stopPropagation());
+      wrap.appendChild(sel);
+
+      // Knob for the literal value (only meaningful when selector === 0).
+      const knob = makeKnob({
+        label: '',
+        value: slot[param.field] as number,
+        min: param.type.min,
+        max: param.type.max,
+        defaultValue: 0,
+        onChange: writeValue,
+      });
+      knob.el.classList.add('param-const-knob');
+      knob.el.addEventListener('mousedown', (e) => e.stopPropagation());
+      knob.el.addEventListener('click', (e) => e.stopPropagation());
+      knob.el.addEventListener('dblclick', (e) => e.stopPropagation());
+      wrap.appendChild(knob.el);
+
+      const applyMode = (mode: number): void => {
+        if (mode === 0) {
+          knob.el.classList.remove('disabled');
+        } else {
+          knob.el.classList.add('disabled');
+        }
+      };
+      applyMode(curSelector);
+
+      sel.addEventListener('change', () => {
+        const v = parseInt(sel.value, 10);
+        if (!Number.isFinite(v)) return;
+        model.setSlotParam(instrIdx, slotIdx, selFieldKey, v);
+        applyMode(v);
+      });
+      break;
+    }
+
+    case 'enum': {
+      const label = document.createElement('span');
+      label.className = 'pname';
+      label.textContent = param.type.label;
+      wrap.appendChild(label);
+      const sel = makeEnumSelect({
+        value: slot[param.field] as number,
+        options: param.type.options,
+        title: param.type.label,
+        onChange: writeValue,
+      });
+      wrap.appendChild(sel);
+      break;
+    }
+
+    case 'instr-ref': {
+      const label = document.createElement('span');
+      label.className = 'pname';
+      label.textContent = param.type.label;
+      wrap.appendChild(label);
+      const sel = makeRefSelect({
+        value: slot[param.field] as number,
+        count: N_INSTRUMENTS,
+        labelFor: (i) => {
+          const ins = model.patch.instruments[i];
+          const name = (ins?.name ?? '').trim();
+          return name
+            ? `${String(i + 1).padStart(2, '0')} ${name}`
+            : String(i + 1).padStart(2, '0');
+        },
+        title: param.type.label,
+        onChange: writeValue,
+      });
+      wrap.appendChild(sel);
+      break;
+    }
+
+    case 'sample-ref': {
+      const label = document.createElement('span');
+      label.className = 'pname';
+      label.textContent = param.type.label;
+      wrap.appendChild(label);
+      const sel = makeRefSelect({
+        value: slot[param.field] as number,
+        count: N_IMPORTS,
+        labelFor: (i) => {
+          const samp = model.patch.importedSamples[i];
+          const name = (samp?.name ?? '').trim();
+          return name ? `${String(i + 1)} ${name}` : `${String(i + 1)} (empty)`;
+        },
+        title: param.type.label,
+        onChange: writeValue,
+      });
+      wrap.appendChild(sel);
+      break;
+    }
+  }
+  return wrap;
+}
+
 function renderRow(
   model: PatchModel,
   instrIdx: number,
@@ -274,12 +456,21 @@ function renderRow(
   row.dataset['modelSlot'] = String(slotIdx);
   row.dataset['rowIdx'] = String(rowIdx);
   row.draggable = true;
-  if (opts.auditionSlot === slotIdx) row.classList.add('audition', 'active');
+  if (opts.selectedSlot === slotIdx) row.classList.add('selected', 'active');
+  const isOutputTarget = opts.outputSlot === slotIdx;
+  if (isOutputTarget) row.classList.add('output-target');
 
   // Display 1-based position by visible row, not by model index — empty
   // slots are hidden so the user sees a contiguous 01..N numbering.
   const num = String(rowIdx + 1).padStart(2, '0');
   const opLabel = OP_NAME[slot.fn] ?? `op${slot.fn}`;
+  const outGlyph = isOutputTarget
+    ? `<span class="out-glyph" title="Playback output target">►</span>`
+    : '';
+  const speakerTitle = isOutputTarget
+    ? 'Currently the playback output'
+    : 'Set as playback output';
+  const speakerBtn = `<button class="slot-output-btn${isOutputTarget ? ' active' : ''}" data-output-btn title="${speakerTitle}">🔊</button>`;
 
   const isClone = slot.fn === 17;
   const expandToggle = isClone
@@ -287,7 +478,7 @@ function renderRow(
     : '';
 
   row.innerHTML = `
-    <div class="col col-num">${num}</div>
+    <div class="col col-num">${outGlyph}${num}</div>
     <div class="col col-out">
       <select class="out-select" title="Output variable">
         <option value="0"${slot.outVar === 0 ? ' selected' : ''}>·</option>
@@ -297,10 +488,11 @@ function renderRow(
         <option value="4"${slot.outVar === 4 ? ' selected' : ''}>v4</option>
       </select>
     </div>
-    <div class="col col-op">${expandToggle}${opLabel}</div>
+    <div class="col col-op">${expandToggle}<button class="op-name-btn" data-op-name title="Click to change op">${opLabel}</button></div>
     <div class="col"><div class="params" data-knobs></div></div>
     <div class="col wave-cell">
-      <canvas class="wave" width="160" height="32" data-wave></canvas>
+      <canvas class="wave" width="200" height="48" data-wave></canvas>
+      ${speakerBtn}
       <button class="slot-del" title="Delete this slot">✕</button>
     </div>
   `;
@@ -320,30 +512,45 @@ function renderRow(
     model.removeSlot(instrIdx, slotIdx);
   });
 
-  // Knobs
+  // Click on the function-name button to change the op type for this slot.
+  const opNameBtn = row.querySelector('[data-op-name]') as HTMLButtonElement;
+  opNameBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const code = await pickOp();
+    if (code == null || code === slot.fn) return;
+    const next = resetSlotForOp(slot, code);
+    // Apply each changed field via setSlotParam so model events fire properly
+    // (one event per write is fine — the listener debounces redraw).
+    for (const key of Object.keys(next) as Array<keyof Slot>) {
+      if (next[key] !== slot[key]) {
+        model.setSlotParam(instrIdx, slotIdx, key, next[key]);
+      }
+    }
+  });
+
+  // Strict per-op param schema. Render exactly the controls OP_DEFS specifies.
   const knobsHost = row.querySelector('[data-knobs]') as HTMLElement;
-  const specs = knobSpecForOp(slot.fn);
-  for (const spec of specs) {
-    const initial = slot[spec.field] as number;
-    const knob = makeKnob({
-      label: spec.label,
-      value: initial,
-      min: spec.min,
-      max: spec.max,
-      defaultValue: 0,
-      onChange: (v) => {
-        model.setSlotParam(instrIdx, slotIdx, spec.field, v);
-      },
-    });
-    knob.el.addEventListener('mousedown', (e) => e.stopPropagation());
-    knob.el.addEventListener('click', (e) => e.stopPropagation());
-    knob.el.addEventListener('dblclick', (e) => e.stopPropagation());
-    knobsHost.appendChild(knob.el);
+  const opDef = opByCode(slot.fn);
+  if (opDef) {
+    for (const p of opDef.params) {
+      knobsHost.appendChild(renderParam(model, instrIdx, slotIdx, slot, p));
+    }
+  }
+  // If no OpDef entry exists for slot.fn, render no param controls — the
+  // function-name button still lets the user change to a known op.
+
+  if (opts.onSelect) {
+    const select = opts.onSelect;
+    row.addEventListener('click', () => select(slotIdx));
   }
 
-  if (opts.onAudition) {
-    const handler = opts.onAudition;
-    row.addEventListener('click', () => handler(slotIdx));
+  const outBtn = row.querySelector('[data-output-btn]') as HTMLButtonElement | null;
+  if (outBtn) {
+    outBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (opts.onSetOutput) opts.onSetOutput(slotIdx);
+    });
+    outBtn.addEventListener('mousedown', (e) => e.stopPropagation());
   }
 
   // drag-to-reorder (lifted from editor-mockup.html)

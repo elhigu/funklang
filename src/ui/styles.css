@@ -313,11 +313,11 @@
   /* slot grid header */
   .grid-head {
     display: grid;
-    grid-template-columns: 38px 56px 124px 1fr 220px;
+    grid-template-columns: 44px 64px 144px 1fr 260px;
     gap: 1px;
     background: var(--bg-1);
     border-bottom: 1px solid var(--grid);
-    padding: 6px 0;
+    padding: 8px 0;
     position: sticky;
     top: 0;
     z-index: 5;
@@ -325,7 +325,7 @@
   .grid-head > div {
     padding: 0 14px;
     font-family: 'Silkscreen', monospace;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--amber-dim);
     letter-spacing: 0.8px;
   }
@@ -336,11 +336,11 @@
   }
   .slot {
     display: grid;
-    grid-template-columns: 38px 56px 124px 1fr 220px;
+    grid-template-columns: 44px 64px 144px 1fr 260px;
     gap: 1px;
     align-items: center;
     border-bottom: 1px solid var(--grid-dim);
-    min-height: 44px;
+    min-height: 64px;
     position: relative;
     cursor: pointer;
     transition: background 60ms linear;
@@ -349,13 +349,79 @@
   .slot.active {
     background: var(--bg-2);
   }
-  .slot.audition::before {
+  .slot.audition::before,
+  .slot.selected::before {
     content: '';
     position: absolute;
     left: 0; top: 0; bottom: 0;
     width: 3px;
-    background: var(--magenta);
-    box-shadow: 0 0 8px var(--magenta);
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber-glow);
+  }
+  .slot.output-target {
+    /* tinted background hint so the output target reads at a glance */
+    background: rgba(255, 45, 146, 0.06);
+  }
+  .slot.output-target:hover {
+    background: rgba(255, 45, 146, 0.12);
+  }
+  .slot .out-glyph {
+    color: var(--magenta);
+    text-shadow: 0 0 6px var(--magenta-glow);
+    margin-right: 4px;
+    font-size: 11px;
+  }
+  .slot-output-btn {
+    background: transparent;
+    color: var(--fg-2);
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 4px;
+    margin-left: 2px;
+    opacity: 0;
+    transition: opacity 80ms linear, color 80ms linear;
+  }
+  .slot:hover .slot-output-btn { opacity: 0.55; }
+  .slot-output-btn:hover { color: var(--magenta); opacity: 1; }
+  .slot-output-btn.active {
+    color: var(--magenta);
+    opacity: 1;
+    text-shadow: 0 0 6px var(--magenta-glow);
+  }
+  .output-select-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    height: 100%;
+    border-right: 1px solid var(--grid-dim);
+    color: var(--fg-1);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .output-select-label { color: var(--fg-2); }
+  .output-select-wrap select {
+    background: var(--bg-2);
+    color: var(--magenta);
+    border: 1px solid var(--grid);
+    font: inherit;
+    text-transform: none;
+    padding: 2px 4px;
+    cursor: pointer;
+    max-width: 180px;
+  }
+  .output-select-wrap select:focus { outline: none; border-color: var(--magenta); }
+  .footer-status .selection {
+    color: var(--amber);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .footer-status .output {
+    color: var(--magenta);
+    font-weight: 600;
+    letter-spacing: 0.5px;
   }
   .slot.empty { color: var(--fg-2); min-height: 28px; }
 
@@ -406,24 +472,46 @@
   }
   .slot.empty .col-op { color: var(--fg-2); }
 
+  .op-name-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    padding: 2px 8px;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 2px;
+    transition: background 60ms linear, border-color 60ms linear;
+  }
+  .op-name-btn:hover {
+    background: var(--bg-2);
+    border-color: var(--amber-dim);
+  }
+  .op-name-btn:focus { outline: none; border-color: var(--amber); }
+
   /* params: each param = label + bar + value */
   .params {
     display: flex;
     flex-wrap: wrap;
-    gap: 14px;
-    padding: 6px 14px;
+    gap: 18px;
+    padding: 10px 14px;
   }
   .param {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 8px;
+    font-size: 13px;
+    min-width: 0;
     user-select: none;
   }
   .param .pname {
     color: var(--fg-1);
     letter-spacing: 0.3px;
     text-transform: lowercase;
+    font-size: 12px;
+    min-width: 40px;
   }
   .param .pbar {
     display: inline-block;
@@ -439,6 +527,31 @@
     min-width: 36px;
     text-align: right;
   }
+
+  /* Per-op widget dropdowns inside .params */
+  .param-var-select,
+  .param-mode-select,
+  .param-enum-select,
+  .param-ref-select {
+    background: var(--bg-2);
+    color: var(--amber);
+    border: 1px solid var(--grid);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 3px 4px;
+    cursor: pointer;
+    outline: none;
+    max-width: 180px;
+  }
+  .param-ref-select { max-width: 220px; }
+  .param-var-select:focus,
+  .param-mode-select:focus,
+  .param-enum-select:focus,
+  .param-ref-select:focus { border-color: var(--amber); }
+
+  /* var-or-const: knob is dimmed when source is a variable rather than const */
+  .param-const-knob.disabled { opacity: 0.35; pointer-events: none; }
+  .param-const-knob .klabel { display: none; }
 
   /* waveform canvas */
   .wave-cell {
@@ -655,20 +768,24 @@
   .knob {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 8px;
+    font-size: 14px;
     user-select: none;
+    min-width: 0;
   }
   .knob .klabel {
     color: var(--fg-1);
     text-transform: lowercase;
     letter-spacing: 0.3px;
+    font-size: 12px;
+    min-width: 40px;
   }
   .knob .kbar {
     display: inline-block;
-    width: 6ch;
+    width: 10ch;
     text-align: left;
     font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
     color: var(--amber);
     cursor: ns-resize;
     letter-spacing: -1px;
@@ -678,7 +795,8 @@
   .knob .kval {
     color: var(--fg-0);
     font-variant-numeric: tabular-nums;
-    min-width: 44px;
+    font-size: 14px;
+    min-width: 56px;
     text-align: right;
     cursor: text;
   }
@@ -688,9 +806,9 @@
     border: 1px solid var(--amber);
     color: var(--fg-0);
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    padding: 0 3px;
-    width: 60px;
+    font-size: 13px;
+    padding: 1px 3px;
+    width: 72px;
     outline: none;
     text-align: right;
   }

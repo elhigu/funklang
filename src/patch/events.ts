@@ -22,5 +22,15 @@ export class EventBus<T> {
 /** Mutation announcement emitted by PatchModel. */
 export interface PatchChange {
   instrIdx: number;
-  kind: 'param' | 'structure' | 'meta';
+  kind: 'param' | 'structure' | 'meta' | 'reset';
+  /**
+   * Optional discriminator for coalescing rapid consecutive edits to the
+   * same target (e.g. a knob drag firing many setSlotParam calls on the
+   * same field). Populated by PatchModel.setSlotParam.
+   */
+  coalesceKey?: {
+    instrIdx: number;
+    slotIdx: number;
+    field: string;
+  } | undefined;
 }

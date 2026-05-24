@@ -1,46 +1,44 @@
 // Modal op-code picker. Resolves to chosen op code or null on cancel.
-// Op-code → name map sourced from funklang/docs/dsp-reference.md §4.
+// The list of available ops + their human-readable names + category grouping
+// all come from OP_DEFS (single source of truth) so adding/renaming an op
+// only requires an op-metadata.ts edit.
 
-export const OP_NAME: Record<number, string> = {
-  1: 'vol',
-  2: 'osc_saw',
-  3: 'osc_tri',
-  4: 'osc_sine',
-  5: 'osc_pulse',
-  6: 'osc_noise',
-  7: 'enva',
-  8: 'envd',
-  9: 'add',
-  10: 'mul',
-  11: 'dly_cyc',
-  12: 'cmb_flt_n',
-  13: 'reverb',
-  14: 'ctrl',
-  15: 'sv_flt_n',
-  16: 'distortion',
-  17: 'clone',
-  18: 'chordgen',
-  19: 'sh',
-  20: 'imported',
-  21: 'onepole_flt',
-  23: 'adsr',
-  24: 'vocoder',
+import { OP_DEFS } from '../dsp/op-metadata';
+import type { OpDef } from '../dsp/op-metadata';
+
+/** Backwards-compat lookup table — code → display name. */
+export const OP_NAME: Record<number, string> = (() => {
+  const out: Record<number, string> = {};
+  for (const def of OP_DEFS) out[def.code] = def.name;
+  return out;
+})();
+
+const CATEGORY_TITLES: Record<OpDef['category'], string> = {
+  osc:    'Oscillators',
+  mix:    'Mix',
+  env:    'Envelopes',
+  filter: 'Filters',
+  fx:     'FX',
+  ctrl:   'Control',
+  cross:  'Cross-instrument',
 };
 
-interface OpGroup {
-  title: string;
-  codes: number[];
-}
-
-const GROUPS: OpGroup[] = [
-  { title: 'Oscillators', codes: [2, 3, 4, 5, 6] },
-  { title: 'Mix', codes: [9, 10] },
-  { title: 'Envelopes', codes: [7, 8, 23] },
-  { title: 'Filters', codes: [15, 21, 12] },
-  { title: 'FX', codes: [13, 11, 16, 19, 18] },
-  { title: 'Control', codes: [1, 14] },
-  { title: 'Cross', codes: [17, 20] },
+// Preserve a stable display order for categories rather than walking OP_DEFS.
+const CATEGORY_ORDER: OpDef['category'][] = [
+  'osc', 'mix', 'env', 'filter', 'fx', 'ctrl', 'cross',
 ];
+
+function groupedDefs(): Array<{ title: string; defs: OpDef[] }> {
+  const groups = new Map<OpDef['category'], OpDef[]>();
+  for (const def of OP_DEFS) {
+    const arr = groups.get(def.category) ?? [];
+    arr.push(def);
+    groups.set(def.category, arr);
+  }
+  return CATEGORY_ORDER
+    .map((c) => ({ title: CATEGORY_TITLES[c], defs: groups.get(c) ?? [] }))
+    .filter((g) => g.defs.length > 0);
+}
 
 export function pickOp(): Promise<number | null> {
   return new Promise((resolve) => {
@@ -61,19 +59,23 @@ export function pickOp(): Promise<number | null> {
     const inner = document.createElement('div');
     inner.className = 'op-picker';
     inner.innerHTML = `<div class="op-picker-title">PICK OPERATOR</div>`;
-    for (const g of GROUPS) {
+    for (const g of groupedDefs()) {
       const sect = document.createElement('div');
       sect.className = 'op-picker-group';
-      sect.innerHTML = `<div class="op-picker-group-title">${g.title}</div>`;
+      const titleEl = document.createElement('div');
+      titleEl.className = 'op-picker-group-title';
+      titleEl.textContent = g.title;
+      sect.appendChild(titleEl);
       const grid = document.createElement('div');
       grid.className = 'op-picker-grid';
-      for (const code of g.codes) {
+      for (const def of g.defs) {
         const btn = document.createElement('button');
         btn.className = 'op-picker-btn';
-        btn.textContent = OP_NAME[code] ?? `op${code}`;
+        btn.textContent = def.name;
+        btn.dataset['opCode'] = String(def.code);
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          done(code);
+          done(def.code);
         });
         grid.appendChild(btn);
       }

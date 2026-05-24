@@ -1,4 +1,5 @@
 import { PatchModel } from '../patch/model';
+import { HistoryManager } from '../patch/history';
 import { emptyPatch, N_SLOTS_EDITABLE } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
 import { parseAki, serializeAki } from '../fileio/aki';
@@ -17,9 +18,24 @@ import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 const DEBOUNCE_MS = 80;
 const NOTE_LS_KEY = 'funklang.previewNote';
 
-interface AuditionState {
+/**
+ * Two separate concepts:
+ *  - `selection`:    which slot the user is "looking at" (edit focus).
+ *                    Set by clicking a slot row. Mutating knob values does
+ *                    NOT change this.
+ *  - `outputTarget`: which signal feeds the audio player. `slotIdx === null`
+ *                    means "play the instrument's final v1 output". Only the
+ *                    user explicitly retargets this (header dropdown or the
+ *                    per-row 🔊 button).
+ */
+interface SelectionState {
   instrIdx: number;
-  slotIdx: number | null; // null = play final output
+  slotIdx: number | null;
+}
+
+interface OutputTarget {
+  instrIdx: number;
+  slotIdx: number | null; // null = final output (v1)
 }
 
 function loadStoredNote(): string {
@@ -59,12 +75,14 @@ function warnPatchOver16Slots(model: PatchModel): void {
 
 export function bootApp(root: HTMLElement): void {
   const model = new PatchModel(emptyPatch());
+  const history = new HistoryManager(model);
   const player = new Player();
   let activeIdx = 0;
   let patchFileName = '';
   // File System Access handle if open via FSA; undefined otherwise.
   let patchFileHandle: FileSystemFileHandle | undefined = undefined;
-  let audition: AuditionState = { instrIdx: 0, slotIdx: null };
+  let selection: SelectionState = { instrIdx: 0, slotIdx: null };
+  let outputTarget: OutputTarget = { instrIdx: 0, slotIdx: null };
   let previewNote: string = loadStoredNote();
   // Reverse clone-dependency index. Rebuilt on structure changes.
   let cloneGraph: CloneGraph = buildCloneGraph(model.patch);
@@ -84,12 +102,18 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-save-as">SAVE&nbsp;AS</button>
           <button id="btn-import">IMPORT&nbsp;.AKI</button>
           <button id="btn-export">EXPORT&nbsp;.AKI</button>
+          <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶&nbsp;UNDO</button>
+          <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷&nbsp;REDO</button>
           <button id="btn-play">▶&nbsp;PLAY</button>
           <button id="btn-stop">■&nbsp;STOP</button>
           <button id="btn-retrig">↻&nbsp;RETRIG</button>
           <label class="note-select-wrap" title="Audition note (playback rate)">
             <span class="note-select-label">NOTE</span>
             <select id="note-select">${noteOptions}</select>
+          </label>
+          <label class="output-select-wrap" title="Which signal is sent to the audio output">
+            <span class="output-select-label">OUTPUT</span>
+            <select id="output-select"></select>
           </label>
         </div>
         <div class="file-info">
@@ -106,8 +130,10 @@ export function bootApp(root: HTMLElement): void {
       <footer>
         <div></div>
         <div class="footer-status">
-          <span class="k">audition →</span>
-          <span class="audition" id="audition-label">—</span>
+          <span class="k">selected →</span>
+          <span class="selection" id="selection-label">—</span>
+          <span class="k">output →</span>
+          <span class="output" id="output-label">—</span>
         </div>
         <div class="footer-right"><span class="blink">●</span><span>READY</span></div>
       </footer>
@@ -119,7 +145,11 @@ export function bootApp(root: HTMLElement): void {
   const nameEl = root.querySelector('#file-name') as HTMLElement;
   const mainEl = root.querySelector('#main-area') as HTMLElement;
   const hidden = root.querySelector('#hidden-file-input') as HTMLInputElement;
-  const auditionLabel = root.querySelector('#audition-label') as HTMLElement;
+  const selectionLabel = root.querySelector('#selection-label') as HTMLElement;
+  const outputLabel = root.querySelector('#output-label') as HTMLElement;
+  const outputSelect = root.querySelector('#output-select') as HTMLSelectElement;
+  const undoBtn = root.querySelector('#btn-undo') as HTMLButtonElement;
+  const redoBtn = root.querySelector('#btn-redo') as HTMLButtonElement;
 
   // Per-render caches of the slot-grid container and wave viewer so we can
   // call updateSlotWaves / viewer.setSample without rebuilding the DOM.
@@ -130,6 +160,30 @@ export function bootApp(root: HTMLElement): void {
 
   const rebuildCloneGraph = (): void => {
     cloneGraph = buildCloneGraph(model.patch);
+  };
+
+  const updateUndoRedoButtons = (): void => {
+    undoBtn.disabled = !history.canUndo();
+    redoBtn.disabled = !history.canRedo();
+  };
+
+  /**
+   * If `outputTarget.slotIdx` no longer references a valid slot (e.g. the
+   * row was deleted by undo / removeSlot), fall back to the instrument's
+   * final output.
+   */
+  const validateOutputTarget = (): void => {
+    const ins = model.patch.instruments[outputTarget.instrIdx];
+    if (!ins) {
+      outputTarget = { instrIdx: activeIdx, slotIdx: null };
+      return;
+    }
+    if (outputTarget.slotIdx != null) {
+      const slot = ins.slots[outputTarget.slotIdx];
+      if (!slot || slot.fn === 0) {
+        outputTarget = { instrIdx: outputTarget.instrIdx, slotIdx: null };
+      }
+    }
   };
 
   const renderMain = (): void => {
@@ -159,24 +213,100 @@ export function bootApp(root: HTMLElement): void {
     mainEl.appendChild(gridHost);
     gridHostEl = gridHost;
     renderSlotGrid(gridHost, model, activeIdx, {
-      auditionSlot: audition.instrIdx === activeIdx ? audition.slotIdx : null,
-      onAudition: (slotIdx) => {
-        audition = { instrIdx: activeIdx, slotIdx };
-        // Re-paint audition class without rebuilding everything.
-        renderMain();
-        repaint();
-        scheduleRender(true);
-        updateAuditionLabel();
+      selectedSlot: selection.instrIdx === activeIdx ? selection.slotIdx : null,
+      outputSlot: outputTarget.instrIdx === activeIdx ? outputTarget.slotIdx : null,
+      onSelect: (slotIdx) => {
+        selection = { instrIdx: activeIdx, slotIdx };
+        // Refresh only the row highlights + footer label — don't replay audio
+        // and don't change the output target.
+        refreshSelectionHighlight();
+        updateLabels();
+      },
+      onSetOutput: (slotIdx) => {
+        outputTarget = { instrIdx: activeIdx, slotIdx };
+        refreshOutputHighlight();
+        rebuildOutputSelect();
+        updateLabels();
+        runRender();
+        playAudition();
       },
     });
     runRender();
-    updateAuditionLabel();
+    rebuildOutputSelect();
+    updateLabels();
+  };
+
+  /** Re-tag .selected / .active on slot rows without rebuilding the grid. */
+  const refreshSelectionHighlight = (): void => {
+    if (!gridHostEl) return;
+    const rows = gridHostEl.querySelectorAll('.slots > .slot-wrap > .slot');
+    for (const r of Array.from(rows)) {
+      const el = r as HTMLElement;
+      const idx = parseInt(el.dataset['slot'] ?? '-1', 10);
+      const isSel = selection.instrIdx === activeIdx && idx === selection.slotIdx;
+      el.classList.toggle('selected', isSel);
+      el.classList.toggle('active', isSel);
+    }
+  };
+
+  /** Re-tag .output-target + redraw the ► glyph + 🔊 button highlight. */
+  const refreshOutputHighlight = (): void => {
+    if (!gridHostEl) return;
+    const rows = gridHostEl.querySelectorAll('.slots > .slot-wrap > .slot');
+    for (const r of Array.from(rows)) {
+      const el = r as HTMLElement;
+      const idx = parseInt(el.dataset['slot'] ?? '-1', 10);
+      const isOut = outputTarget.instrIdx === activeIdx && idx === outputTarget.slotIdx;
+      el.classList.toggle('output-target', isOut);
+      const numCol = el.querySelector('.col-num');
+      if (numCol) {
+        const existing = numCol.querySelector('.out-glyph');
+        if (isOut && !existing) {
+          const span = document.createElement('span');
+          span.className = 'out-glyph';
+          span.title = 'Playback output target';
+          span.textContent = '►';
+          numCol.prepend(span);
+        } else if (!isOut && existing) {
+          existing.remove();
+        }
+      }
+      const btn = el.querySelector('[data-output-btn]') as HTMLButtonElement | null;
+      if (btn) {
+        btn.classList.toggle('active', isOut);
+        btn.title = isOut ? 'Currently the playback output' : 'Set as playback output';
+      }
+    }
+  };
+
+  /** Rebuild the header OUTPUT dropdown to list the active instr's slots. */
+  const rebuildOutputSelect = (): void => {
+    const ins = model.patch.instruments[activeIdx];
+    if (!ins) {
+      outputSelect.innerHTML = '<option value="">—</option>';
+      return;
+    }
+    const isFinal = outputTarget.instrIdx === activeIdx && outputTarget.slotIdx == null;
+    let html = `<option value="final"${isFinal ? ' selected' : ''}>final (v1)</option>`;
+    // Build option entries for each filled slot at its model index.
+    let visibleRow = 0;
+    for (let i = 0; i < ins.slots.length; i++) {
+      const s = ins.slots[i]!;
+      if (s.fn === 0) continue;
+      visibleRow++;
+      const num = String(visibleRow).padStart(2, '0');
+      const vlabel = s.outVar > 0 ? ` · v${s.outVar}` : '';
+      const sel = outputTarget.instrIdx === activeIdx && outputTarget.slotIdx === i ? ' selected' : '';
+      html += `<option value="${i}"${sel}>slot ${num}${vlabel}</option>`;
+    }
+    outputSelect.innerHTML = html;
   };
 
   const repaint = (): void => {
     renderSidebar(listEl, model.patch, activeIdx, (i) => {
       activeIdx = i;
-      audition = { instrIdx: i, slotIdx: null };
+      selection = { instrIdx: i, slotIdx: null };
+      outputTarget = { instrIdx: i, slotIdx: null };
       renderMain();
       repaint();
     });
@@ -233,8 +363,8 @@ export function bootApp(root: HTMLElement): void {
       }
     }
     if (waveViewer) {
-      const target = (audition.instrIdx === activeIdx && audition.slotIdx != null && lastRender)
-        ? (lastRender.slotTaps[audition.slotIdx] ?? null)
+      const target = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null && lastRender)
+        ? (lastRender.slotTaps[outputTarget.slotIdx] ?? null)
         : (lastRender ? lastRender.sample : null);
       // Loop overlay only when the patch uses op22 (Loop Generator) somewhere
       // in the active instrument. The user wants the band hidden otherwise.
@@ -260,39 +390,77 @@ export function bootApp(root: HTMLElement): void {
 
   const playAudition = (): void => {
     if (!lastRender) return;
-    const sample = (audition.instrIdx === activeIdx && audition.slotIdx != null)
-      ? (lastRender.slotTaps[audition.slotIdx] ?? lastRender.sample)
+    // Playback ALWAYS uses outputTarget (never selection).
+    const sample = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null)
+      ? (lastRender.slotTaps[outputTarget.slotIdx] ?? lastRender.sample)
       : lastRender.sample;
     if (!sample || sample.length === 0) return;
     player.play(sample, noteRateHz(previewNote));
   };
 
-  const updateAuditionLabel = (): void => {
-    const num = String(audition.instrIdx + 1).padStart(2, '0');
-    if (audition.slotIdx == null) {
-      auditionLabel.textContent = `instr ${num} / final`;
+  const updateLabels = (): void => {
+    const sNum = String(selection.instrIdx + 1).padStart(2, '0');
+    if (selection.slotIdx == null) {
+      selectionLabel.textContent = `instr ${sNum} / —`;
     } else {
-      const ins = model.patch.instruments[audition.instrIdx];
-      const slot = ins?.slots[audition.slotIdx];
+      const ins = model.patch.instruments[selection.instrIdx];
+      const slot = ins?.slots[selection.slotIdx];
       const vlabel = slot && slot.outVar > 0 ? ` · v${slot.outVar}` : '';
-      auditionLabel.textContent = `instr ${num} / slot ${String(audition.slotIdx + 1).padStart(2, '0')}${vlabel}`;
+      selectionLabel.textContent =
+        `instr ${sNum} / slot ${String(selection.slotIdx + 1).padStart(2, '0')}${vlabel}`;
     }
+    const oNum = String(outputTarget.instrIdx + 1).padStart(2, '0');
+    if (outputTarget.slotIdx == null) {
+      outputLabel.textContent = `instr ${oNum} / final`;
+    } else {
+      const ins = model.patch.instruments[outputTarget.instrIdx];
+      const slot = ins?.slots[outputTarget.slotIdx];
+      const vlabel = slot && slot.outVar > 0 ? ` · v${slot.outVar}` : '';
+      outputLabel.textContent =
+        `instr ${oNum} / slot ${String(outputTarget.slotIdx + 1).padStart(2, '0')}${vlabel}`;
+    }
+    updateUndoRedoButtons();
   };
 
+  outputSelect.addEventListener('change', () => {
+    const v = outputSelect.value;
+    if (v === 'final' || v === '') {
+      outputTarget = { instrIdx: activeIdx, slotIdx: null };
+    } else {
+      const idx = parseInt(v, 10);
+      if (Number.isFinite(idx)) outputTarget = { instrIdx: activeIdx, slotIdx: idx };
+    }
+    refreshOutputHighlight();
+    updateLabels();
+    runRender();
+    playAudition();
+  });
+
   model.events.on((e) => {
+    // Undo/redo synthesises a 'reset' event — rebuild everything from scratch.
+    if (e.kind === 'reset') {
+      rebuildCloneGraph();
+      validateOutputTarget();
+      renderMain();
+      repaint();
+      updateUndoRedoButtons();
+      return;
+    }
     // Structure changes can rewire the clone graph; rebuild before we decide
     // which instruments are affected.
     if (e.kind === 'structure') {
       rebuildCloneGraph();
+      validateOutputTarget();
     }
     // The active instrument re-renders whenever IT changes OR when any
-    // instrument it (transitively) clones changes. Audition target also
-    // matters because the user may be auditioning a different instrument
+    // instrument it (transitively) clones changes. Output target also
+    // matters because the user may be playing a different instrument
     // than activeIdx — although currently the UI keeps them aligned.
     const affectsActive =
       e.instrIdx === activeIdx ||
-      audition.instrIdx === e.instrIdx ||
+      outputTarget.instrIdx === e.instrIdx ||
       allDependentsOf(cloneGraph, e.instrIdx).has(activeIdx);
+    updateUndoRedoButtons();
     if (!affectsActive) return;
     if (e.kind === 'structure') {
       // Layout change → full DOM rebuild + sidebar refresh.
@@ -301,6 +469,42 @@ export function bootApp(root: HTMLElement): void {
     }
     scheduleRender(true);
   });
+
+  history.on(() => {
+    updateUndoRedoButtons();
+  });
+
+  // Keyboard shortcuts: Ctrl+Z / Ctrl+Shift+Z (and Cmd on Mac).
+  document.addEventListener('keydown', (ev) => {
+    // Don't hijack typing in text inputs / textareas.
+    const target = ev.target as HTMLElement | null;
+    if (target) {
+      const tag = target.tagName;
+      const editable = (target as HTMLElement).isContentEditable;
+      if (editable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        // Allow undo INSIDE text fields too — native browser undo works there
+        // and we don't want to fight it.
+        return;
+      }
+    }
+    const mod = ev.ctrlKey || ev.metaKey;
+    if (!mod) return;
+    if (ev.key === 'z' || ev.key === 'Z') {
+      if (ev.shiftKey) {
+        ev.preventDefault();
+        history.redo();
+      } else {
+        ev.preventDefault();
+        history.undo();
+      }
+    } else if (ev.key === 'y' || ev.key === 'Y') {
+      ev.preventDefault();
+      history.redo();
+    }
+  });
+
+  undoBtn.addEventListener('click', () => history.undo());
+  redoBtn.addEventListener('click', () => history.redo());
 
   hidden.addEventListener('change', async () => {
     const f = hidden.files?.[0];
@@ -313,8 +517,11 @@ export function bootApp(root: HTMLElement): void {
       (ins) => ins.slots.some((s) => s.fn !== 0),
     );
     if (activeIdx < 0) activeIdx = 0;
-    audition = { instrIdx: activeIdx, slotIdx: null };
+    selection = { instrIdx: activeIdx, slotIdx: null };
+    outputTarget = { instrIdx: activeIdx, slotIdx: null };
     rebuildCloneGraph();
+    // Re-emit reset so HistoryManager rebaselines on the new patch.
+    model.events.emit({ instrIdx: -1, kind: 'reset' });
     warnPatchOver16Slots(model);
     renderMain();
     repaint();
@@ -327,8 +534,10 @@ export function bootApp(root: HTMLElement): void {
     patchFileHandle = undefined;
     nameEl.textContent = '(no patch)';
     activeIdx = 0;
-    audition = { instrIdx: 0, slotIdx: null };
+    selection = { instrIdx: 0, slotIdx: null };
+    outputTarget = { instrIdx: 0, slotIdx: null };
     rebuildCloneGraph();
+    model.events.emit({ instrIdx: -1, kind: 'reset' });
     renderMain();
     repaint();
   });
@@ -393,4 +602,5 @@ export function bootApp(root: HTMLElement): void {
   });
 
   repaint();
+  updateUndoRedoButtons();
 }

@@ -21,7 +21,11 @@ export class PatchModel {
     const slot = instr.slots[slotIdx];
     if (!slot) throw new RangeError(`slot index out of range: ${slotIdx}`);
     slot[key] = value;
-    this.events.emit({ instrIdx, kind: 'param' });
+    this.events.emit({
+      instrIdx,
+      kind: 'param',
+      coalesceKey: { instrIdx, slotIdx, field: String(key) },
+    });
   }
 
   insertSlot(instrIdx: number, at: number, slot: Slot): void {

@@ -24,8 +24,8 @@ export interface WaveViewer {
   destroy(): void;
 }
 
-const W = 640;
-const H = 120;
+const W = 800;
+const H = 140;
 
 interface DragState {
   kind: 'pan' | 'loop-start' | 'loop-end';

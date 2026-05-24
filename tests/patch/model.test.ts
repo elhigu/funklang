@@ -24,7 +24,11 @@ describe('PatchModel', () => {
 
     const slot = model.patch.instruments[3]!.slots[0]!;
     expect(slot.freq).toBe(42);
-    expect(events).toEqual([{ instrIdx: 3, kind: 'param' }]);
+    expect(events).toEqual([{
+      instrIdx: 3,
+      kind: 'param',
+      coalesceKey: { instrIdx: 3, slotIdx: 0, field: 'freq' },
+    }]);
   });
 
   it('moveSlot reorders the slots array and emits {kind:"structure"}', () => {
