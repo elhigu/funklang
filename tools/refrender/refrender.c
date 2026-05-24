@@ -301,12 +301,25 @@ static int render_instrument(const Instr instrs[N_INSTRUMENTS],
     if (N < 0) N = 0;
     int total = N + 1;   /* loop runs smp <= sampleLength, inclusive */
 
-    /* Allocate / reset the byte cache for this instrument. */
+    /* Allocate / reset the byte cache for this instrument.
+     *
+     * IMPORTANT: chordgen (op 18) and clone (op 17) can read PAST the end of
+     * the source buffer (e.g. chordgen step 12 reads `BaseAdr + (sample<<1) +
+     * shift`, where `sample<<1` already reaches the end of the buffer). In
+     * the original Amiga binary all instruments live in one big contiguous
+     * ModAdr/BaseAdr block, so OOB reads see the next instrument's bytes
+     * (also data). On host malloc this is UB and yields heap-bookkeeping
+     * noise that breaks bit-exactness vs the JS engine (which returns 0 for
+     * OOB). To make OOB reads well-defined AND match the JS engine, we
+     * over-allocate by SAMPLE_PAD bytes (zeroed). This is large enough to
+     * cover any reasonable chordgen/clone offset within int16 range. */
+    enum { SAMPLE_PAD = 65536 };
+    size_t allocSize = (size_t)(total > 0 ? total : 1) + SAMPLE_PAD;
     if (!sampleBytes[idx]) {
-        sampleBytes[idx] = (int8_t*)calloc((size_t)(total > 0 ? total : 1), 1);
+        sampleBytes[idx] = (int8_t*)calloc(allocSize, 1);
         if (!sampleBytes[idx]) return 1;
     } else {
-        memset(sampleBytes[idx], 0, (size_t)(total > 0 ? total : 1));
+        memset(sampleBytes[idx], 0, allocSize);
     }
 
     renderState[idx] = 1;
@@ -392,12 +405,21 @@ static int render_instrument(const Instr instrs[N_INSTRUMENTS],
             }
             case 7: {  /* enva — Form1 passes literal 0 for sustain */
                 BYTE  attack = (BYTE)pick_short(s->val1, s->val1Value, v);
+                /* Clamp attack to decayTable's defined range. Without this
+                 * `decayTable[attack]` is UB for negative attack values that
+                 * arise when slot.val1 references a modulating variable.
+                 * The JS engine clamps identically (see ops/enva.ts). */
+                if (attack < 0) attack = 0;
+                if (attack > 127) attack = 127;
                 UBYTE gain   = pick_byte (s->gain, s->gainVal, v);
                 out = enva(smp, attack, 0, gain);
                 break;
             }
             case 8: {  /* envd */
                 BYTE  decay   = (BYTE)pick_short(s->val1, s->val1Value, v);
+                /* Same clamp rationale as case 7 (see ops/envd.ts). */
+                if (decay < 0) decay = 0;
+                if (decay > 127) decay = 127;
                 BYTE  sustain = (BYTE)pick_short(s->val2, s->val2Value, v);
                 UBYTE gain    = pick_byte (s->gain, s->gainVal, v);
                 out = envd(smp, decay, sustain, gain);
