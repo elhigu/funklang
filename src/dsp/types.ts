@@ -26,6 +26,29 @@ export interface OpState {
   noise_x1: number;
   noise_x2: number;
   noise_x3: number;
+
+  // adsr: per-slot envelope segment / accumulator / sustain counter.
+  // ADSR_Mode is short[] in C; ADSR_Value and ADSR_SustainCounter are int[].
+  ADSR_Mode: Int16Array;
+  ADSR_Value: Int32Array;
+  ADSR_SustainCounter: Int32Array;
+
+  // sv_flt_n / onepole_flt scratch: 4 shorts per instance (lpf, hpf, bpf, pole).
+  // Indexed as filterBuffer[(instance << 2) + k] with k ∈ {0..3}.
+  filterBuffer: Int16Array;
+
+  // cmb_flt_n / dly_cyc / reverb delay lines (24 channels × 2048 shorts).
+  // Indexed as buffern[instance * 2048 + i]. We use a single flat Int16Array
+  // to mirror C's `short buffern[24][2048]` row-major layout.
+  buffern: Int16Array;
+  // cmb_flt_n local-static index `i[24]` — NOT cleared by clr_buf in C
+  // (process-static), but for per-instrument renders we treat it as
+  // per-OpState to match refrender's per-instrument reset behavior.
+  cmb_flt_n_i: Int16Array;
+
+  // adsr needs the enclosing instrument's sampleLength for its sustain-
+  // segment comparison. Engine sets this before the per-tick loop.
+  sampleLength: number;
 }
 
 export type OpFn = (

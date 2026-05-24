@@ -44,6 +44,10 @@ export function renderInstrument(
   const sample = new Int16Array(total);
   const slotTaps = ins.slots.map(() => new Int16Array(total));
   const state = newOpState();
+  // adsr op needs sampleLength to compute its sustain-segment threshold;
+  // we expose the raw value (not the inclusive-loop adjusted `total`) per
+  // refrender.c case 23 which uses `ins->sampleLength`.
+  state.sampleLength = ins.sampleLength;
   // variables[0] unused; [1..4] are v1..v4. Reset ONCE per instrument
   // (matches main-binary.c lines 76-82 — see dsp-reference.md §7 #5).
   const variables = new Int16Array(5);
