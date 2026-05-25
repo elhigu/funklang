@@ -31,7 +31,10 @@ export async function openFileBytes(
 
 /**
  * Open a file, preferring `showOpenFilePicker` so we can keep a handle for
- * silent SAVE. Falls back to `<input type=file>` (no handle).
+ * silent SAVE. Falls back to `<input type=file>` ONLY when the FSA picker
+ * itself never appeared — never after the user has already seen and
+ * interacted with the FSA picker (which would otherwise pop a second
+ * picker for the same operation).
  */
 export async function openFileWithHandle(
   accept: string,
@@ -45,20 +48,40 @@ export async function openFileWithHandle(
     }) => Promise<FileSystemFileHandle[]>;
   };
   if (w.showOpenFilePicker) {
+    // Phase 1 — show the picker. If THIS throws, the picker either wasn't
+    // shown at all (browser support issue, security context, etc.) or was
+    // cancelled by the user. Only then is it safe to fall back.
+    let handle: FileSystemFileHandle | undefined;
     try {
-      const [handle] = await w.showOpenFilePicker({
+      const result = await w.showOpenFilePicker({
         multiple: false,
         types: [{ description, accept: { 'application/octet-stream': [accept] } }],
       });
-      if (!handle) return null;
+      handle = result[0];
+    } catch (err) {
+      const name = (err as Error).name;
+      if (name === 'AbortError') return null;       // user cancelled
+      // Picker itself failed to even appear — try the input fallback.
+      console.warn('showOpenFilePicker failed, falling back to <input>:', err);
+      const fallback = await openFileBytes(accept);
+      return fallback ? { name: fallback.name, bytes: fallback.bytes } : null;
+    }
+    if (!handle) return null;
+
+    // Phase 2 — read the file. The picker already gave us a handle; if the
+    // read fails (rare — permissions revoked between pick and read, disk
+    // I/O error, etc.) we DO NOT fall back, because that would pop a
+    // second picker for the same user action.
+    try {
       const file = await handle.getFile();
       const bytes = new Uint8Array(await file.arrayBuffer());
       return { name: file.name, bytes, handle };
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return null;
-      // Fall through to the input-based fallback.
+      console.error('Failed to read the picked file:', err);
+      return null;
     }
   }
+  // No FSA at all (Firefox / Safari) — use the input fallback directly.
   const fallback = await openFileBytes(accept);
   return fallback ? { name: fallback.name, bytes: fallback.bytes } : null;
 }
