@@ -181,7 +181,13 @@ function makeInserter(model: PatchModel, instrIdx: number, atIdx: number): HTMLE
 interface VarSelectOpts {
   /** Current value (0..4). */
   value: number;
-  /** When `allowNone`, option 0 shows as "—"; otherwise "v0" (unusual). */
+  /**
+   * `allowNone` is accepted for API compatibility but is purely cosmetic
+   * now — the 0 option always reads as "—" because Klang treats 0 as
+   * "no source connected" in EVERY var-source field (`v0` doesn't exist).
+   * Ops that require a source still surface 0 → "—" so the user can SEE
+   * that nothing is wired and pick a real variable.
+   */
   allowNone: boolean;
   title?: string | undefined;
   onChange: (v: number) => void;
@@ -190,9 +196,9 @@ function makeVarSelect(opts: VarSelectOpts): HTMLSelectElement {
   const sel = document.createElement('select');
   sel.className = 'param-var-select';
   if (opts.title) sel.title = opts.title;
-  const noneLabel = opts.allowNone ? '—' : 'v0';
+  void opts.allowNone;       // intentionally ignored; see comment above
   const labels: ReadonlyArray<{ value: number; text: string }> = [
-    { value: 0, text: noneLabel },
+    { value: 0, text: '—' },
     { value: 1, text: 'v1' },
     { value: 2, text: 'v2' },
     { value: 3, text: 'v3' },
