@@ -7,6 +7,7 @@ export function renderSidebar(
   onPick: (i: number) => void,
 ): void {
   root.innerHTML = '';
+  let activeRow: HTMLLIElement | null = null;
   for (let i = 0; i < patch.instruments.length; i++) {
     const ins = patch.instruments[i]!;
     // Count filled (non-empty) slots — the editor hides op0 rows entirely,
@@ -14,13 +15,22 @@ export function renderSidebar(
     // in the sidebar too.
     const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
     const li = document.createElement('li');
+    const isActive = i === activeIdx;
     li.className = 'instr-row' +
       (filled === 0 ? ' empty' : '') +
-      (i === activeIdx ? ' active' : '');
+      (isActive ? ' active' : '');
     li.innerHTML =
       `<span class="num">${String(i + 1).padStart(2, '0')}</span>` +
       `<span class="name">${ins.name || '—'}</span>`;
     if (filled > 0) li.addEventListener('click', () => onPick(i));
     root.appendChild(li);
+    if (isActive) activeRow = li;
+  }
+
+  // If the active row is off-screen in the scrollable list, scroll it back
+  // into view. `block: 'nearest'` is a no-op when it's already visible, so
+  // we don't jitter on every repaint.
+  if (activeRow) {
+    activeRow.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 }
