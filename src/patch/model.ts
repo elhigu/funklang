@@ -63,7 +63,13 @@ export class PatchModel {
   ): void {
     const instr = this.instr(instrIdx);
     instr[key] = value;
-    this.events.emit({ instrIdx, kind: 'meta' });
+    this.events.emit({
+      instrIdx,
+      kind: 'meta',
+      // slotIdx=-1 sentinel for instrument-level mutations so the history
+      // layer can coalesce a loop-handle drag into a single undo step.
+      coalesceKey: { instrIdx, slotIdx: -1, field: String(key) },
+    });
   }
 
   private instr(instrIdx: number): Instrument {

@@ -106,6 +106,34 @@ describe('HistoryManager', () => {
     expect(model.patch.instruments[0]!.slots[0]!.freqVal).toBe(0);
   });
 
+  it('coalesces 50 rapid setInstrumentField calls (loop drag) into one entry', () => {
+    // Simulate dragging the loop-region edge: many setInstrumentField calls
+    // on loopOffset within the coalesce window. Should produce ONE undo step,
+    // not 50.
+    for (let i = 1; i <= 50; i++) {
+      now += 10; // 10ms apart, well inside the 600ms window
+      model.setInstrumentField(0, 'loopOffset', i * 8);
+    }
+    expect(model.patch.instruments[0]!.loopOffset).toBe(400);
+    history.undo();
+    expect(model.patch.instruments[0]!.loopOffset).toBe(0);
+    expect(history.canUndo()).toBe(false);
+  });
+
+  it('does NOT coalesce setInstrumentField across different fields', () => {
+    now += 50;
+    model.setInstrumentField(0, 'loopOffset', 100);
+    now += 50;
+    model.setInstrumentField(0, 'loopLength', 200);
+    expect(model.patch.instruments[0]!.loopOffset).toBe(100);
+    expect(model.patch.instruments[0]!.loopLength).toBe(200);
+    history.undo(); // undo loopLength
+    expect(model.patch.instruments[0]!.loopLength).toBe(0);
+    expect(model.patch.instruments[0]!.loopOffset).toBe(100);
+    history.undo(); // undo loopOffset
+    expect(model.patch.instruments[0]!.loopOffset).toBe(0);
+  });
+
   it('emits a reset event on undo/redo so listeners can rebuild', () => {
     const seen: string[] = [];
     model.events.on((e) => seen.push(e.kind));

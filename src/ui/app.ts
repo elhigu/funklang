@@ -4,12 +4,14 @@ import { emptyPatch, N_SLOTS_EDITABLE } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
 import { parseAki, serializeAki } from '../fileio/aki';
 import { renderInstrument, CyclicCloneError } from '../dsp/engine';
+import type { RenderResult } from '../dsp/types';
 import { Player } from '../audio/player';
 import { buildCloneGraph, allDependentsOf } from '../patch/clone-graph';
 import type { CloneGraph } from '../patch/clone-graph';
 import { renderSidebar } from './sidebar';
 import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
+import { bytesToInt16 } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, openFileWithHandle, saveFileBytes, saveToHandle } from './file-dialog';
@@ -154,7 +156,7 @@ export function bootApp(root: HTMLElement): void {
   // call updateSlotWaves / viewer.setSample without rebuilding the DOM.
   let gridHostEl: HTMLElement | null = null;
   let waveViewer: WaveViewer | null = null;
-  let lastRender: { sample: Int16Array; slotTaps: Int16Array[] } | null = null;
+  let lastRender: RenderResult | null = null;
   let cycleError: CyclicCloneError | null = null;
 
   const rebuildCloneGraph = (): void => {
@@ -311,6 +313,36 @@ export function bootApp(root: HTMLElement): void {
     });
   };
 
+  /**
+   * loop_gen (op22) produces no per-tick output — its slotTap[i] is silent.
+   * To make the loop_gen slot's tap (and the dedicated wave-viewer when
+   * loop_gen is in play) actually show the crossfaded loop region, we use
+   * the engine's post-loopgen `bytes` buffer (upscaled to Int16) as that
+   * slot's display tap.
+   */
+  function slotDisplayTap(
+    ins: typeof model.patch.instruments[number],
+    render: NonNullable<typeof lastRender>,
+    slotIdx: number,
+  ): Int16Array {
+    const slot = ins.slots[slotIdx];
+    if (slot?.fn === 22 && render.bytes.length > 0) {
+      return bytesToInt16(render.bytes);
+    }
+    return render.slotTaps[slotIdx] ?? new Int16Array(0);
+  }
+
+  function displayTapsFor(
+    ins: typeof model.patch.instruments[number],
+    render: NonNullable<typeof lastRender>,
+  ): Int16Array[] {
+    const out: Int16Array[] = new Array(render.slotTaps.length);
+    for (let i = 0; i < render.slotTaps.length; i++) {
+      out[i] = slotDisplayTap(ins, render, i);
+    }
+    return out;
+  }
+
   // Debounced re-render + audio replay for the active instrument.
   let debounceHandle: ReturnType<typeof setTimeout> | null = null;
   const scheduleRender = (play: boolean): void => {
@@ -337,7 +369,7 @@ export function bootApp(root: HTMLElement): void {
       }
     }
     if (gridHostEl && lastRender) {
-      updateSlotWaves(gridHostEl, lastRender.slotTaps);
+      updateSlotWaves(gridHostEl, displayTapsFor(ins, lastRender));
       // Also refresh canvases inside any expanded clone-blocks (they show
       // taps from the SOURCE instrument, not the outer one). Render each
       // visible source instrument independently and update its canvases.
@@ -349,7 +381,9 @@ export function bootApp(root: HTMLElement): void {
         let taps = renderedBySrc.get(srcIdx);
         if (!taps) {
           try {
-            taps = renderInstrument(model.patch, srcIdx).slotTaps;
+            const srcRender = renderInstrument(model.patch, srcIdx);
+            const srcIns = model.patch.instruments[srcIdx]!;
+            taps = displayTapsFor(srcIns, srcRender);
             renderedBySrc.set(srcIdx, taps);
           } catch (err) {
             // Cyclic clone in the recursive render — skip and leave the
@@ -362,9 +396,10 @@ export function bootApp(root: HTMLElement): void {
       }
     }
     if (waveViewer) {
+      const finalAudible = lastRender ? bytesToInt16(lastRender.bytes) : null;
       const target = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null && lastRender)
-        ? (lastRender.slotTaps[outputTarget.slotIdx] ?? null)
-        : (lastRender ? lastRender.sample : null);
+        ? (slotDisplayTap(ins, lastRender, outputTarget.slotIdx))
+        : finalAudible;
       // Loop overlay only when the patch uses op22 (Loop Generator) somewhere
       // in the active instrument. The user wants the band hidden otherwise.
       const showLoop = instrHasOp(model, activeIdx, 22);
@@ -392,10 +427,15 @@ export function bootApp(root: HTMLElement): void {
   const playAudition = (): void => {
     if (!audioEnabled) return;
     if (!lastRender) return;
-    // Playback ALWAYS uses outputTarget (never selection).
+    const ins = model.patch.instruments[activeIdx];
+    if (!ins) return;
+    // Playback ALWAYS uses outputTarget (never selection). For the final
+    // output we use the post-loopgen `bytes` (upscaled to Int16) so the
+    // user actually hears the crossfade applied by loop_gen.
+    const finalAudible = bytesToInt16(lastRender.bytes);
     const sample = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null)
-      ? (lastRender.slotTaps[outputTarget.slotIdx] ?? lastRender.sample)
-      : lastRender.sample;
+      ? slotDisplayTap(ins, lastRender, outputTarget.slotIdx)
+      : finalAudible;
     if (!sample || sample.length === 0) return;
     player.play(sample, noteRateHz(previewNote));
   };

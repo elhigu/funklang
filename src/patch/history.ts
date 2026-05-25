@@ -88,11 +88,14 @@ export class HistoryManager {
     if (this.restoring) return;
     const ev = e as { kind: string; coalesceKey?: CoalesceKey | undefined };
     const t = this.now();
-    const isParam = ev.kind === 'param';
-    const key = isParam ? (ev.coalesceKey ?? null) : null;
+    // Coalesce both 'param' (knob drag) and 'meta' (instrument-field drag,
+    // e.g. loop region edges) as long as they carry a key. 'structure' and
+    // 'reset' always commit.
+    const coalescable = ev.kind === 'param' || ev.kind === 'meta';
+    const key = coalescable ? (ev.coalesceKey ?? null) : null;
 
     let shouldCommit = true;
-    if (isParam && key && this.lastKey && keysEqual(key, this.lastKey)) {
+    if (coalescable && key && this.lastKey && keysEqual(key, this.lastKey)) {
       if (t - this.lastEventAt <= this.coalesceWindowMs) {
         shouldCommit = false;
       }

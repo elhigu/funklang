@@ -25,8 +25,13 @@ export interface PatchChange {
   kind: 'param' | 'structure' | 'meta' | 'reset';
   /**
    * Optional discriminator for coalescing rapid consecutive edits to the
-   * same target (e.g. a knob drag firing many setSlotParam calls on the
-   * same field). Populated by PatchModel.setSlotParam.
+   * same target. Populated by:
+   *   - PatchModel.setSlotParam       → kind='param',  slotIdx = the slot
+   *   - PatchModel.setInstrumentField → kind='meta',   slotIdx = -1 sentinel
+   *
+   * The history layer collapses consecutive same-key events within its
+   * coalesce window into one undo step (so dragging the loop edges is one
+   * undo, not hundreds).
    */
   coalesceKey?: {
     instrIdx: number;

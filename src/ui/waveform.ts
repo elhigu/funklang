@@ -1,5 +1,19 @@
 // Pure waveform drawing helpers. No state, no events.
 
+/**
+ * Expand a Klang 8-bit Amiga byte stream to Int16 for display + audio so the
+ * waveform canvas and the Web Audio buffer can share a single drawWaveform
+ * implementation.
+ *
+ * `bytes` is the engine's `RenderResult.bytes` — the post-loopgen, signed
+ * 8-bit DAC-truth output that the real Amiga would play.
+ */
+export function bytesToInt16(bytes: Int8Array): Int16Array {
+  const out = new Int16Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) out[i] = (bytes[i]! << 8);
+  return out;
+}
+
 export interface WaveOptions {
   width?: number | undefined;
   height?: number | undefined;

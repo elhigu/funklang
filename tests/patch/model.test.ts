@@ -58,6 +58,10 @@ describe('PatchModel', () => {
     model.setInstrumentField(5, 'name', 'kick');
 
     expect(model.patch.instruments[5]!.name).toBe('kick');
-    expect(events).toEqual([{ instrIdx: 5, kind: 'meta' }]);
+    expect(events).toEqual([{
+      instrIdx: 5,
+      kind: 'meta',
+      coalesceKey: { instrIdx: 5, slotIdx: -1, field: 'name' },
+    }]);
   });
 });
