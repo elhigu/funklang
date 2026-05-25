@@ -92,8 +92,11 @@
     width: 8px; height: 8px;
     background: var(--amber);
     box-shadow: 0 0 8px var(--amber);
-    animation: pulse 1.4s infinite;
+    opacity: 1;
   }
+  /* Pulse only while autoplayback mode is on (audio toggle = green).
+     When muted, the dot stays solid. */
+  .brand.audio-on .dot { animation: pulse 1.4s infinite; }
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
@@ -414,23 +417,120 @@
   }
   .output-select-wrap select:focus { outline: none; border-color: var(--magenta); }
 
-  /* single audio on/off toggle next to OUTPUT — replaces PLAY/STOP/RETRIG */
+  /* Single audio on/off toggle next to OUTPUT — replaces PLAY/STOP/RETRIG.
+     Rendered as a triangle (▶) like a transport play button; colour
+     indicates state. Square border (not circular) reads more like a
+     button than a status dot. */
   .audio-toggle {
     background: var(--bg-2);
     border: 1px solid var(--grid);
-    width: 22px; height: 22px;
-    padding: 0;
+    width: 26px; height: 22px;
+    padding: 0 0 0 2px;             /* nudge ▶ optical centre */
     margin-left: 4px;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1;
     cursor: pointer;
-    border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    transition: color 120ms linear, box-shadow 120ms linear;
+    transition: color 120ms linear, border-color 120ms linear, box-shadow 120ms linear;
   }
-  .audio-toggle.on  { color: var(--green); box-shadow: 0 0 6px rgba(123,225,123,0.55); }
-  .audio-toggle.off { color: var(--red);   box-shadow: 0 0 6px rgba(255,74,91,0.45); }
+  .audio-toggle.on  {
+    color: var(--green); border-color: var(--green);
+    text-shadow: 0 0 6px rgba(123,225,123,0.55);
+  }
+  .audio-toggle.off {
+    color: var(--red);   border-color: var(--red);
+    text-shadow: 0 0 6px rgba(255,74,91,0.45);
+  }
   .audio-toggle:hover { background: var(--bg-3); }
+
+  /* Help button + modal */
+  .help-btn {
+    background: var(--bg-2);
+    border: 1px solid var(--grid);
+    color: var(--fg-1);
+    font: inherit;
+    font-weight: 600;
+    width: 22px; height: 22px;
+    margin-left: 6px;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .help-btn:hover { background: var(--bg-3); color: var(--amber); border-color: var(--amber); }
+
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+  }
+  .help-overlay.hidden { display: none; }
+  .help-card {
+    background: var(--bg-1);
+    border: 1px solid var(--amber);
+    box-shadow: 0 0 24px rgba(255, 177, 78, 0.18);
+    max-width: 640px;
+    width: min(640px, 92vw);
+    max-height: 86vh;
+    display: flex; flex-direction: column;
+  }
+  .help-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--grid);
+    font-family: 'Silkscreen', monospace;
+    color: var(--amber);
+    letter-spacing: 0.6px;
+  }
+  .help-close {
+    background: transparent; border: 1px solid var(--grid);
+    color: var(--fg-1); font: inherit;
+    width: 22px; height: 22px; padding: 0; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .help-close:hover { color: var(--red); border-color: var(--red); }
+  .help-body {
+    padding: 14px 18px 18px;
+    overflow-y: auto;
+    color: var(--fg-0);
+  }
+  .help-body h3 {
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    color: var(--amber-dim);
+    margin: 14px 0 6px;
+    letter-spacing: 0.6px;
+  }
+  .help-body h3:first-child { margin-top: 0; }
+  .help-kbd {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px;
+  }
+  .help-kbd td {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--grid-dim);
+    vertical-align: middle;
+  }
+  .help-kbd td:first-child {
+    width: 220px;
+    color: var(--fg-1);
+  }
+  .help-kbd kbd {
+    background: var(--bg-3);
+    border: 1px solid var(--grid);
+    border-radius: 2px;
+    padding: 1px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--amber);
+    margin: 0 2px;
+  }
+  .help-foot {
+    margin-top: 14px;
+    font-size: 11px;
+    color: var(--fg-2);
+  }
 
   .footer-status .selection {
     color: var(--amber);

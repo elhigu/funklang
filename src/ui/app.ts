@@ -97,7 +97,7 @@ export function bootApp(root: HTMLElement): void {
   root.innerHTML = `
     <div class="app">
       <header>
-        <div class="brand"><div class="dot"></div><span>KLANG.WEB</span></div>
+        <div class="brand"><div class="dot"></div><span>FUNKLANG.WEB</span></div>
         <div class="menu">
           <button id="btn-new">NEW</button>
           <button id="btn-open">OPEN&nbsp;PATCH</button>
@@ -114,13 +114,50 @@ export function bootApp(root: HTMLElement): void {
           <label class="output-select-wrap" title="Which signal is sent to the audio output">
             <span class="output-select-label">OUTPUT</span>
             <select id="output-select"></select>
-            <button id="btn-audio-toggle" class="audio-toggle on" title="Audio on — click to mute (changes still re-render). Spacebar replays.">●</button>
+            <button id="btn-audio-toggle" class="audio-toggle on" title="Audio on — click to mute (changes still re-render). Spacebar replays.">▶</button>
           </label>
+          <button id="btn-help" class="help-btn" title="Keyboard shortcuts (?)">?</button>
         </div>
         <div class="file-info">
           <span class="file-name" id="file-name">(no patch)</span>
         </div>
       </header>
+      <div id="help-overlay" class="help-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <div class="help-card">
+          <div class="help-head">
+            <span id="help-title">FUNKLANG.WEB</span>
+            <button class="help-close" id="help-close" aria-label="Close">✕</button>
+          </div>
+          <div class="help-body">
+            <h3>Keyboard shortcuts</h3>
+            <table class="help-kbd">
+              <tbody>
+                <tr><td><kbd>Space</kbd></td><td>Replay last sound</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save patch (silent if file was opened)</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save patch as…</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo (alt)</td></tr>
+                <tr><td><kbd>?</kbd> or <kbd>Esc</kbd></td><td>Toggle / close this help</td></tr>
+              </tbody>
+            </table>
+            <h3>Mouse</h3>
+            <table class="help-kbd">
+              <tbody>
+                <tr><td>Drag knob</td><td>Coarse change (~2 units/px)</td></tr>
+                <tr><td><kbd>Shift</kbd>+drag</td><td>Fine change (1 unit/px)</td></tr>
+                <tr><td>Wheel over knob / dropdown</td><td>Step ±1</td></tr>
+                <tr><td>Double-click knob</td><td>Type exact value</td></tr>
+                <tr><td>Right-click knob</td><td>Reset to default</td></tr>
+                <tr><td>Click slot function name</td><td>Change op type</td></tr>
+                <tr><td>Click 🔊 on a slot</td><td>Set as playback output</td></tr>
+                <tr><td>Drag slot # column</td><td>Reorder slots</td></tr>
+              </tbody>
+            </table>
+            <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
+          </div>
+        </div>
+      </div>
       <aside class="sidebar">
         <div class="sidebar-title">PATCH · INSTRUMENTS</div>
         <ul class="instr-list" id="instr-list"></ul>
@@ -423,9 +460,17 @@ export function bootApp(root: HTMLElement): void {
   };
 
   let audioEnabled = true;
+  // Cache the brand-dot element so we can drive its "autoplayback active"
+  // pulse animation off audioEnabled. The CSS pulse runs only while the
+  // `.audio-on` class is present on the brand container.
+  const brandEl = root.querySelector('.brand') as HTMLElement | null;
+  const reflectAudioOnDot = (): void => {
+    if (brandEl) brandEl.classList.toggle('audio-on', audioEnabled);
+  };
 
-  const playAudition = (): void => {
-    if (!audioEnabled) return;
+  /** Internal core; callers can bypass the audioEnabled gate via `force`. */
+  const playAuditionInternal = (opts: { force?: boolean } = {}): void => {
+    if (!audioEnabled && !opts.force) return;
     if (!lastRender) return;
     const ins = model.patch.instruments[activeIdx];
     if (!ins) return;
@@ -440,14 +485,20 @@ export function bootApp(root: HTMLElement): void {
     player.play(sample, noteRateHz(previewNote));
   };
 
-  /** Replay whatever's already rendered (does not re-run DSP). Used by spacebar. */
-  const retriggerAudio = (): void => {
-    if (!audioEnabled) return;
+  /** Auto-replay-on-change path — gated by the audio toggle. */
+  const playAudition = (): void => playAuditionInternal();
+
+  /**
+   * Replay whatever's already rendered (does not re-run DSP). Used by spacebar.
+   * `force` bypasses the audioEnabled gate — spacebar is an explicit user
+   * action, so it always plays even when "autoplayback on changes" is muted.
+   */
+  const retriggerAudio = (opts: { force?: boolean } = {}): void => {
+    if (!audioEnabled && !opts.force) return;
     if (!lastRender) {
-      // Nothing rendered yet — produce one and play.
       runRender();
     }
-    playAudition();
+    playAuditionInternal({ force: !!opts.force });
   };
 
   const updateLabels = (): void => {
@@ -526,23 +577,73 @@ export function bootApp(root: HTMLElement): void {
     updateUndoRedoButtons();
   });
 
-  // Keyboard shortcuts: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y / Ctrl+S / Ctrl+Shift+S
-  // (and Cmd on Mac). Ctrl+S intercepts ALWAYS so it overrides the browser's
-  // "save page" dialog even when focus is inside an input.
-  document.addEventListener('keydown', (ev) => {
-    const target = ev.target as HTMLElement | null;
-    const inField = !!target && (
-      (target as HTMLElement).isContentEditable ||
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.tagName === 'SELECT'
-    );
+  // Help modal: open via ? button or unmodified '?' key; close via X / Esc.
+  const helpOverlay = root.querySelector('#help-overlay') as HTMLElement;
+  const helpCloseBtn = root.querySelector('#help-close') as HTMLButtonElement;
+  const showHelp = (): void => helpOverlay.classList.remove('hidden');
+  const hideHelp = (): void => helpOverlay.classList.add('hidden');
+  const toggleHelp = (): void =>
+    helpOverlay.classList.contains('hidden') ? showHelp() : hideHelp();
+  (root.querySelector('#btn-help') as HTMLButtonElement).addEventListener('click', toggleHelp);
+  helpCloseBtn.addEventListener('click', hideHelp);
+  helpOverlay.addEventListener('click', (ev) => {
+    if (ev.target === helpOverlay) hideHelp();   // outside click
+  });
 
-    // Spacebar: replay the latest sound. Skip when typing in a field so the
-    // user can put spaces in instrument names etc.
-    if ((ev.key === ' ' || ev.code === 'Space') && !inField) {
+  // Global keydown / beforeunload. Stored on window so Vite HMR re-mounts
+  // don't accumulate duplicate listeners (which would fire savePatch
+  // multiple times for one Ctrl+S — the "saving opens twice" bug).
+  const w = window as unknown as {
+    __funklangKeydown?: (ev: KeyboardEvent) => void;
+    __funklangBeforeUnload?: (ev: BeforeUnloadEvent) => void;
+  };
+  if (w.__funklangKeydown) document.removeEventListener('keydown', w.__funklangKeydown);
+  if (w.__funklangBeforeUnload) window.removeEventListener('beforeunload', w.__funklangBeforeUnload);
+
+  const keydownHandler = (ev: KeyboardEvent): void => {
+    // Use BOTH the event target AND document.activeElement to decide if the
+    // user is currently typing somewhere. activeElement is more reliable for
+    // cases where keydown is delivered to <body> while focus actually sits
+    // inside an INPUT (e.g. shortly after a click).
+    //
+    // `inTextField` = something that consumes typed characters (INPUT,
+    //   TEXTAREA, SELECT, contentEditable). Undo/redo and ? help skip.
+    // `inActivatable` = also includes BUTTON / focused dropdowns. Spacebar
+    //   skips when on these so the browser's native Space-activates-button
+    //   behavior wins (Tab-navigating with the keyboard still feels right).
+    const ae = document.activeElement as HTMLElement | null;
+    const target = ev.target as HTMLElement | null;
+    const isText = (el: HTMLElement | null): boolean => !!el && (
+      el.isContentEditable ||
+      el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.tagName === 'SELECT'
+    );
+    const inField = isText(ae) || isText(target);
+    const inActivatable = inField
+      || ae?.tagName === 'BUTTON' || target?.tagName === 'BUTTON';
+
+    // Esc closes the help modal first.
+    if (ev.key === 'Escape' && !helpOverlay.classList.contains('hidden')) {
       ev.preventDefault();
-      retriggerAudio();
+      hideHelp();
+      return;
+    }
+    // '?' (Shift+/ on most layouts) toggles help — only when not in a field.
+    if (ev.key === '?' && !inField && !ev.ctrlKey && !ev.metaKey) {
+      ev.preventDefault();
+      toggleHelp();
+      return;
+    }
+
+    // Spacebar: replay the latest sound. Skip when typing in a field (so
+    // the user can put spaces in instrument names) AND when a button /
+    // dropdown is focused (so the browser's native Space-activates behavior
+    // still works). Audio toggle does NOT gate spacebar — it's an explicit
+    // user action, always honored.
+    if ((ev.key === ' ' || ev.code === 'Space') && !inActivatable) {
+      ev.preventDefault();
+      retriggerAudio({ force: true });
       return;
     }
 
@@ -571,21 +672,22 @@ export function bootApp(root: HTMLElement): void {
       ev.preventDefault();
       history.redo();
     }
-  });
+  };
+  w.__funklangKeydown = keydownHandler;
+  document.addEventListener('keydown', keydownHandler);
 
-  // Warn before refresh/close when there's a patch in play. The browser
-  // will show its own generic "Changes you made may not be saved" prompt.
-  window.addEventListener('beforeunload', (ev) => {
+  // Warn before refresh/close when there's a patch in play.
+  const beforeUnloadHandler = (ev: BeforeUnloadEvent): void => {
     const hasWork = patchFileName !== '' || model.patch.instruments.some(
       (ins) => ins.slots.length > 0,
     );
     if (hasWork) {
       ev.preventDefault();
-      // returnValue is the legacy way to trigger the prompt; required by
-      // some browsers even though they ignore the string content.
       ev.returnValue = '';
     }
-  });
+  };
+  w.__funklangBeforeUnload = beforeUnloadHandler;
+  window.addEventListener('beforeunload', beforeUnloadHandler);
 
   undoBtn.addEventListener('click', () => history.undo());
   redoBtn.addEventListener('click', () => history.redo());
@@ -651,6 +753,7 @@ export function bootApp(root: HTMLElement): void {
     audioToggle.title = audioEnabled
       ? 'Audio on — click to mute (changes still re-render). Spacebar replays.'
       : 'Audio muted — click to unmute.';
+    reflectAudioOnDot();
   };
   audioToggle.addEventListener('click', () => {
     audioEnabled = !audioEnabled;
@@ -659,43 +762,54 @@ export function bootApp(root: HTMLElement): void {
   });
   updateAudioToggle();
 
+  // Re-entrancy guard so a quick Ctrl+S double-tap (or a Ctrl+S that
+  // races with a SAVE button click) doesn't open the picker twice.
+  let saving = false;
+
   // Save current patch. If we have a write-back handle (FSA-opened or
   // captured from a previous SAVE AS), write silently — no dialog. Only
   // when no handle is available (Firefox / Safari, or fresh patch never
   // saved) do we fall back to a picker / download.
   const savePatch = async (): Promise<void> => {
-    const bytes = serializeAkp(model.patch);
-    if (patchFileHandle) {
-      try {
-        await saveToHandle(patchFileHandle, bytes);
-        return;
-      } catch { /* fall through to picker fallback */ }
-    }
-    const name = patchFileName || 'patch.akp';
-    const newHandle = await saveFileBytes(bytes, name, '.akp');
-    if (newHandle) {
-      patchFileHandle = newHandle;
-      // Refresh the display name to match what they picked.
-      try {
-        const f = await newHandle.getFile();
-        patchFileName = f.name;
-        nameEl.textContent = patchFileName;
-      } catch { /* ignore */ }
-    }
+    if (saving) return;
+    saving = true;
+    try {
+      const bytes = serializeAkp(model.patch);
+      if (patchFileHandle) {
+        try {
+          await saveToHandle(patchFileHandle, bytes);
+          return;
+        } catch { /* fall through to picker fallback */ }
+      }
+      const name = patchFileName || 'patch.akp';
+      const newHandle = await saveFileBytes(bytes, name, '.akp');
+      if (newHandle) {
+        patchFileHandle = newHandle;
+        try {
+          const f = await newHandle.getFile();
+          patchFileName = f.name;
+          nameEl.textContent = patchFileName;
+        } catch { /* ignore */ }
+      }
+    } finally { saving = false; }
   };
 
   const savePatchAs = async (): Promise<void> => {
-    const bytes = serializeAkp(model.patch);
-    const name = patchFileName || 'patch.akp';
-    const newHandle = await saveFileBytes(bytes, name, '.akp');
-    if (newHandle) {
-      patchFileHandle = newHandle;
-      try {
-        const f = await newHandle.getFile();
-        patchFileName = f.name;
-        nameEl.textContent = patchFileName;
-      } catch { /* ignore */ }
-    }
+    if (saving) return;
+    saving = true;
+    try {
+      const bytes = serializeAkp(model.patch);
+      const name = patchFileName || 'patch.akp';
+      const newHandle = await saveFileBytes(bytes, name, '.akp');
+      if (newHandle) {
+        patchFileHandle = newHandle;
+        try {
+          const f = await newHandle.getFile();
+          patchFileName = f.name;
+          nameEl.textContent = patchFileName;
+        } catch { /* ignore */ }
+      }
+    } finally { saving = false; }
   };
 
   (root.querySelector('#btn-save-as') as HTMLButtonElement).addEventListener('click', () => { void savePatchAs(); });
