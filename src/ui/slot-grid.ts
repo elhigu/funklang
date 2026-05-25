@@ -488,7 +488,10 @@ function renderRow(
     : '';
 
   row.innerHTML = `
-    <div class="col col-num">${outGlyph}${num}</div>
+    <div class="col col-num">
+      ${outGlyph}${num}
+      <button class="slot-del" title="Delete this slot">✕</button>
+    </div>
     <div class="col col-out">
       <select class="out-select" title="Output variable">
         <option value="0"${slot.outVar === 0 ? ' selected' : ''}>·</option>
@@ -503,7 +506,6 @@ function renderRow(
     <div class="col wave-cell">
       <canvas class="wave" width="320" height="40" data-wave></canvas>
       ${speakerBtn}
-      <button class="slot-del" title="Delete this slot">✕</button>
     </div>
   `;
 

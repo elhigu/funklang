@@ -392,18 +392,21 @@
     color: var(--fg-2);
     border: none;
     cursor: pointer;
-    font-size: 13px;
-    padding: 2px 4px;
+    /* 2× the previous size — the per-slot playback selector is a primary
+       affordance, the user explicitly asked for it to read bigger. */
+    font-size: 26px;
+    line-height: 1;
+    padding: 4px 6px;
     margin-left: 2px;
     opacity: 0;
-    transition: opacity 80ms linear, color 80ms linear;
+    transition: opacity 80ms linear, color 80ms linear, transform 80ms linear;
   }
-  .slot:hover .slot-output-btn { opacity: 0.55; }
-  .slot-output-btn:hover { color: var(--magenta); opacity: 1; }
+  .slot:hover .slot-output-btn { opacity: 0.6; }
+  .slot-output-btn:hover { color: var(--magenta); opacity: 1; transform: scale(1.08); }
   .slot-output-btn.active {
     color: var(--magenta);
     opacity: 1;
-    text-shadow: 0 0 6px var(--magenta-glow);
+    text-shadow: 0 0 10px var(--magenta-glow);
   }
   .output-select-wrap {
     display: inline-flex;
@@ -700,15 +703,13 @@
     display: block;
     min-width: 0;
   }
-  .wave-cell .slot-output-btn,
-  .wave-cell .slot-del {
+  .wave-cell .slot-output-btn {
     position: absolute;
-    top: 6px;
+    top: 4px;
+    right: 12px;
     z-index: 2;
     pointer-events: auto;
   }
-  .wave-cell .slot-output-btn { right: 38px; }
-  .wave-cell .slot-del         { right: 14px; }
   canvas.wave {
     background: #050507;
     border: 1px solid var(--grid-dim);
@@ -804,19 +805,33 @@
   }
   .slot-insert-btn:hover { background: var(--magenta-glow); }
 
+  /* Delete button lives in the slot #-column, near the slot number. Stacks
+     vertically beneath the # for compactness. Hidden until the row is
+     hovered so it doesn't add visual noise to a full grid. */
   .slot-del {
     background: transparent;
     color: var(--fg-2);
-    border: none;
+    border: 1px solid transparent;
     cursor: pointer;
     font-size: 13px;
-    padding: 2px 6px;
-    margin-left: 6px;
+    padding: 0 4px;
+    margin-top: 4px;
+    line-height: 1.1;
     opacity: 0;
-    transition: opacity 80ms linear, color 80ms linear;
+    transition: opacity 80ms linear, color 80ms linear, border-color 80ms linear;
   }
-  .slot:hover .slot-del { opacity: 1; }
-  .slot-del:hover { color: var(--red); }
+  .slot:hover .slot-del { opacity: 0.7; }
+  .slot-del:hover { color: var(--red); border-color: var(--red); opacity: 1; }
+
+  /* The col-num cell now stacks the number on top and the delete button
+     beneath. Keep both compactly centred in the cell. */
+  .slot > .col-num {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
 
   .out-select {
     background: transparent;
