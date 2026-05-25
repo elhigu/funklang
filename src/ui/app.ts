@@ -129,31 +129,62 @@ export function bootApp(root: HTMLElement): void {
             <button class="help-close" id="help-close" aria-label="Close">✕</button>
           </div>
           <div class="help-body">
-            <h3>Keyboard shortcuts</h3>
+            <h3>Playback &amp; transport</h3>
             <table class="help-kbd">
               <tbody>
-                <tr><td><kbd>Space</kbd></td><td>Replay last sound</td></tr>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save patch (silent if file was opened)</td></tr>
+                <tr><td><kbd>Space</kbd></td><td>Replay the selected output (always — even if the audio toggle is muted)</td></tr>
+                <tr><td>Click 🔊 on a slot</td><td>Set that slot as the playback output and audition it once</td></tr>
+                <tr><td>Click ▶ next to OUTPUT</td><td>Toggle auto-playback (green = plays on every change, red = muted)</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Instrument selection (sidebar)</h3>
+            <table class="help-kbd">
+              <tbody>
+                <tr><td>Click instrument</td><td>Select + audition (if audio toggle is on)</td></tr>
+                <tr><td>Mouse wheel over list</td><td>Step ± to previous / next non-empty instrument</td></tr>
+                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Same — wraps around past the ends</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Slider (when bar is focused — click it once)</h3>
+            <table class="help-kbd">
+              <tbody>
+                <tr><td>Click anywhere on the bar</td><td>Set value to that position; bar gains focus</td></tr>
+                <tr><td>Drag</td><td>Value follows the mouse X (release to commit)</td></tr>
+                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Fine ±1</td></tr>
+                <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Coarse (~3% of the slider's full range)</td></tr>
+                <tr><td><kbd>Shift</kbd>+arrow</td><td>Coarse from any direction</td></tr>
+                <tr><td>Wheel over the slider</td><td>Fine ±1</td></tr>
+                <tr><td><kbd>Shift</kbd>+wheel</td><td>Coarse (~3% of range)</td></tr>
+                <tr><td>Double-click the value</td><td>Type exact value (<kbd>↑</kbd>/<kbd>↓</kbd> step in the editor too)</td></tr>
+                <tr><td>Right-click</td><td>Reset to default</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Slots</h3>
+            <table class="help-kbd">
+              <tbody>
+                <tr><td>Click slot row</td><td>Set as the edit selection (amber bar on the left)</td></tr>
+                <tr><td>Click slot function name</td><td>Change op type (opens the op picker)</td></tr>
+                <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
+                <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
+                <tr><td>Click ▶ on a clone slot</td><td>Expand the source instrument inline (recursive)</td></tr>
+                <tr><td>Wheel over a dropdown</td><td>Step through its options</td></tr>
+              </tbody>
+            </table>
+
+            <h3>File &amp; history</h3>
+            <table class="help-kbd">
+              <tbody>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save patch (silent if the file was opened via OPEN PATCH)</td></tr>
                 <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save patch as…</td></tr>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo (alt)</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo (knob drags coalesce into one entry)</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo</td></tr>
                 <tr><td><kbd>?</kbd> or <kbd>Esc</kbd></td><td>Toggle / close this help</td></tr>
               </tbody>
             </table>
-            <h3>Mouse</h3>
-            <table class="help-kbd">
-              <tbody>
-                <tr><td>Drag knob</td><td>Coarse change (~2 units/px)</td></tr>
-                <tr><td><kbd>Shift</kbd>+drag</td><td>Fine change (1 unit/px)</td></tr>
-                <tr><td>Wheel over knob / dropdown</td><td>Step ±1</td></tr>
-                <tr><td>Double-click knob</td><td>Type exact value</td></tr>
-                <tr><td>Right-click knob</td><td>Reset to default</td></tr>
-                <tr><td>Click slot function name</td><td>Change op type</td></tr>
-                <tr><td>Click 🔊 on a slot</td><td>Set as playback output</td></tr>
-                <tr><td>Drag slot # column</td><td>Reorder slots</td></tr>
-              </tbody>
-            </table>
+
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>
         </div>
