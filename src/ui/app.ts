@@ -135,6 +135,7 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td><kbd>Space</kbd></td><td>Replay the selected output (always — even if the audio toggle is muted)</td></tr>
                 <tr><td>Click 🔊 on a slot</td><td>Set that slot as the playback output and audition it once</td></tr>
                 <tr><td>Click ▶ next to OUTPUT</td><td>Toggle auto-playback (green = plays on every change, red = no auto play)</td></tr>
+                <tr><td><kbd>Shift</kbd>+click ▶</td><td>Play a 0.8 s sine test tone (audio-chain diagnostic — logs Player state)</td></tr>
               </tbody>
             </table>
 
@@ -875,7 +876,27 @@ export function bootApp(root: HTMLElement): void {
       : 'Audio muted — click to unmute.';
     reflectAudioOnDot();
   };
-  audioToggle.addEventListener('click', () => {
+  audioToggle.addEventListener('click', (ev) => {
+    // Shift-click = diagnostic test tone: routes a 0.8s 440 Hz sine wave
+    // through the same Player path that real audition uses. If you can
+    // SEE the tab speaker icon active while playing but HEAR nothing,
+    // this confirms whether the Player / Web Audio chain itself is
+    // producing output (vs the silence being caused by sample data,
+    // tab-mute, sink routing, etc.). Logs Player state to the console.
+    if (ev.shiftKey) {
+      const RATE = 22050;
+      const LEN_S = 0.8;
+      const N = (RATE * LEN_S) | 0;
+      const sample = new Int16Array(N);
+      const freq = 440;
+      for (let i = 0; i < N; i++) {
+        sample[i] = Math.round(Math.sin((i / RATE) * 2 * Math.PI * freq) * 16000);
+      }
+      // eslint-disable-next-line no-console
+      console.log('[funklang] test tone: 440 Hz sine, 0.8s, peak ±16000');
+      player.play(sample, RATE);
+      return;
+    }
     audioEnabled = !audioEnabled;
     if (!audioEnabled) player.stop();
     updateAudioToggle();
