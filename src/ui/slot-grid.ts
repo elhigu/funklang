@@ -28,10 +28,20 @@ export interface SlotGridOptions {
    * magenta `►` glyph in the # column — independent of the selection.
    */
   outputSlot?: number | null | undefined;
+  /** Instrument index of the current output target — used so the ► glyph
+   *  highlights the right slot inside expanded clone blocks (whose rows
+   *  belong to a DIFFERENT instrIdx than the active outer one). */
+  outputInstr?: number | undefined;
   /** Called when user clicks a slot row to make it the edit selection. */
   onSelect?: ((slotIdx: number) => void) | undefined;
   /** Called when user clicks the per-row speaker button to retarget output. */
-  onSetOutput?: ((slotIdx: number) => void) | undefined;
+  /**
+   * Set this slot as the playback output target. `instrIdx` is the
+   * instrument the slot belongs to — different from the active instrument
+   * when the user clicks 🔊 inside an expanded clone block (the inner
+   * grid is rendered for the SOURCE instrument).
+   */
+  onSetOutput?: ((instrIdx: number, slotIdx: number) => void) | undefined;
 }
 
 /**
@@ -481,7 +491,8 @@ function renderRow(
   row.dataset['rowIdx'] = String(rowIdx);
   row.draggable = true;
   if (opts.selectedSlot === slotIdx) row.classList.add('selected', 'active');
-  const isOutputTarget = opts.outputSlot === slotIdx;
+  const isOutputTarget = opts.outputSlot === slotIdx
+    && (opts.outputInstr === undefined || opts.outputInstr === instrIdx);
   if (isOutputTarget) row.classList.add('output-target');
 
   // Display 1-based position by visible row, not by model index — empty
@@ -575,7 +586,7 @@ function renderRow(
   if (outBtn) {
     outBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (opts.onSetOutput) opts.onSetOutput(slotIdx);
+      if (opts.onSetOutput) opts.onSetOutput(instrIdx, slotIdx);
     });
     outBtn.addEventListener('mousedown', (e) => e.stopPropagation());
   }
@@ -646,7 +657,19 @@ function renderRow(
       block.appendChild(inner);
       expandedHost.appendChild(block);
       try {
-        renderSlotGrid(inner, model, srcIdx, { depth: depth + 1 });
+        // Forward the interaction callbacks so 🔊 / row click / drag-
+        // reorder inside the expanded block fire the same handlers as
+        // the outer grid (with the correct srcIdx for instr-aware
+        // callbacks). The outer code uses `outputInstr` to decide
+        // which row carries the ► glyph.
+        renderSlotGrid(inner, model, srcIdx, {
+          depth: depth + 1,
+          selectedSlot: opts.selectedSlot,
+          outputSlot: opts.outputSlot,
+          outputInstr: opts.outputInstr,
+          onSelect: opts.onSelect,
+          onSetOutput: opts.onSetOutput,
+        });
       } catch (err) {
         block.innerHTML += `<div class="cycle-chip">would create cycle</div>`;
         void err;

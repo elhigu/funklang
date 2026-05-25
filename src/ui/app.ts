@@ -284,7 +284,8 @@ export function bootApp(root: HTMLElement): void {
     gridHostEl = gridHost;
     renderSlotGrid(gridHost, model, activeIdx, {
       selectedSlot: selection.instrIdx === activeIdx ? selection.slotIdx : null,
-      outputSlot: outputTarget.instrIdx === activeIdx ? outputTarget.slotIdx : null,
+      outputSlot: outputTarget.slotIdx,
+      outputInstr: outputTarget.instrIdx,
       onSelect: (slotIdx) => {
         selection = { instrIdx: activeIdx, slotIdx };
         // Refresh only the row highlights + footer label — don't replay audio
@@ -292,8 +293,12 @@ export function bootApp(root: HTMLElement): void {
         refreshSelectionHighlight();
         updateLabels();
       },
-      onSetOutput: (slotIdx) => {
-        outputTarget = { instrIdx: activeIdx, slotIdx };
+      onSetOutput: (srcInstrIdx, slotIdx) => {
+        // srcInstrIdx may not be activeIdx if 🔊 was clicked inside an
+        // expanded clone block — the inner grid belongs to the source
+        // instrument. Honour the actual instr the slot belongs to so the
+        // user hears that slot's tap, not the active instrument's.
+        outputTarget = { instrIdx: srcInstrIdx, slotIdx };
         refreshOutputHighlight();
         refreshOutputMasterBtn();
         updateLabels();
@@ -549,8 +554,9 @@ export function bootApp(root: HTMLElement): void {
   const buildFinalAudible = (
     ins: typeof model.patch.instruments[number],
     render: NonNullable<typeof lastRender>,
+    instrIdx: number,
   ): Int16Array => {
-    if (instrHasOp(model, activeIdx, 22) && ins.loopLength > 0) {
+    if (instrHasOp(model, instrIdx, 22) && ins.loopLength > 0) {
       return bytesToInt16WithLoop(
         render.bytes, ins.loopOffset, ins.loopLength, FINAL_LOOP_REPEATS,
       );
@@ -561,18 +567,30 @@ export function bootApp(root: HTMLElement): void {
   /** Internal core; callers can bypass the audioEnabled gate via `force`. */
   const playAuditionInternal = (opts: { force?: boolean } = {}): void => {
     if (!audioEnabled && !opts.force) return;
-    if (!lastRender) return;
-    const ins = model.patch.instruments[activeIdx];
-    if (!ins) return;
-    // Playback ALWAYS uses outputTarget (never selection). For the final
-    // output (or a slot 15 / loop_gen tap) we want the looped bytes;
-    // intermediate slot taps stay one-shot.
-    const targetIsLoopGenSlot = outputTarget.instrIdx === activeIdx
-      && outputTarget.slotIdx != null
-      && ins.slots[outputTarget.slotIdx]?.fn === 22;
-    const sample = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null && !targetIsLoopGenSlot)
-      ? slotDisplayTap(ins, lastRender, outputTarget.slotIdx)
-      : buildFinalAudible(ins, lastRender);
+
+    // When outputTarget.instrIdx differs from activeIdx (e.g. user clicked
+    // 🔊 inside an expanded clone block), render THAT instrument so we
+    // can pull its sample / slotTap rather than the active one's.
+    let render: typeof lastRender = lastRender;
+    let renderIns = model.patch.instruments[activeIdx];
+    if (outputTarget.instrIdx !== activeIdx) {
+      try {
+        render = renderInstrument(model.patch, outputTarget.instrIdx);
+        renderIns = model.patch.instruments[outputTarget.instrIdx];
+      } catch {
+        // Cyclic clone, etc. — just bail; nothing to play.
+        return;
+      }
+    }
+    if (!render || !renderIns) return;
+
+    // For final output (slotIdx == null) and for the loop_gen slot's tap
+    // we want the looped bytes; intermediate slot taps stay one-shot.
+    const targetIsLoopGenSlot = outputTarget.slotIdx != null
+      && renderIns.slots[outputTarget.slotIdx]?.fn === 22;
+    const sample = (outputTarget.slotIdx != null && !targetIsLoopGenSlot)
+      ? slotDisplayTap(renderIns, render, outputTarget.slotIdx)
+      : buildFinalAudible(renderIns, render, outputTarget.instrIdx);
     if (!sample || sample.length === 0) return;
     player.play(sample, noteRateHz(previewNote));
   };
