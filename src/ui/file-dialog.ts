@@ -68,17 +68,24 @@ export async function openFileWithHandle(
     }
     if (!handle) return null;
 
-    // Phase 2 — read the file. The picker already gave us a handle; if the
-    // read fails (rare — permissions revoked between pick and read, disk
-    // I/O error, etc.) we DO NOT fall back, because that would pop a
-    // second picker for the same user action.
+    // Phase 2 — read the file. The picker already gave us a handle. On
+    // most setups this just works; on some (observed on NixOS + Wayland
+    // portal + GNOME Files) getFile() / arrayBuffer() silently fails
+    // even though the picker resolved with a valid-looking handle. When
+    // that happens we DO fall back to the <input type=file> picker so
+    // the user can still load the file — at the cost of seeing a second
+    // dialog. Better two dialogs than a silently-dropped patch.
     try {
       const file = await handle.getFile();
       const bytes = new Uint8Array(await file.arrayBuffer());
       return { name: file.name, bytes, handle };
     } catch (err) {
-      console.error('Failed to read the picked file:', err);
-      return null;
+      console.warn(
+        'FSA read failed after a successful pick — opening the <input> ' +
+        'fallback so the file still loads. The original error was:', err,
+      );
+      const fallback = await openFileBytes(accept);
+      return fallback ? { name: fallback.name, bytes: fallback.bytes } : null;
     }
   }
   // No FSA at all (Firefox / Safari) — use the input fallback directly.
