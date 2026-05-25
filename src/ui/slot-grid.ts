@@ -10,6 +10,7 @@ import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
 import { opByCode, resetSlotForOp } from '../dsp/op-metadata';
+import { clampLoopOffset, loopLengthFor, minLoopOffset, maxLoopOffset } from '../patch/loop-rules';
 import type { ParamDef } from '../dsp/op-metadata';
 
 export interface SlotGridOptions {
@@ -199,6 +200,13 @@ interface VarSelectOpts {
    * that nothing is wired and pick a real variable.
    */
   allowNone: boolean;
+  /**
+   * Set of variable indices (1..4) that have been written to by any
+   * earlier slot in the same instrument. Options outside this set get
+   * a "(unset)" suffix and, when SELECTED-but-unset, the whole control
+   * gets a red border so the user knows the input will be silence.
+   */
+  availableVars?: ReadonlySet<number> | undefined;
   title?: string | undefined;
   onChange: (v: number) => void;
 }
@@ -214,13 +222,22 @@ function makeVarSelect(opts: VarSelectOpts): HTMLSelectElement {
     { value: 3, text: 'v3' },
     { value: 4, text: 'v4' },
   ];
+  const avail = opts.availableVars;
   for (const o of labels) {
     const optEl = document.createElement('option');
     optEl.value = String(o.value);
-    optEl.textContent = o.text;
+    // v1..v4 that aren't yet written get a "(unset)" suffix so the user
+    // knows picking them feeds silence into this slot.
+    const isUnset = o.value > 0 && !!avail && !avail.has(o.value);
+    optEl.textContent = isUnset ? `${o.text} (unset)` : o.text;
     if (o.value === opts.value) optEl.selected = true;
     sel.appendChild(optEl);
   }
+  // If the currently-selected source is unset, highlight the whole control
+  // so the warning is visible without opening the dropdown.
+  const currentlyUnset = opts.value > 0 && !!avail && !avail.has(opts.value);
+  sel.classList.toggle('var-unset', currentlyUnset);
+  if (currentlyUnset) sel.title = (sel.title ? sel.title + ' — ' : '') + `v${opts.value} is not written by any earlier slot`;
   sel.addEventListener('change', () => {
     const v = parseInt(sel.value, 10);
     if (Number.isFinite(v)) opts.onChange(v);
@@ -291,6 +308,26 @@ function makeRefSelect(opts: RefSelectOpts): HTMLSelectElement {
  * Render a single ParamDef as a DOM element (which the slot-grid appends
  * into the per-row .params host). Each widget is wired to model.setSlotParam.
  */
+/**
+ * The set of variables (1..4) written to by any slot BEFORE `slotIdx` in
+ * the given instrument. A var-source dropdown picking a variable outside
+ * this set is referencing silence — surfaced as `(unset)` + red border.
+ */
+function writtenVarsBefore(
+  model: PatchModel,
+  instrIdx: number,
+  slotIdx: number,
+): Set<number> {
+  const ins = model.patch.instruments[instrIdx];
+  if (!ins) return new Set();
+  const out = new Set<number>();
+  for (let i = 0; i < slotIdx; i++) {
+    const s = ins.slots[i];
+    if (s && s.fn !== 0 && s.outVar > 0) out.add(s.outVar);
+  }
+  return out;
+}
+
 function renderParam(
   model: PatchModel,
   instrIdx: number,
@@ -330,6 +367,7 @@ function renderParam(
       const sel = makeVarSelect({
         value: slot[param.field] as number,
         allowNone: param.type.allowNone ?? true,
+        availableVars: writtenVarsBefore(model, instrIdx, slotIdx),
         title: param.type.label,
         onChange: writeValue,
       });
@@ -349,7 +387,9 @@ function renderParam(
       label.textContent = param.type.label;
       wrap.appendChild(label);
 
-      // Selector dropdown: "const" | v1..v4.
+      // Selector dropdown: "const" | v1..v4. Variables not written by any
+      // earlier slot get a "(unset)" suffix, and when one is the current
+      // selection the whole dropdown gets a red border (.var-unset).
       const sel = document.createElement('select');
       sel.className = 'param-mode-select';
       sel.title = `${param.type.label}: source`;
@@ -361,12 +401,18 @@ function renderParam(
         { value: 4, text: 'v4' },
       ];
       const curSelector = slot[selFieldKey] as number;
+      const availV = writtenVarsBefore(model, instrIdx, slotIdx);
       for (const m of modes) {
         const optEl = document.createElement('option');
         optEl.value = String(m.value);
-        optEl.textContent = m.text;
+        const isUnsetVar = m.value > 0 && !availV.has(m.value);
+        optEl.textContent = isUnsetVar ? `${m.text} (unset)` : m.text;
         if (m.value === curSelector) optEl.selected = true;
         sel.appendChild(optEl);
+      }
+      if (curSelector > 0 && !availV.has(curSelector)) {
+        sel.classList.add('var-unset');
+        sel.title += ` — v${curSelector} is not written by any earlier slot`;
       }
       sel.addEventListener('click', (e) => e.stopPropagation());
       sel.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -572,6 +618,41 @@ function renderRow(
   if (opDef) {
     for (const p of opDef.params) {
       knobsHost.appendChild(renderParam(model, instrIdx, slotIdx, slot, p));
+    }
+  }
+  // loop_gen (op 22) has no slot params, but it owns the instrument's
+  // loop region. Surface a single "offset" knob that drives
+  // ins.loopOffset, snapping to the loop-rules valid set. loopLength is
+  // derived (sampleLength − loopOffset).
+  if (slot.fn === 22) {
+    const ins = model.patch.instruments[instrIdx];
+    if (ins) {
+      const minOff = minLoopOffset(ins.sampleLength);
+      const maxOff = maxLoopOffset(ins.sampleLength);
+      const wrap = document.createElement('div');
+      wrap.className = 'param';
+      const offsetKnob = makeKnob({
+        label: 'offset',
+        value: ins.loopOffset,
+        min: minOff,
+        max: maxOff,
+        defaultValue: minOff,
+        onChange: (v) => {
+          const snapped = clampLoopOffset(ins.sampleLength, v);
+          if (snapped !== ins.loopOffset) {
+            model.setInstrumentField(instrIdx, 'loopOffset', snapped);
+          }
+          const newLen = loopLengthFor(ins.sampleLength, snapped);
+          if (newLen !== ins.loopLength) {
+            model.setInstrumentField(instrIdx, 'loopLength', newLen);
+          }
+        },
+      });
+      offsetKnob.el.addEventListener('mousedown', (e) => e.stopPropagation());
+      offsetKnob.el.addEventListener('click', (e) => e.stopPropagation());
+      offsetKnob.el.addEventListener('dblclick', (e) => e.stopPropagation());
+      wrap.appendChild(offsetKnob.el);
+      knobsHost.appendChild(wrap);
     }
   }
   // If no OpDef entry exists for slot.fn, render no param controls — the

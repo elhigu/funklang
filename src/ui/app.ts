@@ -7,6 +7,7 @@ import { renderInstrument, CyclicCloneError } from '../dsp/engine';
 import type { RenderResult } from '../dsp/types';
 import { Player } from '../audio/player';
 import { buildCloneGraph, allDependentsOf } from '../patch/clone-graph';
+import { clampLoopOffset, loopLengthFor } from '../patch/loop-rules';
 import type { CloneGraph } from '../patch/clone-graph';
 import { renderSidebar } from './sidebar';
 import { renderInstrHeader } from './instr-header';
@@ -272,9 +273,22 @@ export function bootApp(root: HTMLElement): void {
     viewerHost.className = 'wave-viewer';
     mainEl.appendChild(viewerHost);
     waveViewer = makeWaveViewer(viewerHost, {
-      onLoopChange: (loopOffset, loopLength) => {
-        model.setInstrumentField(activeIdx, 'loopOffset', loopOffset);
-        model.setInstrumentField(activeIdx, 'loopLength', loopLength);
+      onLoopChange: (rawOffset, _rawLength) => {
+        // loopLength is no longer user-modifiable — it's always derived
+        // as `sampleLength − loopOffset`. The wave-viewer's drag emits
+        // a raw offset; we snap it to the nearest valid even value per
+        // loop-rules, then update BOTH instrument fields so the
+        // serialized .akp stays consistent.
+        const ins = model.patch.instruments[activeIdx];
+        if (!ins) return;
+        const snapped = clampLoopOffset(ins.sampleLength, rawOffset);
+        const newLen = loopLengthFor(ins.sampleLength, snapped);
+        if (snapped !== ins.loopOffset) {
+          model.setInstrumentField(activeIdx, 'loopOffset', snapped);
+        }
+        if (newLen !== ins.loopLength) {
+          model.setInstrumentField(activeIdx, 'loopLength', newLen);
+        }
       },
     });
 
@@ -550,7 +564,7 @@ export function bootApp(root: HTMLElement): void {
    * user audibly hears the loop behaviour the Amiga would produce, not
    * just one-shot the whole buffer.
    */
-  const FINAL_LOOP_REPEATS = 3;
+  const FINAL_LOOP_REPEATS = 2;
   const buildFinalAudible = (
     ins: typeof model.patch.instruments[number],
     render: NonNullable<typeof lastRender>,

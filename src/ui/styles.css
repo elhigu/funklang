@@ -724,6 +724,12 @@
   .param-mode-select:focus,
   .param-enum-select:focus,
   .param-ref-select:focus { border-color: var(--amber); }
+  /* Dropdown points at a variable nothing earlier writes — warning. */
+  .param-var-select.var-unset,
+  .param-mode-select.var-unset {
+    color: var(--red);
+    border-color: var(--red);
+  }
 
   /* var-or-const: knob is dimmed when source is a variable rather than const */
   .param-const-knob.disabled { opacity: 0.35; pointer-events: none; }

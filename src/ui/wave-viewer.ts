@@ -28,7 +28,7 @@ const W = 800;
 const H = 140;
 
 interface DragState {
-  kind: 'pan' | 'loop-start' | 'loop-end';
+  kind: 'pan' | 'loop-start';
   startX: number;
   startStart: number;
   startEnd: number;
@@ -115,23 +115,16 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
   canvas.addEventListener('mousedown', (e) => {
     if (!sample) return;
     e.preventDefault();
-    // Edge-detect loop handles first (only when the loop band is visible).
+    // Edge-detect the LEFT loop handle (loopOffset). The right edge is
+    // pinned to the sample end (loopLength is derived) so we don't
+    // listen for drags there.
     if (showLoop && loopLength > 0) {
       const xL = sampleToX(loopOffset);
-      const xR = sampleToX(loopOffset + loopLength);
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       if (Math.abs(mouseX - xL) <= EDGE_PX) {
         drag = {
           kind: 'loop-start', startX: e.clientX,
-          startStart: viewStart, startEnd: viewEnd,
-          startLoopOfs: loopOffset, startLoopLen: loopLength,
-        };
-        return;
-      }
-      if (Math.abs(mouseX - xR) <= EDGE_PX) {
-        drag = {
-          kind: 'loop-end', startX: e.clientX,
           startStart: viewStart, startEnd: viewEnd,
           startLoopOfs: loopOffset, startLoopLen: loopLength,
         };
@@ -159,21 +152,21 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
       viewEnd = ee;
       paint();
     } else if (drag.kind === 'loop-start') {
-      const newStart = Math.max(0, Math.min(drag.startLoopOfs + drag.startLoopLen - 1,
-        Math.round(drag.startLoopOfs + dxSamples)));
-      const newLen = drag.startLoopOfs + drag.startLoopLen - newStart;
-      loopOffset = newStart;
-      loopLength = newLen;
-      paint();
-      if (opts.onLoopChange) opts.onLoopChange(loopOffset, loopLength);
-    } else if (drag.kind === 'loop-end') {
-      const newEnd = Math.max(drag.startLoopOfs + 1, Math.min(total(),
-        Math.round(drag.startLoopOfs + drag.startLoopLen + dxSamples)));
-      const newLen = newEnd - drag.startLoopOfs;
-      loopLength = newLen;
+      // Loop LENGTH isn't user-modifiable — it's always (sampleLength −
+      // loopOffset). The receiver (app.ts) clamps the proposed offset
+      // to the nearest valid even position via loop-rules. We just
+      // forward the raw click position and let the caller snap.
+      const proposedStart = Math.round(drag.startLoopOfs + dxSamples);
+      // Locally show an unclamped preview so the band tracks the cursor.
+      const localEnd = drag.startLoopOfs + drag.startLoopLen;
+      const previewStart = Math.max(0, Math.min(localEnd - 2, proposedStart));
+      loopOffset = previewStart;
+      loopLength = localEnd - previewStart;
       paint();
       if (opts.onLoopChange) opts.onLoopChange(loopOffset, loopLength);
     }
+    // loop-end drag intentionally removed — the loop region's right
+    // edge is always pinned to the sample end (loopLength is derived).
   };
   const onUp = (): void => { drag = null; };
   document.addEventListener('mousemove', onMove);
