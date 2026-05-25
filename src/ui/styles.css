@@ -421,17 +421,34 @@
     text-transform: uppercase;
   }
   .output-select-label { color: var(--fg-2); }
-  .output-select-wrap select {
+  /* MASTER V1 toggle button. Replaces the per-slot dropdown the wrap
+     used to hold — when active, the active instrument's final v1 is the
+     playback target (which is the usual case). When a per-slot 🔊 takes
+     over, the button dims to "dimmed" to advertise that some other slot
+     owns the output. Clicking it always returns to MASTER V1. */
+  .output-master {
     background: var(--bg-2);
-    color: var(--magenta);
     border: 1px solid var(--grid);
+    color: var(--magenta);
     font: inherit;
-    text-transform: none;
-    padding: 2px 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 3px 10px;
     cursor: pointer;
-    max-width: 180px;
+    transition: opacity 80ms linear, color 80ms linear, border-color 80ms linear;
   }
-  .output-select-wrap select:focus { outline: none; border-color: var(--magenta); }
+  .output-master.active {
+    color: var(--magenta);
+    border-color: var(--magenta);
+    text-shadow: 0 0 8px var(--magenta-glow);
+  }
+  .output-master.dimmed {
+    color: var(--fg-2);
+    border-color: var(--grid);
+    opacity: 0.55;
+  }
+  .output-master:hover { opacity: 1; color: var(--magenta); border-color: var(--magenta); }
 
   /* Single audio on/off toggle next to OUTPUT — replaces PLAY/STOP/RETRIG.
      Rendered as a triangle (▶) like a transport play button; colour
@@ -672,17 +689,37 @@
   .param-mode-select,
   .param-enum-select,
   .param-ref-select {
+    /* `appearance: none` strips the OS native widget so OUR background +
+       text colors actually apply on Chromium (otherwise the dropdown
+       renders as a light-themed system widget with light text, unreadable
+       on our dark page). `color-scheme: dark` makes the popped-open
+       option list also render dark on Chromium / Firefox. */
+    appearance: none;
+    -webkit-appearance: none;
+    color-scheme: dark;
     background: var(--bg-2);
     color: var(--amber);
     border: 1px solid var(--grid);
     font-family: 'IBM Plex Mono', monospace;
     font-size: 12px;
-    padding: 3px 4px;
+    padding: 3px 22px 3px 6px;       /* room on right for the custom arrow */
     cursor: pointer;
     outline: none;
     max-width: 180px;
+    /* Custom dropdown arrow (SVG embedded as a data URL) so we don't need
+       to ship an asset — caret is amber to match the brand. */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%23ffb14e'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
   }
   .param-ref-select { max-width: 220px; }
+  .param-var-select option,
+  .param-mode-select option,
+  .param-enum-select option,
+  .param-ref-select option {
+    background: var(--bg-1);
+    color: var(--fg-0);
+  }
   .param-var-select:focus,
   .param-mode-select:focus,
   .param-enum-select:focus,
@@ -834,14 +871,21 @@
   }
 
   .out-select {
-    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    color-scheme: dark;
+    background: var(--bg-2);
     border: 1px solid var(--grid-dim);
     color: var(--cyan);
     font-family: 'IBM Plex Mono', monospace;
     font-size: 12px;
-    padding: 1px 3px;
+    padding: 1px 18px 1px 6px;
     outline: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%2338e8ff'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 4px center;
   }
+  .out-select option { background: var(--bg-1); color: var(--fg-0); }
   .out-select:focus { border-color: var(--amber); }
 
   /* op picker modal */
