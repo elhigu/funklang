@@ -427,7 +427,15 @@ function renderParam(
             : String(i + 1).padStart(2, '0');
         },
         title: param.type.label,
-        onChange: writeValue,
+        onChange: (v) => {
+          writeValue(v);
+          // Changing a clone/chordgen source instrument is structural,
+          // not parametric — the expanded clone block, title, dependency
+          // graph and any cached source render are now stale. Re-emit
+          // as 'structure' so the slot grid rebuilds and the clone
+          // graph reverse-index is refreshed.
+          model.events.emit({ instrIdx, kind: 'structure' });
+        },
       });
       wrap.appendChild(sel);
       break;
