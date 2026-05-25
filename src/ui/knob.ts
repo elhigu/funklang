@@ -1,6 +1,8 @@
-// Vertical-bar knob component with drag / wheel / arrow / dblclick edit / contextmenu reset.
-// Values stay numeric; out-of-range gets a red-tinted display but is still emitted to onChange
-// so the caller (model) can clamp on serialize.
+// Horizontal slider knob: label on the left, a wide CSS-rendered track in
+// the middle (clickable + draggable to set value by X position), value on
+// the right. The track is focusable; ArrowUp/ArrowDown fine-tune ±1, wheel
+// steps ±1, dblclick opens a numeric <input> for exact entry, right-click
+// resets to default.
 
 export interface KnobOptions {
   label: string;
@@ -8,9 +10,9 @@ export interface KnobOptions {
   min?: number | undefined;
   max?: number | undefined;
   defaultValue?: number | undefined;
-  /** Pixels-per-unit divisor for coarse drag (default 0.5 → ~2 units/px). */
+  /** Legacy: ignored. Drag is now position-based (click X → value at that ratio). */
   coarsePxPerUnit?: number | undefined;
-  /** Pixels-per-unit divisor for shift-drag (default 1 → 1 unit/px). */
+  /** Legacy: ignored. */
   finePxPerUnit?: number | undefined;
   onChange: (v: number) => void;
 }
@@ -26,20 +28,11 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function barString(val: number, min: number, max: number, width = 6): string {
-  const range = max - min;
-  const ratio = range <= 0 ? 0 : (val - min) / range;
-  const r = clamp(ratio, 0, 1);
-  const filled = Math.round(r * width);
-  return '█'.repeat(filled) + '░'.repeat(width - filled);
-}
-
 export function makeKnob(opts: KnobOptions): Knob {
   const min = opts.min ?? 0;
   const max = opts.max ?? 255;
   const defaultValue = opts.defaultValue ?? 0;
-  const coarse = opts.coarsePxPerUnit ?? 0.5;
-  const fine = opts.finePxPerUnit ?? 1;
+  const range = max - min;
 
   let value = opts.value;
 
@@ -47,7 +40,7 @@ export function makeKnob(opts: KnobOptions): Knob {
   el.className = 'knob';
   el.innerHTML = `
     <span class="klabel"></span>
-    <span class="kbar" tabindex="0"></span>
+    <span class="kbar" tabindex="0" role="slider"></span>
     <span class="kval"></span>
   `;
   const labelEl = el.querySelector('.klabel') as HTMLElement;
@@ -55,10 +48,12 @@ export function makeKnob(opts: KnobOptions): Knob {
   const valEl = el.querySelector('.kval') as HTMLElement;
   labelEl.textContent = opts.label;
 
-  const range = max - min;
-
   const paint = (): void => {
-    barEl.textContent = barString(value, min, max);
+    const ratio = range <= 0 ? 0 : clamp((value - min) / range, 0, 1);
+    barEl.style.setProperty('--fill', `${ratio * 100}%`);
+    barEl.setAttribute('aria-valuenow', String(value));
+    barEl.setAttribute('aria-valuemin', String(min));
+    barEl.setAttribute('aria-valuemax', String(max));
     valEl.textContent = String(value);
     const oor = value < min || value > max;
     valEl.classList.toggle('out-of-range', oor);
@@ -72,40 +67,46 @@ export function makeKnob(opts: KnobOptions): Knob {
     opts.onChange(value);
   };
 
-  // wheel: ±1, shift ±10
+  // Step sizes are range-aware. Fine (plain wheel / arrow) is always ±1.
+  // Coarse (Shift+wheel / Shift+arrow) is ~3% of the value range so a
+  // wide param like freq (0..32767) moves ~983 per tick instead of
+  // imperceptible ±10. Min 1 so tiny ranges still move.
+  const coarseStep = (): number => Math.max(1, Math.round(range * 0.03));
+
+  // wheel: ±1, shift ±coarse
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault();
-    const step = e.shiftKey ? 10 : 1;
+    const step = e.shiftKey ? coarseStep() : 1;
     const dir = e.deltaY < 0 ? 1 : -1;
     emit(value + step * dir);
   };
   el.addEventListener('wheel', onWheel, { passive: false });
 
-  // arrow keys when focused
+  // arrow keys when bar is focused: ±1, shift ±coarse
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    e.preventDefault();
-    const step = e.shiftKey ? 10 : 1;
-    const dir = e.key === 'ArrowUp' ? 1 : -1;
-    emit(value + step * dir);
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      emit(value + (e.shiftKey ? coarseStep() : 1));
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      emit(value - (e.shiftKey ? coarseStep() : 1));
+    }
   };
   barEl.addEventListener('keydown', onKey);
 
-  // drag: vertical, ~2 units/px coarse (px*2), 1 units/px shift fine.
-  // Movement up = increase.
+  // Click+drag: value follows mouse X relative to the bar's bounding rect.
+  // Single click at X = set value to that ratio (and focus the bar so arrow
+  // keys can fine-tune from there).
+  const valueFromClientX = (clientX: number): number => {
+    const rect = barEl.getBoundingClientRect();
+    if (rect.width <= 0) return value;
+    const r = clamp((clientX - rect.left) / rect.width, 0, 1);
+    return min + r * range;
+  };
   let dragging = false;
-  let startY = 0;
-  let startV = 0;
-  let dragShift = false;
   const onMouseMove = (e: MouseEvent): void => {
     if (!dragging) return;
-    const dy = startY - e.clientY;
-    const ppu = e.shiftKey ? fine : coarse;
-    // pxPerUnit ppu means: 1 unit per ppu pixels → dy/ppu units (approximately).
-    // For coarse default 0.5 → 1 unit per 0.5 px = 2 units/px.
-    const delta = dy / ppu;
-    emit(startV + delta);
-    dragShift = e.shiftKey;
+    emit(valueFromClientX(e.clientX));
   };
   const onMouseUp = (): void => {
     dragging = false;
@@ -113,16 +114,14 @@ export function makeKnob(opts: KnobOptions): Knob {
     document.removeEventListener('mouseup', onMouseUp);
   };
   barEl.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;  // ignore right/middle
     e.preventDefault();
+    barEl.focus();
     dragging = true;
-    startY = e.clientY;
-    startV = value;
-    dragShift = e.shiftKey;
+    emit(valueFromClientX(e.clientX));
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   });
-  // Silence unused-var lint: dragShift is for future visual feedback.
-  void dragShift;
 
   // contextmenu: reset to default
   barEl.addEventListener('contextmenu', (e) => {
@@ -135,9 +134,7 @@ export function makeKnob(opts: KnobOptions): Knob {
     if (el.querySelector('input.kedit')) return;
     const input = document.createElement('input');
     input.className = 'kedit';
-    // Use type=number so the browser's native ArrowUp/ArrowDown ±1 step
-    // (and Shift+arrow ±10) works inside the inline editor. min/max keep
-    // typed/stepped values inside the param's declared range.
+    // type=number → native ArrowUp/ArrowDown ±1 step (Shift+arrow ±10 too).
     input.type = 'number';
     input.min = String(min);
     input.max = String(max);
@@ -152,9 +149,7 @@ export function makeKnob(opts: KnobOptions): Knob {
       if (closed) return;
       closed = true;
       const n = parseInt(input.value, 10);
-      if (Number.isFinite(n)) {
-        emit(n);
-      }
+      if (Number.isFinite(n)) emit(n);
       input.remove();
       valEl.style.display = '';
     };
@@ -174,7 +169,6 @@ export function makeKnob(opts: KnobOptions): Knob {
   barEl.addEventListener('dblclick', openEditor);
 
   paint();
-  void range;
 
   return {
     el,
@@ -185,8 +179,6 @@ export function makeKnob(opts: KnobOptions): Knob {
       paint();
     },
     getValue(): number { return value; },
-    destroy(): void {
-      el.remove();
-    },
+    destroy(): void { el.remove(); },
   };
 }

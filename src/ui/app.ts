@@ -342,15 +342,58 @@ export function bootApp(root: HTMLElement): void {
     outputSelect.innerHTML = html;
   };
 
+  /**
+   * Activate `i` (clamped to the nearest non-empty instrument if `i` is
+   * empty or out of range), re-render, and optionally retrigger audio.
+   * Used by sidebar clicks, mouse wheel, ArrowUp/Down, and `NEW`/`OPEN`.
+   */
+  const selectInstrument = (i: number, opts: { play?: boolean } = {}): void => {
+    const n = model.patch.instruments.length;
+    let want = Math.max(0, Math.min(n - 1, i));
+    if (want === activeIdx) return;
+    activeIdx = want;
+    selection = { instrIdx: want, slotIdx: null };
+    outputTarget = { instrIdx: want, slotIdx: null };
+    renderMain();
+    repaint();
+    if (opts.play) playAudition();   // gated by audioEnabled
+  };
+
+  /**
+   * Step the sidebar selection by `delta`, skipping over empty instruments
+   * so wheel/arrow nav lands only on something audible. Wraps around past
+   * the ends so you can scroll continuously.
+   */
+  const stepInstrument = (delta: number, opts: { play?: boolean } = {}): void => {
+    const list = model.patch.instruments;
+    const n = list.length;
+    if (n === 0) return;
+    const dir = delta > 0 ? 1 : -1;
+    let next = activeIdx;
+    for (let tries = 0; tries < n; tries++) {
+      next = (next + dir + n) % n;
+      const ins = list[next];
+      if (ins && ins.slots.some((s) => s.fn !== 0)) {
+        selectInstrument(next, opts);
+        return;
+      }
+    }
+    // No non-empty instrument anywhere — leave activeIdx alone.
+  };
+
   const repaint = (): void => {
     renderSidebar(listEl, model.patch, activeIdx, (i) => {
-      activeIdx = i;
-      selection = { instrIdx: i, slotIdx: null };
-      outputTarget = { instrIdx: i, slotIdx: null };
-      renderMain();
-      repaint();
+      selectInstrument(i);
     });
   };
+
+  // Sidebar wheel + arrow nav. Wheel anywhere over the list scrolls the
+  // SELECTION (not the DOM scroll); arrows do the same when the keydown
+  // target isn't inside a text field. Both auto-play if audio is on.
+  listEl.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    stepInstrument(e.deltaY > 0 ? 1 : -1, { play: true });
+  }, { passive: false });
 
   /**
    * loop_gen (op22) produces no per-tick output — its slotTap[i] is silent.
@@ -603,6 +646,10 @@ export function bootApp(root: HTMLElement): void {
   if (w.__funklangBeforeUnload) window.removeEventListener('beforeunload', w.__funklangBeforeUnload);
 
   const keydownHandler = (ev: KeyboardEvent): void => {
+    // If a focused inner control already handled this key (e.g. a knob bar's
+    // ArrowUp), defer to it — don't double-fire the global behavior.
+    if (ev.defaultPrevented) return;
+
     // Use BOTH the event target AND document.activeElement to decide if the
     // user is currently typing somewhere. activeElement is more reliable for
     // cases where keydown is delivered to <body> while focus actually sits
@@ -657,7 +704,8 @@ export function bootApp(root: HTMLElement): void {
       return;
     }
 
-    // For undo/redo, leave native behavior alone inside text inputs.
+    // For undo/redo and instrument nav, leave native behavior alone inside
+    // text inputs (so the user can type in instrument-name fields, etc.).
     if (inField) return;
     if (ev.key === 'z' || ev.key === 'Z') {
       if (ev.shiftKey) {
@@ -670,6 +718,12 @@ export function bootApp(root: HTMLElement): void {
     } else if (ev.key === 'y' || ev.key === 'Y') {
       ev.preventDefault();
       history.redo();
+    } else if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+      // ArrowUp/Down at the global level steps the instrument selection.
+      // (Knob bars have their own keydown handler that stops propagation
+      // via target check above when focused.)
+      ev.preventDefault();
+      stepInstrument(ev.key === 'ArrowDown' ? 1 : -1, { play: true });
     }
   };
   w.__funklangKeydown = keydownHandler;
