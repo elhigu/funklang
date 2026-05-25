@@ -31,6 +31,20 @@ describe('PatchModel', () => {
     }]);
   });
 
+  it('setSlotParam("fn", ...) emits {kind:"structure"} so the row UI rebuilds', () => {
+    // Changing the op-type means the slot's param schema is now different
+    // (new knobs, new labels). The UI listens to 'structure' to rebuild
+    // the row, so the model must emit structure for fn — not param.
+    const model = new PatchModel(emptyPatch());
+    model.insertSlot(0, 0, makeSlot(1));   // start with fn=1 (vol)
+    const events = recorder(model);
+
+    model.setSlotParam(0, 0, 'fn', 4);     // change to fn=4 (osc_sine)
+
+    expect(model.patch.instruments[0]!.slots[0]!.fn).toBe(4);
+    expect(events).toEqual([{ instrIdx: 0, kind: 'structure' }]);
+  });
+
   it('moveSlot reorders the slots array and emits {kind:"structure"}', () => {
     const model = new PatchModel(emptyPatch());
     model.insertSlot(0, 0, makeSlot(1)); // a

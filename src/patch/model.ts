@@ -21,11 +21,19 @@ export class PatchModel {
     const slot = instr.slots[slotIdx];
     if (!slot) throw new RangeError(`slot index out of range: ${slotIdx}`);
     slot[key] = value;
-    this.events.emit({
-      instrIdx,
-      kind: 'param',
-      coalesceKey: { instrIdx, slotIdx, field: String(key) },
-    });
+    // Changing `fn` is structural — the slot's whole param schema changes,
+    // so the UI needs to rebuild the row (new knobs, new labels) rather
+    // than just refresh the existing waveform tap. Emit 'structure' for fn,
+    // 'param' for everything else.
+    if (key === 'fn') {
+      this.events.emit({ instrIdx, kind: 'structure' });
+    } else {
+      this.events.emit({
+        instrIdx,
+        kind: 'param',
+        coalesceKey: { instrIdx, slotIdx, field: String(key) },
+      });
+    }
   }
 
   insertSlot(instrIdx: number, at: number, slot: Slot): void {
