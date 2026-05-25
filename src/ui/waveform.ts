@@ -14,6 +14,46 @@ export function bytesToInt16(bytes: Int8Array): Int16Array {
   return out;
 }
 
+/**
+ * Same as bytesToInt16, but for samples that have a loop region (op22
+ * loop_gen): the original bytes 0..end play first, then bytes
+ * [loopOffset, loopOffset+loopLength] are appended `loopRepeats` times to
+ * audibly demonstrate what the Amiga would do when DMA wraps onto the
+ * loop region. Out-of-range / zero-length loops fall back to the
+ * one-shot conversion so callers don't need to special-case.
+ */
+export function bytesToInt16WithLoop(
+  bytes: Int8Array,
+  loopOffset: number,
+  loopLength: number,
+  loopRepeats: number,
+): Int16Array {
+  if (loopLength <= 0 || loopRepeats <= 0 || loopOffset < 0
+      || loopOffset >= bytes.length) {
+    return bytesToInt16(bytes);
+  }
+  // Clamp the loop region to the actual buffer.
+  const loopEnd = Math.min(bytes.length, loopOffset + loopLength);
+  const safeLen = Math.max(0, loopEnd - loopOffset);
+  if (safeLen === 0) return bytesToInt16(bytes);
+
+  const total = bytes.length + safeLen * loopRepeats;
+  const out = new Int16Array(total);
+  // Phase 1: the original sample, as-rendered (loop_gen has already
+  // crossfaded the loop region inside `bytes`).
+  for (let i = 0; i < bytes.length; i++) out[i] = (bytes[i]! << 8);
+  // Phase 2: repeat the loop region right after the original tail. The
+  // crossfade in `bytes` makes the boundaries seamless.
+  let pos = bytes.length;
+  for (let r = 0; r < loopRepeats; r++) {
+    for (let i = 0; i < safeLen; i++) {
+      out[pos + i] = (bytes[loopOffset + i]! << 8);
+    }
+    pos += safeLen;
+  }
+  return out;
+}
+
 export interface WaveOptions {
   width?: number | undefined;
   height?: number | undefined;

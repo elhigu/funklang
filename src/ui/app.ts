@@ -11,7 +11,7 @@ import type { CloneGraph } from '../patch/clone-graph';
 import { renderSidebar } from './sidebar';
 import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
-import { bytesToInt16 } from './waveform';
+import { bytesToInt16, bytesToInt16WithLoop } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, openFileWithHandle, saveFileBytes, saveToHandle } from './file-dialog';
@@ -134,7 +134,7 @@ export function bootApp(root: HTMLElement): void {
               <tbody>
                 <tr><td><kbd>Space</kbd></td><td>Replay the selected output (always — even if the audio toggle is muted)</td></tr>
                 <tr><td>Click 🔊 on a slot</td><td>Set that slot as the playback output and audition it once</td></tr>
-                <tr><td>Click ▶ next to OUTPUT</td><td>Toggle auto-playback (green = plays on every change, red = muted)</td></tr>
+                <tr><td>Click ▶ next to OUTPUT</td><td>Toggle auto-playback (green = plays on every change, red = no auto play)</td></tr>
               </tbody>
             </table>
 
@@ -546,6 +546,27 @@ export function bootApp(root: HTMLElement): void {
     if (brandEl) brandEl.classList.toggle('audio-on', audioEnabled);
   };
 
+  /**
+   * Build the Int16 buffer that represents what we actually want to
+   * audition for the instrument's FINAL output. When the instrument has
+   * an op22 loop_gen slot AND the loop region is non-empty, we append a
+   * few iterations of the loop region after the original sample so the
+   * user audibly hears the loop behaviour the Amiga would produce, not
+   * just one-shot the whole buffer.
+   */
+  const FINAL_LOOP_REPEATS = 3;
+  const buildFinalAudible = (
+    ins: typeof model.patch.instruments[number],
+    render: NonNullable<typeof lastRender>,
+  ): Int16Array => {
+    if (instrHasOp(model, activeIdx, 22) && ins.loopLength > 0) {
+      return bytesToInt16WithLoop(
+        render.bytes, ins.loopOffset, ins.loopLength, FINAL_LOOP_REPEATS,
+      );
+    }
+    return bytesToInt16(render.bytes);
+  };
+
   /** Internal core; callers can bypass the audioEnabled gate via `force`. */
   const playAuditionInternal = (opts: { force?: boolean } = {}): void => {
     if (!audioEnabled && !opts.force) return;
@@ -553,12 +574,14 @@ export function bootApp(root: HTMLElement): void {
     const ins = model.patch.instruments[activeIdx];
     if (!ins) return;
     // Playback ALWAYS uses outputTarget (never selection). For the final
-    // output we use the post-loopgen `bytes` (upscaled to Int16) so the
-    // user actually hears the crossfade applied by loop_gen.
-    const finalAudible = bytesToInt16(lastRender.bytes);
-    const sample = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null)
+    // output (or a slot 15 / loop_gen tap) we want the looped bytes;
+    // intermediate slot taps stay one-shot.
+    const targetIsLoopGenSlot = outputTarget.instrIdx === activeIdx
+      && outputTarget.slotIdx != null
+      && ins.slots[outputTarget.slotIdx]?.fn === 22;
+    const sample = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null && !targetIsLoopGenSlot)
       ? slotDisplayTap(ins, lastRender, outputTarget.slotIdx)
-      : finalAudible;
+      : buildFinalAudible(ins, lastRender);
     if (!sample || sample.length === 0) return;
     player.play(sample, noteRateHz(previewNote));
   };
