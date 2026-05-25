@@ -809,12 +809,23 @@ export function bootApp(root: HTMLElement): void {
     adoptPatch(f.name, new Uint8Array(await f.arrayBuffer()), undefined);
   });
 
+  // Re-entrancy guard for OPEN PATCH. A double-click inside the OS file
+  // dialog can buffer a second click that's delivered to the OPEN button
+  // after the dialog closes — without this guard, a second picker opens
+  // and the user has to pick the file again. Same pattern as savePatch.
+  let opening = false;
   (root.querySelector('#btn-open') as HTMLButtonElement).addEventListener('click', async () => {
-    // Prefer the FSA picker so we can save back silently; fall back to the
-    // hidden input if FSA isn't available (the helper handles the fallback).
-    const opened = await openFileWithHandle('.akp', 'Klang patch');
-    if (!opened) return;
-    adoptPatch(opened.name, opened.bytes, opened.handle);
+    if (opening) return;
+    opening = true;
+    try {
+      const opened = await openFileWithHandle('.akp', 'Klang patch');
+      if (!opened) return;
+      adoptPatch(opened.name, opened.bytes, opened.handle);
+    } finally {
+      // Brief tail-window blocks any straggling double-click event that
+      // the OS dialog may have queued just as it closed.
+      setTimeout(() => { opening = false; }, 300);
+    }
   });
   (root.querySelector('#btn-new') as HTMLButtonElement).addEventListener('click', () => {
     model.patch = emptyPatch();
@@ -897,7 +908,11 @@ export function bootApp(root: HTMLElement): void {
           nameEl.textContent = patchFileName;
         } catch { /* ignore */ }
       }
-    } finally { saving = false; }
+    } finally {
+      // Brief tail-window blocks any straggling double-click event the OS
+      // save dialog may have queued just as it closed.
+      setTimeout(() => { saving = false; }, 300);
+    }
   };
 
   const savePatchAs = async (): Promise<void> => {
@@ -915,30 +930,49 @@ export function bootApp(root: HTMLElement): void {
           nameEl.textContent = patchFileName;
         } catch { /* ignore */ }
       }
-    } finally { saving = false; }
+    } finally {
+      // Brief tail-window blocks any straggling double-click event the OS
+      // save dialog may have queued just as it closed.
+      setTimeout(() => { saving = false; }, 300);
+    }
   };
 
   (root.querySelector('#btn-save-as') as HTMLButtonElement).addEventListener('click', () => { void savePatchAs(); });
   (root.querySelector('#btn-save') as HTMLButtonElement).addEventListener('click', () => { void savePatch(); });
+  // Same re-entrancy guard as OPEN PATCH — protects against double-clicks
+  // in the OS file dialog spilling a second click onto the IMPORT button.
+  let importing = false;
   (root.querySelector('#btn-import') as HTMLButtonElement).addEventListener('click', async () => {
-    const f = await openFileBytes('.aki');
-    if (!f) return;
-    const ins = parseAki(f.bytes);
-    // Use filename (no extension) as name, like the original GUI.
-    const stem = f.name.replace(/\.aki$/i, '');
-    if (!ins.name) ins.name = stem;
-    model.patch.instruments[activeIdx] = ins;
-    rebuildCloneGraph();
-    model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
-    renderMain();
-    repaint();
+    if (importing) return;
+    importing = true;
+    try {
+      const f = await openFileBytes('.aki');
+      if (!f) return;
+      const ins = parseAki(f.bytes);
+      const stem = f.name.replace(/\.aki$/i, '');
+      if (!ins.name) ins.name = stem;
+      model.patch.instruments[activeIdx] = ins;
+      rebuildCloneGraph();
+      model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
+      renderMain();
+      repaint();
+    } finally {
+      setTimeout(() => { importing = false; }, 300);
+    }
   });
+  let exporting = false;
   (root.querySelector('#btn-export') as HTMLButtonElement).addEventListener('click', async () => {
-    const ins = model.patch.instruments[activeIdx];
-    if (!ins) return;
-    const bytes = serializeAki(ins);
-    const stem = (ins.name || `instr_${activeIdx + 1}`).replace(/[^\w.-]+/g, '_');
-    await saveFileBytes(bytes, `${stem}.aki`, '.aki');
+    if (exporting) return;
+    exporting = true;
+    try {
+      const ins = model.patch.instruments[activeIdx];
+      if (!ins) return;
+      const bytes = serializeAki(ins);
+      const stem = (ins.name || `instr_${activeIdx + 1}`).replace(/[^\w.-]+/g, '_');
+      await saveFileBytes(bytes, `${stem}.aki`, '.aki');
+    } finally {
+      setTimeout(() => { exporting = false; }, 300);
+    }
   });
 
   const noteSelect = root.querySelector('#note-select') as HTMLSelectElement;
