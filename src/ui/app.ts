@@ -383,7 +383,9 @@ export function bootApp(root: HTMLElement): void {
 
   const repaint = (): void => {
     renderSidebar(listEl, model.patch, activeIdx, (i) => {
-      selectInstrument(i);
+      // Sidebar click also auto-plays (subject to the audio toggle), same
+      // as wheel/arrow nav.
+      selectInstrument(i, { play: true });
     });
   };
 

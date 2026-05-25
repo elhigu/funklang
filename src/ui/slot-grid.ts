@@ -494,9 +494,9 @@ function renderRow(
       </select>
     </div>
     <div class="col col-op">${expandToggle}<button class="op-name-btn" data-op-name title="Click to change op">${opLabel}</button></div>
-    <div class="col"><div class="params" data-knobs></div></div>
+    <div class="col col-params"><div class="params" data-knobs></div></div>
     <div class="col wave-cell">
-      <canvas class="wave" width="200" height="48" data-wave></canvas>
+      <canvas class="wave" width="320" height="40" data-wave></canvas>
       ${speakerBtn}
       <button class="slot-del" title="Delete this slot">✕</button>
     </div>
