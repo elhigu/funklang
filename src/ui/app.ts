@@ -266,7 +266,9 @@ export function bootApp(root: HTMLElement): void {
         rebuildOutputSelect();
         updateLabels();
         runRender();
-        playAudition();
+        // Force-play so clicking the 🔊 always auditions the new target,
+        // even when autoplayback-on-change is muted.
+        playAuditionInternal({ force: true });
       },
     });
     runRender();
@@ -606,11 +608,10 @@ export function bootApp(root: HTMLElement): void {
     // cases where keydown is delivered to <body> while focus actually sits
     // inside an INPUT (e.g. shortly after a click).
     //
-    // `inTextField` = something that consumes typed characters (INPUT,
-    //   TEXTAREA, SELECT, contentEditable). Undo/redo and ? help skip.
-    // `inActivatable` = also includes BUTTON / focused dropdowns. Spacebar
-    //   skips when on these so the browser's native Space-activates-button
-    //   behavior wins (Tab-navigating with the keyboard still feels right).
+    // `inField` = the user is typing in a text input / dropdown / editable
+    // region. Buttons + sliders are NOT counted (they auto-blur on click —
+    // see the delegated click handler — so focus shouldn't linger on
+    // non-text controls).
     const ae = document.activeElement as HTMLElement | null;
     const target = ev.target as HTMLElement | null;
     const isText = (el: HTMLElement | null): boolean => !!el && (
@@ -620,8 +621,6 @@ export function bootApp(root: HTMLElement): void {
       el.tagName === 'SELECT'
     );
     const inField = isText(ae) || isText(target);
-    const inActivatable = inField
-      || ae?.tagName === 'BUTTON' || target?.tagName === 'BUTTON';
 
     // Esc closes the help modal first.
     if (ev.key === 'Escape' && !helpOverlay.classList.contains('hidden')) {
@@ -636,12 +635,12 @@ export function bootApp(root: HTMLElement): void {
       return;
     }
 
-    // Spacebar: replay the latest sound. Skip when typing in a field (so
-    // the user can put spaces in instrument names) AND when a button /
-    // dropdown is focused (so the browser's native Space-activates behavior
-    // still works). Audio toggle does NOT gate spacebar — it's an explicit
+    // Spacebar: replay the latest sound. Only suppressed when actually
+    // typing in a text input — buttons/selects DO trigger play because
+    // we auto-blur them after click, so focus shouldn't linger on them
+    // anyway. Audio toggle does NOT gate spacebar — it's an explicit
     // user action, always honored.
-    if ((ev.key === ' ' || ev.code === 'Space') && !inActivatable) {
+    if ((ev.key === ' ' || ev.code === 'Space') && !inField) {
       ev.preventDefault();
       retriggerAudio({ force: true });
       return;
@@ -761,6 +760,26 @@ export function bootApp(root: HTMLElement): void {
     updateAudioToggle();
   });
   updateAudioToggle();
+
+  // Auto-blur BUTTON / SELECT after click so focus doesn't linger on UI
+  // controls. Text inputs (knob inline editor, instr-header fields) and
+  // knob bars (which the user explicitly focused for keyboard nav) keep
+  // their focus. Without this, clicking the SAVE button would leave it
+  // focused → spacebar would re-activate it instead of replaying audio.
+  root.addEventListener('click', (ev) => {
+    const t = ev.target as HTMLElement | null;
+    if (!t) return;
+    // Walk up to the nearest button (event might be on a child icon span).
+    const btn = t.closest('button');
+    if (btn && btn instanceof HTMLElement) {
+      // Defer to next tick so the click handler can react first.
+      queueMicrotask(() => btn.blur());
+      return;
+    }
+    if (t.tagName === 'SELECT') {
+      queueMicrotask(() => t.blur());
+    }
+  });
 
   // Re-entrancy guard so a quick Ctrl+S double-tap (or a Ctrl+S that
   // races with a SAVE button click) doesn't open the picker twice.

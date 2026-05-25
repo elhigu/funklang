@@ -135,6 +135,13 @@ export function makeKnob(opts: KnobOptions): Knob {
     if (el.querySelector('input.kedit')) return;
     const input = document.createElement('input');
     input.className = 'kedit';
+    // Use type=number so the browser's native ArrowUp/ArrowDown ±1 step
+    // (and Shift+arrow ±10) works inside the inline editor. min/max keep
+    // typed/stepped values inside the param's declared range.
+    input.type = 'number';
+    input.min = String(min);
+    input.max = String(max);
+    input.step = '1';
     input.value = String(value);
     valEl.style.display = 'none';
     el.appendChild(input);

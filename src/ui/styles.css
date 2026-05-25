@@ -60,13 +60,16 @@
   .app {
     display: grid;
     grid-template-rows: 44px 1fr 30px;
-    grid-template-columns: 240px 1fr;
+    /* `minmax(0, 1fr)` on the main column means a wide slot row can't push
+       past the viewport and trigger a page-level horizontal scrollbar. */
+    grid-template-columns: 240px minmax(0, 1fr);
     grid-template-areas:
       "header header"
       "sidebar main"
       "footer  footer";
     height: 100vh;
     width: 100vw;
+    overflow: hidden;          /* belt-and-suspenders against page-level scrollbars */
   }
 
   /* ─── header ────────────────────────────────────────────── */
@@ -232,6 +235,8 @@
   main {
     grid-area: main;
     overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 0;
     background: var(--bg-0);
     display: flex;
     flex-direction: column;
@@ -316,7 +321,7 @@
   /* slot grid header */
   .grid-head {
     display: grid;
-    grid-template-columns: 44px 64px 144px 1fr 260px;
+    grid-template-columns: 44px 64px 144px minmax(0, 1fr) 260px;
     gap: 1px;
     background: var(--bg-1);
     border-bottom: 1px solid var(--grid);
@@ -331,19 +336,25 @@
     font-size: 11px;
     color: var(--amber-dim);
     letter-spacing: 0.8px;
+    min-width: 0;
   }
 
   /* slot rows */
   .slots {
     flex: 1;
+    min-width: 0;
   }
   .slot {
     display: grid;
-    grid-template-columns: 44px 64px 144px 1fr 260px;
+    /* `minmax(0, 1fr)` is the key fix for horizontal overflow: without
+       the 0 floor a wide knob row would force the grid column past 1fr
+       and add a horizontal scrollbar to the whole page. */
+    grid-template-columns: 44px 64px 144px minmax(0, 1fr) 260px;
     gap: 1px;
     align-items: center;
     border-bottom: 1px solid var(--grid-dim);
-    min-height: 64px;
+    /* Taller rows accommodate the 3x-bigger knobs. */
+    min-height: 110px;
     position: relative;
     cursor: pointer;
     transition: background 60ms linear;
@@ -678,12 +689,17 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    /* The cell itself is a passive backdrop — pointer interactions belong
+       to the speaker button only (which re-enables pointer-events below). */
+    pointer-events: none;
   }
+  .wave-cell .slot-output-btn { pointer-events: auto; }
   canvas.wave {
     background: #050507;
     border: 1px solid var(--grid-dim);
     image-rendering: pixelated;
     display: block;
+    pointer-events: none;
   }
   .wave-cell .wave-meta {
     font-size: 10px;
@@ -884,27 +900,34 @@
   }
 
   /* knob */
+  /* Knob is laid out vertically — label on top, wide bar in the middle,
+     value below. Fits 3-4 across a normal-width row and stays compact. */
   .knob {
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    font-size: 14px;
+    gap: 2px;
+    font-size: 13px;
     user-select: none;
     min-width: 0;
+    padding: 2px 0;
   }
   .knob .klabel {
     color: var(--fg-1);
     text-transform: lowercase;
     letter-spacing: 0.3px;
-    font-size: 12px;
-    min-width: 40px;
+    font-size: 13px;
+    text-align: center;
   }
   .knob .kbar {
     display: inline-block;
-    width: 10ch;
-    text-align: left;
+    /* ~16 chars at this font ≈ 180px — meaningfully bigger than the
+       old 10ch / 15px but still fits comfortably in the column. */
+    width: 16ch;
+    text-align: center;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 15px;
+    font-size: 30px;
+    line-height: 1;
     color: var(--amber);
     cursor: ns-resize;
     letter-spacing: -1px;
@@ -914,9 +937,9 @@
   .knob .kval {
     color: var(--fg-0);
     font-variant-numeric: tabular-nums;
-    font-size: 14px;
-    min-width: 56px;
-    text-align: right;
+    font-size: 22px;
+    min-width: 64px;
+    text-align: center;
     cursor: text;
   }
   .knob .kval.out-of-range { color: var(--red); }
@@ -925,9 +948,9 @@
     border: 1px solid var(--amber);
     color: var(--fg-0);
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-    padding: 1px 3px;
-    width: 72px;
+    font-size: 18px;
+    padding: 2px 4px;
+    width: 96px;
     outline: none;
     text-align: right;
   }
