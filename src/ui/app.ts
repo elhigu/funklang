@@ -111,11 +111,11 @@ export function bootApp(root: HTMLElement): void {
             <span class="note-select-label">NOTE</span>
             <select id="note-select">${noteOptions}</select>
           </label>
-          <label class="output-select-wrap" title="Which signal is sent to the audio output">
+          <div class="output-select-wrap" title="Which signal is sent to the audio output">
             <span class="output-select-label">OUTPUT</span>
-            <select id="output-select"></select>
+            <button id="btn-output-master" class="output-master active" title="Route the active instrument's final v1 output to playback. Grayed out when a per-slot 🔊 is the current output.">MASTER&nbsp;V1</button>
             <button id="btn-audio-toggle" class="audio-toggle on" title="Audio on — click to mute (changes still re-render). Spacebar replays.">▶</button>
-          </label>
+          </div>
           <button id="btn-help" class="help-btn" title="Keyboard shortcuts (?)">?</button>
         </div>
         <div class="file-info">
@@ -217,7 +217,7 @@ export function bootApp(root: HTMLElement): void {
   const hidden = root.querySelector('#hidden-file-input') as HTMLInputElement;
   const selectionLabel = root.querySelector('#selection-label') as HTMLElement;
   const outputLabel = root.querySelector('#output-label') as HTMLElement;
-  const outputSelect = root.querySelector('#output-select') as HTMLSelectElement;
+  const outputMasterBtn = root.querySelector('#btn-output-master') as HTMLButtonElement;
   const undoBtn = root.querySelector('#btn-undo') as HTMLButtonElement;
   const redoBtn = root.querySelector('#btn-redo') as HTMLButtonElement;
 
@@ -295,7 +295,7 @@ export function bootApp(root: HTMLElement): void {
       onSetOutput: (slotIdx) => {
         outputTarget = { instrIdx: activeIdx, slotIdx };
         refreshOutputHighlight();
-        rebuildOutputSelect();
+        refreshOutputMasterBtn();
         updateLabels();
         runRender();
         // Force-play so clicking the 🔊 always auditions the new target,
@@ -304,7 +304,7 @@ export function bootApp(root: HTMLElement): void {
       },
     });
     runRender();
-    rebuildOutputSelect();
+    refreshOutputMasterBtn();
     updateLabels();
   };
 
@@ -352,26 +352,16 @@ export function bootApp(root: HTMLElement): void {
   };
 
   /** Rebuild the header OUTPUT dropdown to list the active instr's slots. */
-  const rebuildOutputSelect = (): void => {
-    const ins = model.patch.instruments[activeIdx];
-    if (!ins) {
-      outputSelect.innerHTML = '<option value="">—</option>';
-      return;
-    }
-    const isFinal = outputTarget.instrIdx === activeIdx && outputTarget.slotIdx == null;
-    let html = `<option value="final"${isFinal ? ' selected' : ''}>final (v1)</option>`;
-    // Build option entries for each filled slot at its model index.
-    let visibleRow = 0;
-    for (let i = 0; i < ins.slots.length; i++) {
-      const s = ins.slots[i]!;
-      if (s.fn === 0) continue;
-      visibleRow++;
-      const num = String(visibleRow).padStart(2, '0');
-      const vlabel = s.outVar > 0 ? ` · v${s.outVar}` : '';
-      const sel = outputTarget.instrIdx === activeIdx && outputTarget.slotIdx === i ? ' selected' : '';
-      html += `<option value="${i}"${sel}>slot ${num}${vlabel}</option>`;
-    }
-    outputSelect.innerHTML = html;
+  /**
+   * Refresh the MASTER V1 button's visual state. It's "active" (highlighted
+   * amber/cyan) when the playback target IS the active instrument's final
+   * v1; otherwise it dims to show that some per-slot 🔊 has taken over.
+   * Clicking it always returns the output to MASTER V1 of the active instr.
+   */
+  const refreshOutputMasterBtn = (): void => {
+    const isMaster = outputTarget.instrIdx === activeIdx && outputTarget.slotIdx == null;
+    outputMasterBtn.classList.toggle('active', isMaster);
+    outputMasterBtn.classList.toggle('dimmed', !isMaster);
   };
 
   /**
@@ -627,18 +617,16 @@ export function bootApp(root: HTMLElement): void {
     updateUndoRedoButtons();
   };
 
-  outputSelect.addEventListener('change', () => {
-    const v = outputSelect.value;
-    if (v === 'final' || v === '') {
-      outputTarget = { instrIdx: activeIdx, slotIdx: null };
-    } else {
-      const idx = parseInt(v, 10);
-      if (Number.isFinite(idx)) outputTarget = { instrIdx: activeIdx, slotIdx: idx };
-    }
+  // MASTER V1 button → route playback to the active instrument's final v1.
+  // Always force-plays so the user hears the change immediately, even when
+  // the audio toggle is muted (consistent with clicking a slot's 🔊).
+  outputMasterBtn.addEventListener('click', () => {
+    outputTarget = { instrIdx: activeIdx, slotIdx: null };
     refreshOutputHighlight();
+    refreshOutputMasterBtn();
     updateLabels();
     runRender();
-    playAudition();
+    playAuditionInternal({ force: true });
   });
 
   model.events.on((e) => {
@@ -1028,7 +1016,6 @@ export function bootApp(root: HTMLElement): void {
     playAudition();
   });
   attachWheelStep(noteSelect);
-  attachWheelStep(outputSelect);
 
   repaint();
   updateUndoRedoButtons();
