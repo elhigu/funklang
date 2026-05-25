@@ -318,10 +318,10 @@
   }
   .meta-num:focus { border-color: var(--amber); }
 
-  /* slot grid header — matches the slot row's TOP-ROW columns */
+  /* slot grid header — matches the slot row's 5 columns */
   .grid-head {
     display: grid;
-    grid-template-columns: 44px 64px 144px minmax(0, 1fr);
+    grid-template-columns: 44px 64px 144px minmax(0, 1fr) minmax(0, 1fr);
     gap: 1px;
     background: var(--bg-1);
     border-bottom: 1px solid var(--grid);
@@ -344,17 +344,12 @@
     flex: 1;
     min-width: 0;
   }
-  /* The slot is a 4-column × 2-row grid: the first row holds #/OUT/OP/
-     PARAMS, and the second row holds the per-slot waveform tap underneath
-     the PARAMS column. This lets the slider track stretch across the full
-     params column instead of competing with the wave-cell for horizontal
-     space. */
+  /* 5-column single-row grid. Params and waveform split the remaining
+     horizontal space 50/50. The waveform fills the entire right half
+     (full slot height) so it's actually inspectable. */
   .slot {
     display: grid;
-    grid-template-columns: 44px 64px 144px minmax(0, 1fr);
-    grid-template-areas:
-      "num out op params"
-      "num out op wave";
+    grid-template-columns: 44px 64px 144px minmax(0, 1fr) minmax(0, 1fr);
     gap: 1px;
     align-items: stretch;
     border-bottom: 1px solid var(--grid-dim);
@@ -363,11 +358,9 @@
     cursor: pointer;
     transition: background 60ms linear;
   }
-  .slot > .col-num    { grid-area: num;    align-self: center; }
-  .slot > .col-out    { grid-area: out;    align-self: center; }
-  .slot > .col-op     { grid-area: op;     align-self: center; }
-  .slot > .col-params { grid-area: params; }
-  .slot > .wave-cell  { grid-area: wave; }
+  .slot > .col-num    { align-self: center; }
+  .slot > .col-out    { align-self: center; }
+  .slot > .col-op     { align-self: center; }
   .slot:hover { background: var(--bg-1); }
   .slot.active {
     background: var(--bg-2);
@@ -697,27 +690,32 @@
   .param-const-knob .klabel { display: none; }
 
   /* waveform canvas */
+  /* Wave-cell fills the slot's right half. Canvas stretches edge-to-edge
+     inside it; speaker/delete buttons float in the top corners so they
+     don't steal canvas area. */
   .wave-cell {
-    padding: 4px 14px 8px 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    /* The cell itself is a passive backdrop — pointer interactions belong
-       to the buttons inside (which re-enable pointer-events below). */
+    position: relative;
+    padding: 6px 14px;
     pointer-events: none;
+    display: block;
+    min-width: 0;
   }
   .wave-cell .slot-output-btn,
-  .wave-cell .slot-del { pointer-events: auto; }
+  .wave-cell .slot-del {
+    position: absolute;
+    top: 6px;
+    z-index: 2;
+    pointer-events: auto;
+  }
+  .wave-cell .slot-output-btn { right: 38px; }
+  .wave-cell .slot-del         { right: 14px; }
   canvas.wave {
     background: #050507;
     border: 1px solid var(--grid-dim);
     image-rendering: pixelated;
     display: block;
-    /* Stretch the per-slot tap canvas to fill the remaining cell width
-       (the speaker/delete buttons take their own fixed space). */
-    flex: 1;
     width: 100%;
-    height: 40px;
+    height: 100%;
     pointer-events: none;
   }
   .wave-cell .wave-meta {

@@ -65,6 +65,16 @@ describe('makeKnob — arrow keys', () => {
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(50);
   });
+
+  it('ArrowRight/Left = coarse step (always, no Shift needed)', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
+    const bar = getBar(k);
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(58);   // +coarse 8
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(50);
+  });
 });
 
 describe('makeKnob — position-based drag', () => {

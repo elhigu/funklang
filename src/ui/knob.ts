@@ -82,14 +82,24 @@ export function makeKnob(opts: KnobOptions): Knob {
   };
   el.addEventListener('wheel', onWheel, { passive: false });
 
-  // arrow keys when bar is focused: ±1, shift ±coarse
+  // Arrow keys when bar is focused:
+  //   Up/Down    = fine ±1
+  //   Left/Right = coarse ±(~3% of range)  ("moving across the slider")
+  //   Shift+any  = always coarse (lets touch-typists use the up/down keys
+  //                they're already on without reaching for left/right)
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+    if (e.key === 'ArrowUp') {
       e.preventDefault();
       emit(value + (e.shiftKey ? coarseStep() : 1));
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       emit(value - (e.shiftKey ? coarseStep() : 1));
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      emit(value + coarseStep());
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      emit(value - coarseStep());
     }
   };
   barEl.addEventListener('keydown', onKey);

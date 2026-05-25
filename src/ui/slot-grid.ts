@@ -59,7 +59,12 @@ export function updateSlotWaves(root: HTMLElement, slotTaps: Int16Array[]): void
     const cv = slotEl.querySelector('canvas[data-wave]') as HTMLCanvasElement | null;
     if (!cv) continue;
     const tap = slotTaps[modelIdx] ?? null;
-    drawWaveform(cv, tap, { width: cv.width, height: cv.height });
+    // Render at the canvas' ACTUAL on-screen size (set by CSS), not its
+    // intrinsic 320×40 — otherwise the stretched-to-fill canvas looks
+    // blurry/pixelated when the wave-cell column is wider than 320.
+    const W = Math.max(64, cv.clientWidth | 0);
+    const H = Math.max(24, cv.clientHeight | 0);
+    drawWaveform(cv, tap, { width: W, height: H });
   }
 }
 

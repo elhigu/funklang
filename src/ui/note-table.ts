@@ -1,22 +1,45 @@
 // Note → playback-rate table for the preview audition dropdown.
 //
-// We don't try to be physically accurate to the Amiga Paula period — the
-// editor just needs a reasonable preview rate per note. We anchor C-3 at
-// 11025 Hz (a typical chiptune preview rate, half of the standard 22050)
-// and step by equal-temperament semitones from there. C-4 lands at 22050,
-// C-5 at 44100, etc.
+// Mirrors the original AmigaKlang GUI exactly: 12 notes × 3 octaves with
+// Paula PAL periods, where the per-octave rate is computed from
 //
-// The list ranges from C-1 to B-5 — 5 octaves around middle C, covering
-// the range chiptune samples are typically previewed in.
+//     samplerate = 7093789.2 / period * 2
+//
+// and octaves 2 / 1 halve / quarter the octave-3 rate respectively.
+// (See Form1.calcsamplerate in the decompile, lines 1050-1105.)
+//
+// Klang only ships 3 octaves and labels them just "C" with a separate
+// "Octave 1/2/3" radio group. We surface the cross-product as "C-1" ..
+// "B-3" so the dropdown is a single flat list, but the rates are the
+// same so a patch auditioned at "C-3" in funklang sounds identical to
+// "C, Octave 3" in the original.
 
-const C3_HZ = 11025;
+/** Period table for octave 3 — matches Form1.calcsamplerate switch indices. */
+const PAL_PERIOD_OCT3: ReadonlyArray<{ name: string; period: number }> = [
+  { name: 'C-',  period: 856 },
+  { name: 'C#',  period: 808 },
+  { name: 'D-',  period: 762 },
+  { name: 'D#',  period: 720 },
+  { name: 'E-',  period: 678 },
+  { name: 'F-',  period: 640 },
+  { name: 'F#',  period: 604 },
+  { name: 'G-',  period: 570 },
+  { name: 'G#',  period: 538 },
+  { name: 'A-',  period: 508 },
+  { name: 'A#',  period: 480 },
+  { name: 'B-',  period: 453 },
+];
 
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+const PAL_CLOCK = 7093789.2;
+
+function oct3RateForPeriod(period: number): number {
+  return Math.round((PAL_CLOCK / period) * 2);
+}
 
 function buildNotes(): string[] {
   const out: string[] = [];
-  for (let oct = 1; oct <= 5; oct++) {
-    for (const n of NOTE_NAMES) out.push(`${n}${oct}`);
+  for (let oct = 1; oct <= 3; oct++) {
+    for (const n of PAL_PERIOD_OCT3) out.push(`${n.name}${oct}`);
   }
   return out;
 }
@@ -24,18 +47,16 @@ function buildNotes(): string[] {
 export const NOTE_LIST: ReadonlyArray<string> = buildNotes();
 export const DEFAULT_NOTE = 'C-3';
 
-/** Semitones from C-3 (positive = higher pitch). */
-function semitonesFromC3(note: string): number {
-  // note format: <letter><sharp?><octave>, e.g. "C-3" "C#3" "A-5"
-  const head = note.slice(0, 2); // "C-" / "C#" / etc.
+/** Klang's rate for a `<note>-<octave>` label. */
+export function noteRateHz(note: string): number {
+  const head = note.slice(0, 2);
   const octStr = note.slice(2);
   const oct = parseInt(octStr, 10);
-  if (!Number.isFinite(oct)) return 0;
-  const idx = NOTE_NAMES.indexOf(head);
-  if (idx < 0) return 0;
-  return (oct - 3) * 12 + idx;
-}
-
-export function noteRateHz(note: string): number {
-  return C3_HZ * Math.pow(2, semitonesFromC3(note) / 12);
+  const entry = PAL_PERIOD_OCT3.find((e) => e.name === head);
+  if (!entry || !Number.isFinite(oct)) return oct3RateForPeriod(856);  // fallback: C-3
+  const base = oct3RateForPeriod(entry.period);
+  // Octave 1 = base / 4, octave 2 = base / 2, octave 3 = base.
+  if (oct === 1) return Math.round(base / 4);
+  if (oct === 2) return Math.round(base / 2);
+  return base;
 }
