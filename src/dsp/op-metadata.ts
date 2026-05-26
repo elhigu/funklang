@@ -16,9 +16,9 @@ import type { Slot } from '../patch/types';
  * (0 = "use literal", 1..4 = "use vN") and the `field` (the literal value).
  */
 export type ParamKind =
-  | { kind: 'const-int';    min: number; max: number; label: string; scale?: 'linear' | 'log' }
+  | { kind: 'const-int';    min: number; max: number; label: string; scale?: 'linear' | 'pow' }
   | { kind: 'var-source';   label: string; allowNone?: boolean }
-  | { kind: 'var-or-const'; min: number; max: number; label: string; scale?: 'linear' | 'log' }
+  | { kind: 'var-or-const'; min: number; max: number; label: string; scale?: 'linear' | 'pow' }
   | { kind: 'enum';         options: ReadonlyArray<{ value: number; label: string }>; label: string }
   | { kind: 'instr-ref';    label: string }
   | { kind: 'sample-ref';   label: string };
@@ -107,7 +107,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
     code: 2, name: 'osc_saw', category: 'osc',
     params: [
       { field: 'freqVal', selector: 'freq',
-        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'log' } },
+        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'pow' } },
       { field: 'gainVal', selector: 'gain',
         type: { kind: 'var-or-const', min: 0, max: 128, label: 'gain' } },
     ],
@@ -119,7 +119,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
     code: 3, name: 'osc_tri', category: 'osc',
     params: [
       { field: 'freqVal', selector: 'freq',
-        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'log' } },
+        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'pow' } },
       { field: 'gainVal', selector: 'gain',
         type: { kind: 'var-or-const', min: 0, max: 128, label: 'gain' } },
     ],
@@ -130,7 +130,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
     code: 4, name: 'osc_sine', category: 'osc',
     params: [
       { field: 'freqVal', selector: 'freq',
-        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'log' } },
+        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'pow' } },
       { field: 'gainVal', selector: 'gain',
         type: { kind: 'var-or-const', min: 0, max: 128, label: 'gain' } },
     ],
@@ -142,7 +142,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
     code: 5, name: 'osc_pulse', category: 'osc',
     params: [
       { field: 'freqVal', selector: 'freq',
-        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'log' } },
+        type: { kind: 'var-or-const', min: 0, max: 10000, label: 'freq', scale: 'pow' } },
       { field: 'gainVal', selector: 'gain',
         type: { kind: 'var-or-const', min: 0, max: 128, label: 'gain' } },
       { field: 'widthVal', selector: 'width',

@@ -187,7 +187,7 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>envd defaults</td><td>decay 23, sustain 0, gain 128 — a usable envelope out of the box</td></tr>
                 <tr><td>Sample length</td><td>The instrument header's length is the same horizontal knob the slot rows use — click/drag the bar to set, dblclick to type, wheel for coarse/fine. Step 2 (even only)</td></tr>
                 <tr><td>Even-only fields</td><td>For knobs with step=2 (loop_gen offset, sample length) Shift+wheel moves ±2 and every step (drag / wheel / arrow / numeric editor) snaps to the nearest even value</td></tr>
-                <tr><td>Frequency knobs</td><td>Drag is LOGARITHMIC — the low end of the range (a few Hz) gets as much bar real-estate as the top of the range, so small values are reachable. Wheel / arrows still step linearly</td></tr>
+                <tr><td>Frequency knobs</td><td>Drag uses a SOFT power-curve taper (bar midpoint ≈ 25 % of the range) so the low end is reachable without becoming the whole bar. Wheel / arrows still step linearly</td></tr>
                 <tr><td>BASE selector (header)</td><td>Flip every numeric display between decimal and hex. Inputs accept either format ("0x10" works in dec mode too)</td></tr>
                 <tr><td><kbd>Enter</kbd> in a text/number field</td><td>Commits the value and removes focus</td></tr>
                 <tr><td>Click empty instrument row</td><td>Selects it — first inserted slot auto-names the instrument and sets length to 12288 (12 KB)</td></tr>

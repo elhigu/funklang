@@ -22,16 +22,25 @@ export interface KnobOptions {
   step?: number | undefined;
   /**
    * Position-to-value mapping for the draggable bar. `'linear'`
-   * (default) is the classic uniform mapping. `'log'` gives small
-   * values a much bigger slice of the bar — useful for parameters like
-   * audio frequency where 5..50 Hz needs as much real-estate as
-   * 5000..10000 Hz. Wheel / arrow stepping is unaffected (those still
-   * move by additive `coarseStep` / `shiftStep`).
+   * (default) is the classic uniform mapping. `'pow'` uses a power
+   * curve `value = min + range * ratio ^ scalePow` so small values
+   * get a bigger slice of the bar — useful for parameters like audio
+   * frequency where the low end is otherwise unreachable. Wheel /
+   * arrow stepping is unaffected (those still move by additive
+   * `coarseStep` / `shiftStep`).
    *
-   * Only valid for ranges where min >= 0; mixed-sign log mapping is
+   * Only valid for ranges where min >= 0; mixed-sign power mapping is
    * not well defined, so we silently fall back to linear in that case.
    */
-  scale?: 'linear' | 'log' | undefined;
+  scale?: 'linear' | 'pow' | undefined;
+  /**
+   * Exponent for `scale: 'pow'`. Default 2 (a soft "audio-taper"
+   * curve — bar midpoint = 25 % of the range). Higher values push the
+   * crossover further toward zero (3 → 12.5 %, 4 → 6.25 %). Values
+   * below 1 invert the curve and give large values more bar real-
+   * estate, which is rarely what you want.
+   */
+  scalePow?: number | undefined;
   /** Legacy: ignored. Drag is now position-based (click X → value at that ratio). */
   coarsePxPerUnit?: number | undefined;
   /** Legacy: ignored. */
@@ -56,28 +65,29 @@ export function makeKnob(opts: KnobOptions): Knob {
   const defaultValue = opts.defaultValue ?? 0;
   const range = max - min;
   const step = Math.max(1, Math.round(opts.step ?? 1));
-  // Log scale only kicks in when the range is entirely non-negative
-  // (mixed-sign log is undefined). +1 below the log so a min of 0
-  // doesn't blow up to -Infinity.
-  const useLog = opts.scale === 'log' && min >= 0 && max > min;
-  const LOG_OFFSET = 1;
-  const logMinV = Math.log(min + LOG_OFFSET);
-  const logMaxV = Math.log(max + LOG_OFFSET);
-  const logSpan = logMaxV - logMinV;
+  // Power scale only kicks in when the range is entirely non-negative
+  // (mixed-sign power mapping isn't well defined); silently fall back
+  // to linear otherwise. Default exponent 2 — the classic audio
+  // "soft log" taper: bar midpoint = 25 % of the range. Much gentler
+  // at the top than natural-log but still gives the low end of a
+  // freq-style param plenty of bar real-estate.
+  const usePow = opts.scale === 'pow' && min >= 0 && max > min;
+  const pow = Math.max(0.0001, opts.scalePow ?? 2);
 
   /** value → ratio in [0, 1] for paint + drag mirror. */
   const valueToRatio = (v: number): number => {
     if (range <= 0) return 0;
-    if (useLog) {
-      const r = (Math.log(Math.max(min, v) + LOG_OFFSET) - logMinV) / logSpan;
-      return clamp(r, 0, 1);
+    if (usePow) {
+      const lin = (Math.max(min, Math.min(max, v)) - min) / range;
+      // value = min + range * ratio^pow  ⟹  ratio = lin^(1/pow)
+      return Math.pow(lin, 1 / pow);
     }
     return clamp((v - min) / range, 0, 1);
   };
   /** ratio in [0, 1] → raw (unsnapped) value for drag-to-position. */
   const ratioToValue = (r: number): number => {
     const cr = clamp(r, 0, 1);
-    if (useLog) return Math.exp(logMinV + cr * logSpan) - LOG_OFFSET;
+    if (usePow) return min + range * Math.pow(cr, pow);
     return min + cr * range;
   };
 

@@ -229,7 +229,7 @@ describe('makeKnob — even-only (step=2)', () => {
   });
 });
 
-describe('makeKnob — log scale', () => {
+describe('makeKnob — power scale (soft "log"-style taper)', () => {
   function mockRect(el: HTMLElement, w: number): void {
     el.getBoundingClientRect = () => ({
       left: 0, top: 0, right: w, bottom: 22,
@@ -240,24 +240,30 @@ describe('makeKnob — log scale', () => {
     return k.el.querySelector('.kbar') as HTMLElement;
   }
 
-  it('clicking at the bar midpoint produces a value WELL below the linear midpoint', () => {
-    // range = 0..10000, log scale → midpoint of the bar should land
-    // near sqrt-ish of the range, not the linear midpoint of 5000.
+  it('clicking at the bar midpoint lands at 25% of the range (default pow=2)', () => {
+    // range = 0..10000, pow=2 → midpoint = 10000 * 0.5^2 = 2500.
     const cb = vi.fn();
-    const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'log', onChange: cb });
+    const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
     bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    // Linear would give 5000; log gives exp(0.5 * ln(10001)) - 1 ≈ 99.
-    const v = k.getValue();
-    expect(v).toBeLessThan(500);
-    expect(v).toBeGreaterThan(50);
+    expect(k.getValue()).toBe(2500);
+  });
+
+  it('scalePow=3 gives a harsher curve (bar midpoint = 12.5% of range)', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'pow', scalePow: 3, onChange: cb });
+    const bar = getBarEl(k);
+    mockRect(bar, 200);
+    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(1250);    // 10000 * 0.5^3
   });
 
   it('clicking at the right edge still lands at max', () => {
     const cb = vi.fn();
-    const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'log', onChange: cb });
+    const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
     bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 200, button: 0, bubbles: true, cancelable: true }));
@@ -267,7 +273,7 @@ describe('makeKnob — log scale', () => {
 
   it('clicking at the left edge lands at min (0)', () => {
     const cb = vi.fn();
-    const k = makeKnob({ label: 'freq', value: 5000, max: 10000, scale: 'log', onChange: cb });
+    const k = makeKnob({ label: 'freq', value: 5000, max: 10000, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
     bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 0, button: 0, bubbles: true, cancelable: true }));
@@ -275,25 +281,24 @@ describe('makeKnob — log scale', () => {
     expect(k.getValue()).toBe(0);
   });
 
-  it('paint sets the bar fill ratio using the log mapping (--fill far below 50% at value=100)', () => {
+  it('paint sets bar fill = (value/max)^(1/pow) — value=2500 → ~50%', () => {
+    // value/max = 0.25, ^(1/2) = 0.5 → ~50% fill.
     const cb = vi.fn();
-    const k = makeKnob({ label: 'freq', value: 100, max: 10000, scale: 'log', onChange: cb });
+    const k = makeKnob({ label: 'freq', value: 2500, max: 10000, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
-    // value=100 → ratio = log(101) / log(10001) ≈ 0.501; sanity: > 0.4, < 0.6
     const fill = parseFloat((bar.style.getPropertyValue('--fill') || '0%').replace('%', ''));
-    expect(fill).toBeGreaterThan(40);
-    expect(fill).toBeLessThan(60);
+    expect(fill).toBeGreaterThan(48);
+    expect(fill).toBeLessThan(52);
   });
 
-  it('falls back to LINEAR when min is negative (mixed-sign log is undefined)', () => {
+  it('falls back to LINEAR when min is negative (mixed-sign pow is undefined)', () => {
     const cb = vi.fn();
-    const k = makeKnob({ label: 'x', value: 0, min: -100, max: 100, scale: 'log', onChange: cb });
+    const k = makeKnob({ label: 'x', value: 0, min: -100, max: 100, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
-    // Linear midpoint of [-100, 100] is 0 — log fallback should give that.
     bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(0);
+    expect(k.getValue()).toBe(0);   // linear midpoint of [-100, 100]
   });
 });
 
