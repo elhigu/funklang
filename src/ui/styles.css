@@ -832,29 +832,70 @@
   .footer-right .blink { animation: blink 1.2s infinite; color: var(--amber); }
   @keyframes blink { 0%,49%{opacity:1;} 50%,100%{opacity:0;} }
 
-  /* slot insertion targets */
-  .slot-insert {
-    height: 6px;
-    position: relative;
+  /* Corner [+] insert buttons. One in the bottom-left of every slot row
+     ("insert AFTER me") plus a top-left on the very first row
+     ("insert BEFORE me, i.e. at index 0"). Pinned to the row corners with
+     position:absolute so they don't disturb the grid layout. They use the
+     default amber palette and turn grey when the instrument is at the
+     editable-slot cap. */
+  .slot-corner-insert {
+    position: absolute;
+    left: 4px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    line-height: 1;
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--bg-2);
+    color: var(--amber);
+    border: 1px solid var(--amber-dim);
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 80ms linear, height 80ms linear;
-    overflow: visible;
+    opacity: 0.55;
+    transition: opacity 80ms linear, color 80ms linear, border-color 80ms linear, background 80ms linear;
+    z-index: 2;
   }
-  .slot-insert:hover { opacity: 1; height: 22px; }
-  .slot-insert-btn {
-    background: transparent;
-    color: var(--magenta);
-    border: 1px dashed var(--magenta);
-    font-family: 'IBM Plex Mono', monospace;
+  .slot-corner-insert--before { top: -9px; }
+  .slot-corner-insert--after  { bottom: -9px; }
+  .slot-corner-insert:hover {
+    opacity: 1;
+    color: var(--bg-0);
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+  .slot-corner-insert:disabled {
+    color: var(--fg-2);
+    border-color: var(--grid);
+    background: var(--bg-1);
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .slot-corner-insert:disabled:hover {
+    color: var(--fg-2);
+    background: var(--bg-1);
+    border-color: var(--grid);
+  }
+
+  /* Empty-state placeholder row. Surfaces a single + button so the user can
+     populate an instrument that currently has no filled slots. Layout
+     mimics a normal slot row's left padding so the button sits in roughly
+     the same column. */
+  .slot.empty-placeholder {
+    display: flex;
+    align-items: center;
+    padding-left: 14px;
+    min-height: 36px;
+    border-bottom: 1px solid var(--grid-dim);
+    color: var(--fg-2);
     font-size: 11px;
-    padding: 1px 8px;
-    cursor: pointer;
-    letter-spacing: 1px;
   }
-  .slot-insert-btn:hover { background: var(--magenta-glow); }
+  .slot.empty-placeholder .slot-corner-insert--empty {
+    position: static;
+    opacity: 0.85;
+  }
 
   /* Delete button lives in the slot #-column, near the slot number. Stacks
      vertically beneath the # for compactness. Hidden until the row is

@@ -156,41 +156,94 @@ export function renderSlotGrid(
     if (ins.slots[i]!.fn !== 0) visibleIdx.push(i);
   }
 
-  // [+] at top — inserts at model position 0.
-  if (!full) slots.appendChild(makeInserter(model, instrIdx, 0));
+  // No filled slots → a single empty-state placeholder row whose corner
+  // button opens the picker for model index 0.
+  if (visibleIdx.length === 0) {
+    slots.appendChild(makeEmptyPlaceholder(model, instrIdx, full));
+    return;
+  }
 
   for (let r = 0; r < visibleIdx.length; r++) {
     const modelIdx = visibleIdx[r]!;
     const slot = ins.slots[modelIdx]!;
-    slots.appendChild(renderRow(model, instrIdx, modelIdx, r, slot, opts));
-    if (!full) {
-      // Insert position for "after this row" = modelIdx + 1.
-      slots.appendChild(makeInserter(model, instrIdx, modelIdx + 1));
-    }
+    slots.appendChild(
+      renderRow(model, instrIdx, modelIdx, r, slot, opts, {
+        full,
+        // Only the very first row gets the top-left "+ before me" button —
+        // every row has the bottom-left "+ after me" button.
+        showInsertBefore: r === 0,
+      }),
+    );
   }
 }
 
-function makeInserter(model: PatchModel, instrIdx: number, atIdx: number): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'slot-insert';
-  row.dataset['at'] = String(atIdx);
-  row.innerHTML = `<button class="slot-insert-btn" title="Insert slot here">[+]</button>`;
-  const btn = row.querySelector('button')!;
-  btn.addEventListener('click', async (e) => {
+/**
+ * Try to insert a new slot at `atIdx`. Bails if the UI/file caps would
+ * be exceeded (caller is expected to keep the button disabled too — this
+ * is a defensive second line of defence).
+ */
+async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): Promise<void> {
+  const code = await pickOp();
+  if (code == null) return;
+  const ins = model.patch.instruments[instrIdx];
+  if (!ins) return;
+  const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
+  if (filled >= N_SLOTS_EDITABLE) return;
+  if (ins.slots.length >= N_SLOTS_MAX) return;
+  const slot: Slot = { ...emptySlot(), fn: code, outVar: 1 };
+  model.insertSlot(instrIdx, atIdx, slot);
+}
+
+/**
+ * Build a corner `+` button for a slot row. `atIdx` is the model index at
+ * which the new slot will be spliced in. `disabled` mirrors the `full`
+ * state so visually-full instruments still SHOW the buttons (so the user
+ * knows where they would appear) but greyed-out, per user request.
+ */
+function makeCornerInsertBtn(
+  model: PatchModel,
+  instrIdx: number,
+  atIdx: number,
+  position: 'before' | 'after',
+  disabled: boolean,
+): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.className = `slot-corner-insert slot-corner-insert--${position}`;
+  btn.dataset[position === 'before' ? 'insertBefore' : 'insertAfter'] = String(atIdx);
+  btn.textContent = '+';
+  btn.title = disabled
+    ? `Instrument is full (max ${N_SLOTS_EDITABLE} slots)`
+    : (position === 'before' ? 'Insert slot before this row' : 'Insert slot after this row');
+  if (disabled) btn.disabled = true;
+  btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const code = await pickOp();
-    if (code == null) return;
-    const ins = model.patch.instruments[instrIdx];
-    if (!ins) return;
-    // UI cap: count of FILLED slots can't exceed N_SLOTS_EDITABLE.
-    const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
-    if (filled >= N_SLOTS_EDITABLE) return;
-    // Hard cap: the underlying array can't exceed the file-format cap.
-    if (ins.slots.length >= N_SLOTS_MAX) return;
-    const slot: Slot = { ...emptySlot(), fn: code, outVar: 1 };
-    model.insertSlot(instrIdx, atIdx, slot);
+    if (disabled) return;
+    void tryInsertAt(model, instrIdx, atIdx);
   });
-  return row;
+  btn.addEventListener('mousedown', (e) => e.stopPropagation());
+  return btn;
+}
+
+function makeEmptyPlaceholder(model: PatchModel, instrIdx: number, disabled: boolean): HTMLElement {
+  // Cap-of-zero shouldn't ever fire in practice (N_SLOTS_EDITABLE > 0) but
+  // we honour `disabled` for consistency with the per-row buttons.
+  const ph = document.createElement('div');
+  ph.className = 'slot empty-placeholder';
+  const btn = document.createElement('button');
+  btn.className = 'slot-corner-insert slot-corner-insert--empty';
+  btn.dataset['emptyInsert'] = '0';
+  btn.textContent = '+';
+  btn.title = disabled
+    ? `Instrument is full (max ${N_SLOTS_EDITABLE} slots)`
+    : 'Add the first slot to this instrument';
+  if (disabled) btn.disabled = true;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (disabled) return;
+    void tryInsertAt(model, instrIdx, 0);
+  });
+  ph.appendChild(btn);
+  return ph;
 }
 
 // ── Parameter widgets ────────────────────────────────────────────────────
@@ -558,6 +611,13 @@ function renderParam(
   return wrap;
 }
 
+interface InsertCornerOpts {
+  /** Instrument is at the editor cap — render the buttons but disabled. */
+  full: boolean;
+  /** Render the top-left "+ before me" button (only true for the first row). */
+  showInsertBefore: boolean;
+}
+
 function renderRow(
   model: PatchModel,
   instrIdx: number,
@@ -565,6 +625,7 @@ function renderRow(
   rowIdx: number,
   slot: Slot,
   opts: SlotGridOptions,
+  insertCorners?: InsertCornerOpts,
 ): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'slot-wrap';
@@ -751,6 +812,17 @@ function renderRow(
     if (to > from) to -= 1;
     model.moveSlot(instrIdx, from, to);
   });
+
+  // Corner insert buttons: bottom-left on every row ("+ after"), top-left
+  // ONLY on the first visible row ("+ before"). The buttons live on the
+  // row itself (position:absolute via CSS) so they hover at the corners
+  // without disturbing the grid layout.
+  if (insertCorners) {
+    if (insertCorners.showInsertBefore) {
+      row.appendChild(makeCornerInsertBtn(model, instrIdx, slotIdx, 'before', insertCorners.full));
+    }
+    row.appendChild(makeCornerInsertBtn(model, instrIdx, slotIdx + 1, 'after', insertCorners.full));
+  }
 
   wrap.appendChild(row);
 

@@ -172,6 +172,10 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Click slot function name</td><td>Change op type (opens the op picker)</td></tr>
                 <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
                 <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
+                <tr><td>Click <kbd>+</kbd> at a slot's bottom-left corner</td><td>Insert a new slot right after this one</td></tr>
+                <tr><td>Click <kbd>+</kbd> at the FIRST row's top-left corner</td><td>Insert a new slot at the very beginning</td></tr>
+                <tr><td>Empty instrument</td><td>Shows a single placeholder row with a <kbd>+</kbd> button — click it to add the first slot</td></tr>
+                <tr><td>Grey-out <kbd>+</kbd> buttons</td><td>Instrument is at the editor cap (16 slots) — delete one to insert another</td></tr>
                 <tr><td>Click ▶ on a clone slot</td><td>Expand the source instrument inline (collapsed by default)</td></tr>
                 <tr><td>Wheel over a dropdown</td><td>Step through its options</td></tr>
               </tbody>
