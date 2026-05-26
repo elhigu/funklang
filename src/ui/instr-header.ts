@@ -11,7 +11,7 @@
 
 import type { PatchModel } from '../patch/model';
 import { N_SLOTS_EDITABLE } from '../patch/types';
-import { formatInt, parseFlexInt } from './number-format';
+import { makeKnob } from './knob';
 
 export interface InstrHeaderHandlers {
   /** Called when the user clicks IMPORT .AKI in this header. */
@@ -23,10 +23,11 @@ export interface InstrHeaderHandlers {
   onRemove?: (() => void) | undefined;
 }
 
-/** Soft upper bound for the sample-length slider. The on-disk field is
- *  i32 so anything up to ~2GB is technically valid, but a usable slider
- *  has to cap somewhere. Even values only — Klang requires it. */
-const SAMPLE_LENGTH_SLIDER_MAX = 65534;
+/** Soft upper bound for the sample-length knob. The on-disk field is
+ *  i32 so anything up to ~2GB is technically valid, but a usable
+ *  horizontal knob has to cap somewhere. Even values only — Klang
+ *  requires it, enforced by the knob's `step: 2`. */
+const SAMPLE_LENGTH_KNOB_MAX = 65534;
 
 export function renderInstrHeader(
   root: HTMLElement,
@@ -47,10 +48,6 @@ export function renderInstrHeader(
   // to sample yet — inserting the first slot auto-applies the 12 KB
   // default, which is what re-enables the controls.
   const isUntouched = filled === 0 && !ins.name && ins.sampleLength === 0;
-  // Show the slider in dec for predictability — hex on a 0..65k slider
-  // would just be confusing. The number input next to it follows the
-  // global display base.
-  const lenDisplay = formatInt(ins.sampleLength);
   root.innerHTML = `
     <div class="instr-header">
       <div class="instr-title">
@@ -62,47 +59,44 @@ export function renderInstrHeader(
         <button class="instr-aki-btn instr-remove-btn" data-id="instr-remove" title="Wipe this instrument back to empty (asks for confirmation)">REMOVE</button>
       </div>
       <div class="instr-meta">
-        <label class="pair length-pair${isUntouched ? ' disabled' : ''}"><span class="k">length</span>
-          <input data-id="instr-len" type="text" class="meta-num" value="${escapeHtmlAttr(lenDisplay)}"${isUntouched ? ' disabled' : ''} />
-          <input data-id="instr-len-slider" type="range" min="0" max="${SAMPLE_LENGTH_SLIDER_MAX}" step="2" value="${ins.sampleLength}" class="meta-slider"${isUntouched ? ' disabled' : ''} />
-        </label>
+        <span class="pair length-pair${isUntouched ? ' disabled' : ''}" data-id="instr-len-host"></span>
         <span class="pair badge" data-id="slot-badge">${filled}/${N_SLOTS_EDITABLE}</span>
       </div>
     </div>
   `;
 
-  const nameEl  = root.querySelector('[data-id=instr-name]')        as HTMLInputElement;
-  const lenEl   = root.querySelector('[data-id=instr-len]')         as HTMLInputElement;
-  const slideEl = root.querySelector('[data-id=instr-len-slider]')  as HTMLInputElement;
-  const impBtn  = root.querySelector('[data-id=aki-import]')        as HTMLButtonElement;
-  const expBtn  = root.querySelector('[data-id=aki-export]')        as HTMLButtonElement;
-  const rmBtn   = root.querySelector('[data-id=instr-remove]')      as HTMLButtonElement;
+  const nameEl  = root.querySelector('[data-id=instr-name]')   as HTMLInputElement;
+  const lenHost = root.querySelector('[data-id=instr-len-host]') as HTMLElement;
+  const impBtn  = root.querySelector('[data-id=aki-import]')   as HTMLButtonElement;
+  const expBtn  = root.querySelector('[data-id=aki-export]')   as HTMLButtonElement;
+  const rmBtn   = root.querySelector('[data-id=instr-remove]') as HTMLButtonElement;
 
   nameEl.addEventListener('input', () => {
     model.setInstrumentField(instrIdx, 'name', nameEl.value);
   });
   attachCommitOnEnter(nameEl);
 
-  // Number field: accepts decimal OR `0x...` hex (per the global parser
-  // — so the user can paste a hex value even when the global display is
-  // dec). Live commits on input so undo coalescing groups keystrokes.
-  lenEl.addEventListener('input', () => {
-    const v = parseFlexInt(lenEl.value);
-    if (!Number.isFinite(v)) return;
-    const even = (v | 0) - ((v | 0) & 1);   // even, Klang requirement
-    model.setInstrumentField(instrIdx, 'sampleLength', Math.max(0, even));
-    slideEl.value = String(Math.max(0, even));
+  // Sample length is now a `makeKnob` — same widget the slot rows use.
+  // step=2 makes wheel / arrow / drag / numeric editor all snap to
+  // even values, so the Klang invariant is enforced at the UI layer
+  // and we get the hex/dec display, Enter-to-commit, drag-to-position
+  // and logarithmic coarse step for free.
+  const lenKnob = makeKnob({
+    label: 'length',
+    value: ins.sampleLength,
+    min: 0,
+    max: SAMPLE_LENGTH_KNOB_MAX,
+    step: 2,
+    onChange: (v) => model.setInstrumentField(instrIdx, 'sampleLength', v),
   });
-  attachCommitOnEnter(lenEl);
-
-  // Slider mirrors the number field. The slider's `step=2` means it's
-  // always emitting even values; no extra clamping required.
-  slideEl.addEventListener('input', () => {
-    const v = parseInt(slideEl.value, 10);
-    if (!Number.isFinite(v)) return;
-    model.setInstrumentField(instrIdx, 'sampleLength', v);
-    lenEl.value = formatInt(v);
-  });
+  if (isUntouched) {
+    lenKnob.el.classList.add('knob-disabled');
+    // Block every interaction surface — pointer-events:none lets the
+    // hover state stay quiet too.
+    (lenKnob.el.querySelector('.kbar') as HTMLElement | null)?.setAttribute('tabindex', '-1');
+    lenKnob.el.style.pointerEvents = 'none';
+  }
+  lenHost.appendChild(lenKnob.el);
 
   if (handlers.onImportAki) impBtn.addEventListener('click', () => handlers.onImportAki?.());
   else impBtn.disabled = true;

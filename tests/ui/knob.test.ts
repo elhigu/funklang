@@ -190,6 +190,45 @@ describe('makeKnob — double-click editor', () => {
   });
 });
 
+describe('makeKnob — even-only (step=2)', () => {
+  it('Shift+wheel moves by ±2 (the step), not ±1', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'ofs', value: 100, min: 0, max: 12286, step: 2, onChange: cb });
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(102);
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: 1, shiftKey: true, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(100);
+  });
+
+  it('coarse wheel snaps to a multiple of step', () => {
+    const cb = vi.fn();
+    // range=12286 → log coarse on a value of 100 = round(3 / 2) * 2 = 4
+    const k = makeKnob({ label: 'ofs', value: 100, min: 0, max: 12286, step: 2, onChange: cb });
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+    const v = k.getValue();
+    expect(v % 2).toBe(0);
+    expect(v).toBeGreaterThan(100);
+  });
+
+  it('numeric editor commits even values only (7 rounds to 8)', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'ofs', value: 10, min: 0, max: 100, step: 2, onChange: cb });
+    const val = k.el.querySelector('.kval') as HTMLElement;
+    val.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    const input = k.el.querySelector('input.kedit') as HTMLInputElement;
+    input.value = '7';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(8);
+  });
+
+  it('setValue snaps to a multiple of step', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'ofs', value: 0, min: 0, max: 100, step: 2, onChange: cb });
+    k.setValue(51);
+    expect(k.getValue()).toBe(52);
+  });
+});
+
 describe('makeKnob — out of range', () => {
   it('setValue clamps internally; out-of-range visual on display only', () => {
     const cb = vi.fn();

@@ -764,6 +764,11 @@ function renderRow(
         min: minOff,
         max: maxOff,
         defaultValue: minOff,
+        // Loop offset must be even — let the knob enforce that on every
+        // mutation source (wheel, arrow, drag, dblclick editor). The
+        // clampLoopOffset call below is now a redundant belt-and-
+        // suspenders against any future caller that bypasses the knob.
+        step: 2,
         onChange: (v) => {
           // The user's wheel/arrow stepping doesn't know the loop-rules
           // even-only constraint, so snap here and write the snapped

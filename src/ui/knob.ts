@@ -12,6 +12,14 @@ export interface KnobOptions {
   min?: number | undefined;
   max?: number | undefined;
   defaultValue?: number | undefined;
+  /**
+   * Granularity of legal values, defaulting to 1. When `step > 1` every
+   * source of mutation (wheel, arrow keys, drag-to-position, numeric
+   * editor) snaps to the nearest multiple of `step`, AND the fine /
+   * Shift modifier moves by `step` instead of ±1 — so loop_gen offset
+   * (step = 2) feels right: even values only, even on Shift+wheel.
+   */
+  step?: number | undefined;
   /** Legacy: ignored. Drag is now position-based (click X → value at that ratio). */
   coarsePxPerUnit?: number | undefined;
   /** Legacy: ignored. */
@@ -35,8 +43,18 @@ export function makeKnob(opts: KnobOptions): Knob {
   const max = opts.max ?? 255;
   const defaultValue = opts.defaultValue ?? 0;
   const range = max - min;
+  const step = Math.max(1, Math.round(opts.step ?? 1));
 
-  let value = opts.value;
+  /** Round `v` to the nearest multiple of `step` measured from `min`,
+   *  then clamp to [min, max]. When step = 1 this collapses to the
+   *  usual `clamp(round(v), …)`. */
+  const snap = (v: number): number => {
+    const off = v - min;
+    const snapped = min + Math.round(off / step) * step;
+    return clamp(snapped, min, max);
+  };
+
+  let value = snap(opts.value);
 
   const el = document.createElement('div');
   el.className = 'knob';
@@ -62,9 +80,9 @@ export function makeKnob(opts: KnobOptions): Knob {
   };
 
   const emit = (newV: number): void => {
-    const clamped = clamp(Math.round(newV), min, max);
-    if (clamped === value) return;
-    value = clamped;
+    const snapped = snap(newV);
+    if (snapped === value) return;
+    value = snapped;
     paint();
     opts.onChange(value);
   };
@@ -82,15 +100,20 @@ export function makeKnob(opts: KnobOptions): Knob {
   // mode at all; every step is already meaningful.
   const COARSE_THRESHOLD = 64;
   const LOG_THRESHOLD = 1000;
-  const linearCoarse = (): number => Math.max(1, Math.round(range * 0.03));
-  const logCoarse = (): number => Math.max(1, Math.round(Math.abs(value) * 0.03));
+  /** Round a raw step UP to the nearest multiple of `step`. Guarantees
+   *  that wheel/arrow events always move by a legal increment when the
+   *  knob is even-only (step = 2) or any other granularity. */
+  const toStep = (raw: number): number =>
+    Math.max(step, Math.round(raw / step) * step);
+  const linearCoarse = (): number => toStep(range * 0.03);
+  const logCoarse = (): number => toStep(Math.abs(value) * 0.03);
   const coarseStep = (): number =>
     range > LOG_THRESHOLD ? logCoarse() : linearCoarse();
   const hasCoarse = (): boolean => range >= COARSE_THRESHOLD;
-  /** Step to apply for a non-Shift event. Coarse on wide ranges, ±1 on narrow. */
-  const wheelDefault = (): number => hasCoarse() ? coarseStep() : 1;
-  /** Step to apply when Shift is held. Always ±1 (fine). */
-  const shiftStep = (): number => 1;
+  /** Step to apply for a non-Shift event. Coarse on wide ranges, ±step on narrow. */
+  const wheelDefault = (): number => hasCoarse() ? coarseStep() : step;
+  /** Step to apply when Shift is held. Fine = ±step (always a legal increment). */
+  const shiftStep = (): number => step;
 
   // wheel: COARSE by default (or ±1 on small ranges), Shift → fine ±1.
   const onWheel = (e: WheelEvent): void => {
@@ -202,9 +225,9 @@ export function makeKnob(opts: KnobOptions): Knob {
   return {
     el,
     setValue(v: number): void {
-      const clamped = clamp(Math.round(v), min, max);
-      if (clamped === value) return;
-      value = clamped;
+      const snapped = snap(v);
+      if (snapped === value) return;
+      value = snapped;
       paint();
     },
     getValue(): number { return value; },

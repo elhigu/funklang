@@ -45,23 +45,28 @@ describe('instr-header — REMOVE button', () => {
   });
 });
 
-describe('instr-header — length controls', () => {
-  it('disables length number + slider when the instrument is untouched', () => {
+describe('instr-header — length knob', () => {
+  it('shows the .length-pair host with a disabled knob on an untouched instrument', () => {
     const model = new PatchModel(emptyPatch());
     renderInstrHeader(root, model, 0);
-    const lenEl   = root.querySelector('[data-id=instr-len]')        as HTMLInputElement;
-    const slideEl = root.querySelector('[data-id=instr-len-slider]') as HTMLInputElement;
-    expect(lenEl.disabled).toBe(true);
-    expect(slideEl.disabled).toBe(true);
+    const lenHost = root.querySelector('.length-pair') as HTMLElement;
+    expect(lenHost.classList.contains('disabled')).toBe(true);
+    const knob = lenHost.querySelector('.knob') as HTMLElement;
+    expect(knob).not.toBeNull();
+    expect(knob.classList.contains('knob-disabled')).toBe(true);
   });
 
-  it('enables length controls once the instrument has a slot', () => {
+  it('renders an interactive length knob once the instrument has a slot', () => {
     const model = new PatchModel(emptyPatch());
     populate(model);
     renderInstrHeader(root, model, 0);
-    const lenEl   = root.querySelector('[data-id=instr-len]')        as HTMLInputElement;
-    const slideEl = root.querySelector('[data-id=instr-len-slider]') as HTMLInputElement;
-    expect(lenEl.disabled).toBe(false);
-    expect(slideEl.disabled).toBe(false);
+    const lenHost = root.querySelector('.length-pair') as HTMLElement;
+    expect(lenHost.classList.contains('disabled')).toBe(false);
+    const knob = lenHost.querySelector('.knob') as HTMLElement;
+    expect(knob).not.toBeNull();
+    expect(knob.classList.contains('knob-disabled')).toBe(false);
+    // The current value is rendered in the .kval span.
+    const kval = knob.querySelector('.kval') as HTMLElement;
+    expect(kval.textContent).toBe('1024');
   });
 });
