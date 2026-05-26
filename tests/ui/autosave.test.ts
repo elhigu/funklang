@@ -58,6 +58,26 @@ describe('autosave round-trip', () => {
     expect(listAutosaves(storage).length).toBe(1);
   });
 
+  it('many repeated saves of an unchanging patch never grow past one entry', () => {
+    // Regression: the autosave LOOP fires saveAutosave on a timer. If the
+    // user is idle, none of those ticks should ever create a new entry.
+    const p = variant(42);
+    for (let i = 0; i < 100; i++) {
+      saveAutosave(p, storage, () => 1000 + i);
+    }
+    expect(listAutosaves(storage).length).toBe(1);
+  });
+
+  it('a change between two saves produces TWO entries (sanity check on the dedupe)', () => {
+    const a = variant(1);
+    const b = variant(2);
+    saveAutosave(a, storage, () => 1000);
+    saveAutosave(a, storage, () => 2000);   // dedup
+    saveAutosave(b, storage, () => 3000);   // real change → new entry
+    saveAutosave(b, storage, () => 4000);   // dedup again
+    expect(listAutosaves(storage).map((e) => e.timestamp)).toEqual([3000, 1000]);
+  });
+
   it('trims to MAX_ENTRIES = 30', () => {
     for (let i = 0; i < 35; i++) {
       saveAutosave(variant(i + 1), storage, () => 1000 + i);

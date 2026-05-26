@@ -146,6 +146,13 @@ export function restoreAutosave(entry: AutosaveEntry): Patch {
  * Start a recurring autosave loop. Returns a stop function. Pass a
  * `getPatch` closure rather than the patch itself so the loop always
  * sees the latest model state.
+ *
+ * Idle-tick fast path: the loop keeps the most-recently-serialized
+ * bytes in closure scope. If a tick's serialized bytes match the
+ * cache it skips the entire save call — no storage read, no base64
+ * decode. `saveAutosave` ALSO dedupes against storage, so duplicates
+ * still can't sneak in even when the cache is cold (HMR re-mount,
+ * loop restart, etc.).
  */
 export function startAutosaveLoop(
   getPatch: () => Patch,
@@ -153,9 +160,14 @@ export function startAutosaveLoop(
   intervalMs: number = AUTOSAVE_INTERVAL_MS,
 ): () => void {
   if (!storage) return () => {};
+  let lastBytes: Uint8Array | null = null;
   const id = setInterval(() => {
-    try { saveAutosave(getPatch(), storage); }
-    catch { /* swallow — autosave should never crash the app */ }
+    try {
+      const bytes = serializeAkp(getPatch());
+      if (lastBytes && bytesEqual(lastBytes, bytes)) return;
+      const ts = saveAutosave(getPatch(), storage);
+      if (ts != null) lastBytes = bytes;
+    } catch { /* swallow — autosave should never crash the app */ }
   }, intervalMs);
   return () => clearInterval(id);
 }
