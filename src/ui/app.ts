@@ -1335,6 +1335,7 @@ export function bootApp(root: HTMLElement): void {
     repaint();
   });
 
+  renderMain();
   repaint();
   updateUndoRedoButtons();
 }
