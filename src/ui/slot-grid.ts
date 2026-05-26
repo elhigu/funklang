@@ -453,6 +453,7 @@ function renderParam(
         value: slot[param.field] as number,
         min: param.type.min,
         max: param.type.max,
+        scale: param.type.scale,
         defaultValue: 0,
         onChange: writeValue,
       });
@@ -536,6 +537,7 @@ function renderParam(
         value: slot[param.field] as number,
         min: param.type.min,
         max: param.type.max,
+        scale: param.type.scale,
         defaultValue: 0,
         onChange: writeValue,
       });

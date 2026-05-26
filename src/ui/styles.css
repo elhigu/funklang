@@ -78,8 +78,13 @@
     background: var(--bg-1);
     border-bottom: 1px solid var(--grid);
     display: grid;
-    grid-template-columns: 240px 1fr auto;
+    /* `minmax(0, …)` on the middle column lets the .menu actually
+       shrink past its content's intrinsic width so its own
+       overflow-x:auto kicks in instead of pushing the file-info
+       column off-screen. */
+    grid-template-columns: 240px minmax(0, 1fr) auto;
     align-items: stretch;
+    min-width: 0;
   }
   .brand {
     border-right: 1px solid var(--grid);
@@ -108,7 +113,17 @@
     display: flex;
     align-items: center;
     gap: 0;
+    /* When the viewport is too narrow to fit every button + selector,
+       let the row scroll horizontally instead of clipping or wrapping
+       into a second line (which would break the fixed-height header
+       grid row). */
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-width: 0;
+    scrollbar-width: thin;
   }
+  .menu::-webkit-scrollbar { height: 4px; background: transparent; }
+  .menu::-webkit-scrollbar-thumb { background: var(--bg-3); }
   .menu button {
     background: transparent;
     border: none;
@@ -121,6 +136,8 @@
     letter-spacing: 0.5px;
     text-transform: uppercase;
     font-size: 11px;
+    flex-shrink: 0;     /* buttons keep their natural width; row scrolls instead */
+    white-space: nowrap;
   }
   .menu button:hover { color: var(--amber); background: var(--bg-2); }
   .note-select-wrap {
@@ -132,6 +149,8 @@
     border-right: 1px solid var(--grid-dim);
     color: var(--fg-1);
     font-size: 11px;
+    flex-shrink: 0;
+    white-space: nowrap;
     letter-spacing: 0.5px;
     text-transform: uppercase;
   }
@@ -285,14 +304,28 @@
     border-bottom: 1px solid var(--grid);
     padding: 14px 18px;
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
+    /* On narrow screens, allow the (title, meta) pair to break onto two
+       rows so the length knob never gets shoved off-screen. */
+    row-gap: 8px;
   }
   .instr-title {
     display: flex;
     align-items: baseline;
-    gap: 14px;
+    gap: 12px;
+    /* The AKI / REMOVE buttons live in here next to the name input;
+       at narrow widths they wrap to a second line rather than getting
+       clipped past the right edge. */
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  /* Let the instrument name shrink before the AKI/REMOVE buttons do —
+     the buttons are tiny and chopping them helps no-one. */
+  .instr-title .instr-name-input {
+    min-width: 80px;
+    flex: 1 1 120px;
   }
   .instr-title .label {
     font-family: 'Silkscreen', monospace;
@@ -411,6 +444,8 @@
     font-size: 11px;
     letter-spacing: 0.5px;
     text-transform: uppercase;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .base-toggle-label { color: var(--fg-2); }
   .base-toggle-wrap select {
@@ -427,7 +462,11 @@
   /* slot grid header — matches the slot row's 5 columns */
   .grid-head {
     display: grid;
-    grid-template-columns: 44px 64px 144px minmax(0, 1fr) minmax(0, 1fr);
+    /* Params (col 4) get priority over the waveform (col 5) when the
+       viewport is narrow — a knob row should always remain usable, the
+       waveform is "nice to have". `minmax(260px, 2fr)` keeps the knobs
+       legible; the waveform shrinks below its preferred share first. */
+    grid-template-columns: 44px 64px 144px minmax(260px, 2fr) minmax(0, 1fr);
     gap: 1px;
     background: var(--bg-1);
     border-bottom: 1px solid var(--grid);
@@ -460,7 +499,11 @@
      (full slot height) so it's actually inspectable. */
   .slot {
     display: grid;
-    grid-template-columns: 44px 64px 144px minmax(0, 1fr) minmax(0, 1fr);
+    /* Params (col 4) get priority over the waveform (col 5) when the
+       viewport is narrow — a knob row should always remain usable, the
+       waveform is "nice to have". `minmax(260px, 2fr)` keeps the knobs
+       legible; the waveform shrinks below its preferred share first. */
+    grid-template-columns: 44px 64px 144px minmax(260px, 2fr) minmax(0, 1fr);
     gap: 1px;
     align-items: stretch;
     border-bottom: 1px solid var(--grid-dim);
@@ -530,6 +573,8 @@
     font-size: 11px;
     letter-spacing: 0.5px;
     text-transform: uppercase;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .output-select-label { color: var(--fg-2); }
   /* MASTER V1 toggle button. Replaces the per-slot dropdown the wrap

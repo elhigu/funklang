@@ -20,6 +20,18 @@ export interface KnobOptions {
    * (step = 2) feels right: even values only, even on Shift+wheel.
    */
   step?: number | undefined;
+  /**
+   * Position-to-value mapping for the draggable bar. `'linear'`
+   * (default) is the classic uniform mapping. `'log'` gives small
+   * values a much bigger slice of the bar — useful for parameters like
+   * audio frequency where 5..50 Hz needs as much real-estate as
+   * 5000..10000 Hz. Wheel / arrow stepping is unaffected (those still
+   * move by additive `coarseStep` / `shiftStep`).
+   *
+   * Only valid for ranges where min >= 0; mixed-sign log mapping is
+   * not well defined, so we silently fall back to linear in that case.
+   */
+  scale?: 'linear' | 'log' | undefined;
   /** Legacy: ignored. Drag is now position-based (click X → value at that ratio). */
   coarsePxPerUnit?: number | undefined;
   /** Legacy: ignored. */
@@ -44,6 +56,30 @@ export function makeKnob(opts: KnobOptions): Knob {
   const defaultValue = opts.defaultValue ?? 0;
   const range = max - min;
   const step = Math.max(1, Math.round(opts.step ?? 1));
+  // Log scale only kicks in when the range is entirely non-negative
+  // (mixed-sign log is undefined). +1 below the log so a min of 0
+  // doesn't blow up to -Infinity.
+  const useLog = opts.scale === 'log' && min >= 0 && max > min;
+  const LOG_OFFSET = 1;
+  const logMinV = Math.log(min + LOG_OFFSET);
+  const logMaxV = Math.log(max + LOG_OFFSET);
+  const logSpan = logMaxV - logMinV;
+
+  /** value → ratio in [0, 1] for paint + drag mirror. */
+  const valueToRatio = (v: number): number => {
+    if (range <= 0) return 0;
+    if (useLog) {
+      const r = (Math.log(Math.max(min, v) + LOG_OFFSET) - logMinV) / logSpan;
+      return clamp(r, 0, 1);
+    }
+    return clamp((v - min) / range, 0, 1);
+  };
+  /** ratio in [0, 1] → raw (unsnapped) value for drag-to-position. */
+  const ratioToValue = (r: number): number => {
+    const cr = clamp(r, 0, 1);
+    if (useLog) return Math.exp(logMinV + cr * logSpan) - LOG_OFFSET;
+    return min + cr * range;
+  };
 
   /** Round `v` to the nearest multiple of `step` measured from `min`,
    *  then clamp to [min, max]. When step = 1 this collapses to the
@@ -69,7 +105,7 @@ export function makeKnob(opts: KnobOptions): Knob {
   labelEl.textContent = opts.label;
 
   const paint = (): void => {
-    const ratio = range <= 0 ? 0 : clamp((value - min) / range, 0, 1);
+    const ratio = valueToRatio(value);
     barEl.style.setProperty('--fill', `${ratio * 100}%`);
     barEl.setAttribute('aria-valuenow', String(value));
     barEl.setAttribute('aria-valuemin', String(min));
@@ -154,7 +190,7 @@ export function makeKnob(opts: KnobOptions): Knob {
     const rect = barEl.getBoundingClientRect();
     if (rect.width <= 0) return value;
     const r = clamp((clientX - rect.left) / rect.width, 0, 1);
-    return min + r * range;
+    return ratioToValue(r);
   };
   let dragging = false;
   const onMouseMove = (e: MouseEvent): void => {
