@@ -373,6 +373,15 @@
   }
   .instr-aki-btn:hover { color: var(--amber); border-color: var(--amber); }
   .instr-aki-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* REMOVE flips red on hover — destructive action, even with the
+     confirm() prompt the styling should warn the user. */
+  .instr-remove-btn:hover { color: var(--red); border-color: var(--red); }
+
+  /* Length controls greyed when the instrument has never been touched
+     (no slots, no name, no length). Adding the first slot auto-applies
+     the 12 KB default which re-enables them. */
+  .length-pair.disabled { opacity: 0.5; }
+  .length-pair input:disabled { cursor: not-allowed; }
 
   /* Sample-length slider that lives alongside the number field. */
   .length-pair {

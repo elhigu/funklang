@@ -18,6 +18,9 @@ export interface InstrHeaderHandlers {
   onImportAki?: (() => void) | undefined;
   /** Called when the user clicks EXPORT .AKI in this header. */
   onExportAki?: (() => void) | undefined;
+  /** Called when the user clicks REMOVE. The host runs the confirm
+   *  dialog and the reset — this widget just dispatches the intent. */
+  onRemove?: (() => void) | undefined;
 }
 
 /** Soft upper bound for the sample-length slider. The on-disk field is
@@ -38,6 +41,12 @@ export function renderInstrHeader(
   }
   const num = String(instrIdx + 1).padStart(2, '0');
   const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
+  // "Empty / never-touched" = no slots, no name, no length. Length
+  // controls (number field + slider) are disabled in that state so the
+  // user can't put a sample length on an instrument that has nothing
+  // to sample yet — inserting the first slot auto-applies the 12 KB
+  // default, which is what re-enables the controls.
+  const isUntouched = filled === 0 && !ins.name && ins.sampleLength === 0;
   // Show the slider in dec for predictability — hex on a 0..65k slider
   // would just be confusing. The number input next to it follows the
   // global display base.
@@ -50,11 +59,12 @@ export function renderInstrHeader(
         <input data-id="instr-name" class="instr-name-input" value="${escapeHtmlAttr(ins.name)}" />
         <button class="instr-aki-btn" data-id="aki-import" title="Replace this instrument with one loaded from a .aki file">IMPORT&nbsp;.AKI</button>
         <button class="instr-aki-btn" data-id="aki-export" title="Save this instrument as a standalone .aki file">EXPORT&nbsp;.AKI</button>
+        <button class="instr-aki-btn instr-remove-btn" data-id="instr-remove" title="Wipe this instrument back to empty (asks for confirmation)">REMOVE</button>
       </div>
       <div class="instr-meta">
-        <label class="pair length-pair"><span class="k">length</span>
-          <input data-id="instr-len" type="text" class="meta-num" value="${escapeHtmlAttr(lenDisplay)}" />
-          <input data-id="instr-len-slider" type="range" min="0" max="${SAMPLE_LENGTH_SLIDER_MAX}" step="2" value="${ins.sampleLength}" class="meta-slider" />
+        <label class="pair length-pair${isUntouched ? ' disabled' : ''}"><span class="k">length</span>
+          <input data-id="instr-len" type="text" class="meta-num" value="${escapeHtmlAttr(lenDisplay)}"${isUntouched ? ' disabled' : ''} />
+          <input data-id="instr-len-slider" type="range" min="0" max="${SAMPLE_LENGTH_SLIDER_MAX}" step="2" value="${ins.sampleLength}" class="meta-slider"${isUntouched ? ' disabled' : ''} />
         </label>
         <span class="pair badge" data-id="slot-badge">${filled}/${N_SLOTS_EDITABLE}</span>
       </div>
@@ -66,6 +76,7 @@ export function renderInstrHeader(
   const slideEl = root.querySelector('[data-id=instr-len-slider]')  as HTMLInputElement;
   const impBtn  = root.querySelector('[data-id=aki-import]')        as HTMLButtonElement;
   const expBtn  = root.querySelector('[data-id=aki-export]')        as HTMLButtonElement;
+  const rmBtn   = root.querySelector('[data-id=instr-remove]')      as HTMLButtonElement;
 
   nameEl.addEventListener('input', () => {
     model.setInstrumentField(instrIdx, 'name', nameEl.value);
@@ -97,6 +108,14 @@ export function renderInstrHeader(
   else impBtn.disabled = true;
   if (handlers.onExportAki) expBtn.addEventListener('click', () => handlers.onExportAki?.());
   else expBtn.disabled = true;
+  if (handlers.onRemove) {
+    rmBtn.addEventListener('click', () => handlers.onRemove?.());
+    // Greyed-out if the instrument is already empty — nothing to remove.
+    const filled = ins.slots.some((s) => s.fn !== 0);
+    if (!filled && !ins.name && ins.sampleLength === 0) rmBtn.disabled = true;
+  } else {
+    rmBtn.disabled = true;
+  }
 }
 
 /**

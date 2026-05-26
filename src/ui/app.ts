@@ -192,6 +192,7 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Hover an instrument row</td><td>✕ button appears — reset the instrument (confirms first)</td></tr>
                 <tr><td>CLOSE</td><td>Discards the current patch and opens a fresh, blank project. Disabled when the patch is already empty</td></tr>
                 <tr><td>IMPORT / EXPORT .AKI</td><td>Now lives in the instrument header next to the name — they only ever applied to the active instrument anyway</td></tr>
+                <tr><td>REMOVE (instrument header)</td><td>Wipes the active instrument back to empty. Asks for confirmation; greyed out when the instrument is already empty. Length field + slider also grey out for an untouched instrument and re-enable when you add the first slot</td></tr>
                 <tr><td>Autosave</td><td>Every minute the patch is snapshotted to localStorage (up to 30 minutes of history). On page refresh, the latest snapshot loads automatically</td></tr>
                 <tr><td>REVERT AUTOSAVE</td><td>Opens the autosave panel on the right. First row is your CURRENT state (saved at open time) so you can always click your way back. Click any row to restore it; arrow-up/down browses with audition playback. Escape closes</td></tr>
                 <tr><td>Click <kbd>+</kbd> at a slot's bottom-left corner</td><td>Insert a new slot right after this one</td></tr>
@@ -316,6 +317,7 @@ export function bootApp(root: HTMLElement): void {
     renderInstrHeader(headerHost, model, activeIdx, {
       onImportAki: () => { void importAkiForActive(); },
       onExportAki: () => { void exportAkiForActive(); },
+      onRemove:    () => removeInstrumentWithConfirm(activeIdx),
     });
 
     const viewerHost = document.createElement('div');
@@ -528,26 +530,28 @@ export function bootApp(root: HTMLElement): void {
     if (btn) btn.disabled = !patchHasContent();
   };
 
+  // Shared "reset this instrument to empty" path used by BOTH the
+  // sidebar ✕ button and the instrument header's REMOVE button. Always
+  // asks for confirmation — the operation isn't reachable via Ctrl+Z.
+  const removeInstrumentWithConfirm = (i: number): void => {
+    const ins = model.patch.instruments[i];
+    if (!ins) return;
+    const label = ins.name || `instrument ${String(i + 1).padStart(2, '0')}`;
+    if (!confirm(`Remove "${label}" — clears the name, sample length and all slots. Cannot be undone with Ctrl+Z. Continue?`)) return;
+    model.patch.instruments[i] = emptyInstrument();
+    rebuildCloneGraph();
+    model.events.emit({ instrIdx: i, kind: 'structure' });
+    if (i === activeIdx) renderMain();
+    repaint();
+  };
+
   const repaint = (): void => {
     renderSidebar(listEl, model.patch, activeIdx, {
       // Sidebar click also auto-plays (subject to the audio toggle), same
       // as wheel/arrow nav. Empty rows are clickable now too — the slot
       // grid renders an empty-state placeholder with a [+] button there.
       onPick: (i) => selectInstrument(i, { play: true }),
-      onDelete: (i) => {
-        const ins = model.patch.instruments[i];
-        if (!ins) return;
-        const label = ins.name || `instrument ${String(i + 1).padStart(2, '0')}`;
-        if (!confirm(`Reset "${label}" — clears the name, sample length and all slots. Cannot be undone with Ctrl+Z. Continue?`)) return;
-        // Reset to a brand-new empty instrument and refresh.
-        model.patch.instruments[i] = emptyInstrument();
-        rebuildCloneGraph();
-        model.events.emit({ instrIdx: i, kind: 'structure' });
-        if (i === activeIdx) {
-          renderMain();
-        }
-        repaint();
-      },
+      onDelete: removeInstrumentWithConfirm,
     });
     updateCloseButton();
   };
