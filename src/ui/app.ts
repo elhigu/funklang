@@ -19,6 +19,9 @@ import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, openFileWithHandle, saveFileBytes, saveToHandle } from './file-dialog';
 import { attachWheelStep } from './wheel';
 import { getDisplayBase, setDisplayBase, onDisplayBaseChange } from './number-format';
+import {
+  startAutosaveLoop, latestAutosave, listAutosaves, restoreAutosave, saveAutosave,
+} from './autosave';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -108,6 +111,7 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-save-as">SAVE&nbsp;AS</button>
           <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶&nbsp;UNDO</button>
           <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷&nbsp;REDO</button>
+          <button id="btn-revert" title="Browse autosaves (snapshot every minute to localStorage)">REVERT&nbsp;AUTOSAVE</button>
           <label class="base-toggle-wrap" title="Display numbers as decimal or hexadecimal everywhere">
             <span class="base-toggle-label">BASE</span>
             <select id="display-base">
@@ -188,6 +192,8 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Hover an instrument row</td><td>✕ button appears — reset the instrument (confirms first)</td></tr>
                 <tr><td>CLOSE</td><td>Discards the current patch and opens a fresh, blank project. Disabled when the patch is already empty</td></tr>
                 <tr><td>IMPORT / EXPORT .AKI</td><td>Now lives in the instrument header next to the name — they only ever applied to the active instrument anyway</td></tr>
+                <tr><td>Autosave</td><td>Every minute the patch is snapshotted to localStorage (up to 30 minutes of history). On page refresh, the latest snapshot loads automatically</td></tr>
+                <tr><td>REVERT AUTOSAVE</td><td>Opens the autosave panel on the right. First row is your CURRENT state (saved at open time) so you can always click your way back. Click any row to restore it; arrow-up/down browses with audition playback. Escape closes</td></tr>
                 <tr><td>Click <kbd>+</kbd> at a slot's bottom-left corner</td><td>Insert a new slot right after this one</td></tr>
                 <tr><td>Click <kbd>+</kbd> at the FIRST row's top-left corner</td><td>Insert a new slot at the very beginning</td></tr>
                 <tr><td>Empty instrument</td><td>Shows a single placeholder row with a <kbd>+</kbd> button — click it to add the first slot</td></tr>
@@ -240,6 +246,14 @@ export function bootApp(root: HTMLElement): void {
         </div>
         <div class="footer-right"><span class="blink">●</span><span>READY</span></div>
       </footer>
+      <aside id="revert-panel" class="revert-panel hidden" aria-hidden="true">
+        <div class="revert-head">
+          <span>AUTOSAVES</span>
+          <button class="revert-close" id="revert-close" aria-label="Close">✕</button>
+        </div>
+        <div class="revert-hint">Click an entry to load it. The first row is your CURRENT state, captured when you opened this panel — click it to bail out without changing anything.</div>
+        <ul class="revert-list" id="revert-list"></ul>
+      </aside>
       <input id="hidden-file-input" type="file" accept=".akp" style="display:none" />
     </div>
   `;
@@ -1143,6 +1157,113 @@ export function bootApp(root: HTMLElement): void {
     playAudition();
   });
   attachWheelStep(noteSelect);
+
+  // ── Autosave ────────────────────────────────────────────────────
+  // Snapshot the current patch to localStorage every minute so a tab
+  // crash / refresh doesn't lose work. On mount, if there's an existing
+  // autosave AND the in-memory patch is still empty (i.e. this is a
+  // genuine boot, not an HMR rebuild that already has state), restore
+  // the most recent autosave silently — saves the user a click after a
+  // page reload.
+  const bootAutosave = latestAutosave();
+  if (bootAutosave) {
+    const patchIsBlank = !model.patch.instruments.some(
+      (ins) => ins.slots.some((s) => s.fn !== 0),
+    );
+    if (patchIsBlank) {
+      try {
+        model.patch = restoreAutosave(bootAutosave);
+        normalizePatch(model.patch);
+        activeIdx = model.patch.instruments.findIndex(
+          (ins) => ins.slots.some((s) => s.fn !== 0),
+        );
+        if (activeIdx < 0) activeIdx = 0;
+        selection = { instrIdx: activeIdx, slotIdx: null };
+        outputTarget = { instrIdx: activeIdx, slotIdx: null };
+        rebuildCloneGraph();
+        model.events.emit({ instrIdx: -1, kind: 'reset' });
+      } catch { /* corrupt entry — ignore, user can browse REVERT panel */ }
+    }
+  }
+  // Kick off the recurring loop. (Stop function discarded — the app's
+  // lifetime is the page lifetime; no clean shutdown needed.)
+  startAutosaveLoop(() => model.patch);
+
+  // ── REVERT AUTOSAVE side panel ──────────────────────────────────
+  const revertPanel = root.querySelector('#revert-panel') as HTMLElement;
+  const revertList  = root.querySelector('#revert-list')  as HTMLElement;
+  const revertClose = root.querySelector('#revert-close') as HTMLButtonElement;
+  const revertBtn   = root.querySelector('#btn-revert')   as HTMLButtonElement;
+
+  const openRevertPanel = (): void => {
+    // Snapshot CURRENT state to the top of the list before browsing —
+    // user-requested escape hatch so they can roll back any preview.
+    saveAutosave(model.patch);
+    const entries = listAutosaves();
+    revertList.innerHTML = '';
+    entries.forEach((entry, i) => {
+      const li = document.createElement('li');
+      li.className = 'revert-row';
+      const ts = new Date(entry.timestamp);
+      const labelLeft = i === 0 ? 'CURRENT' : `${i} ${i === 1 ? 'save' : 'saves'} ago`;
+      li.innerHTML = `<span class="revert-label">${labelLeft}</span><span class="revert-time">${ts.toLocaleString()}</span>`;
+      li.addEventListener('click', () => {
+        try {
+          model.patch = restoreAutosave(entry);
+          normalizePatch(model.patch);
+          if (activeIdx >= model.patch.instruments.length) activeIdx = 0;
+          const ins = model.patch.instruments[activeIdx];
+          if (!ins || ins.slots.every((s) => s.fn === 0)) {
+            // Active instrument is empty in the restored patch — fall
+            // back to the first populated one so the user actually sees
+            // something.
+            const firstFilled = model.patch.instruments.findIndex(
+              (i2) => i2.slots.some((s) => s.fn !== 0),
+            );
+            if (firstFilled >= 0) activeIdx = firstFilled;
+          }
+          selection = { instrIdx: activeIdx, slotIdx: null };
+          outputTarget = { instrIdx: activeIdx, slotIdx: null };
+          rebuildCloneGraph();
+          model.events.emit({ instrIdx: -1, kind: 'reset' });
+          renderMain();
+          repaint();
+          playAudition();   // user wants to HEAR the loaded state
+        } catch (err) {
+          console.error('Failed to restore autosave', err);
+        }
+      });
+      revertList.appendChild(li);
+    });
+    revertPanel.classList.remove('hidden');
+    revertPanel.setAttribute('aria-hidden', 'false');
+  };
+  const closeRevertPanel = (): void => {
+    revertPanel.classList.add('hidden');
+    revertPanel.setAttribute('aria-hidden', 'true');
+  };
+  revertBtn.addEventListener('click', openRevertPanel);
+  revertClose.addEventListener('click', closeRevertPanel);
+  // Keyboard browse when the panel is open: Up/Down move highlight +
+  // load that snapshot (so the user actually HEARS each entry as they
+  // scroll). Escape closes.
+  document.addEventListener('keydown', (e) => {
+    if (revertPanel.classList.contains('hidden')) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeRevertPanel(); return; }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const rows = Array.from(revertList.querySelectorAll('.revert-row')) as HTMLElement[];
+    if (rows.length === 0) return;
+    const curIdx = rows.findIndex((r) => r.classList.contains('active'));
+    const nextIdx = curIdx < 0
+      ? 0
+      : Math.max(0, Math.min(rows.length - 1, curIdx + (e.key === 'ArrowDown' ? 1 : -1)));
+    if (nextIdx === curIdx) return;
+    e.preventDefault();
+    for (const r of rows) r.classList.remove('active');
+    rows[nextIdx]!.classList.add('active');
+    rows[nextIdx]!.scrollIntoView({ block: 'nearest' });
+    rows[nextIdx]!.click();
+  });
 
   // Global hex/dec display toggle. Flipping it just re-renders the
   // active instrument (slot-grid knobs read the current base in their
