@@ -99,6 +99,29 @@ describe('slot-grid — corner insert buttons', () => {
     expect(hint!.textContent ?? '').toMatch(/initialize|first slot/i);
   });
 
+  it('clicking the empty-state + sets sampleLength + name BEFORE emitting the structure event', async () => {
+    // Regression: app.ts rebuilds the instrument header on the
+    // `structure` event. If sampleLength/name are written AFTER the
+    // insertSlot, the header rebuild reads stale (empty) values and
+    // never shows the auto-applied 12 KB length or generated name.
+    const p = emptyPatch();
+    const model = new PatchModel(p);
+    const observed: Array<{ kind: string; sampleLength: number; name: string }> = [];
+    model.events.on((e) => {
+      const ins = model.patch.instruments[0]!;
+      observed.push({ kind: e.kind, sampleLength: ins.sampleLength, name: ins.name });
+    });
+    renderSlotGrid(root, model, 0);
+    (root.querySelector('[data-empty-insert]') as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+    // Find the structure event from the insertSlot — when it fires,
+    // sampleLength must already be 12 KB and name must be non-empty.
+    const structEvt = observed.find((e) => e.kind === 'structure');
+    expect(structEvt).toBeDefined();
+    expect(structEvt!.sampleLength).toBeGreaterThan(0);
+    expect(structEvt!.name.length).toBeGreaterThan(0);
+  });
+
   it('clicking the empty-state + inserts at index 0', async () => {
     const p = emptyPatch();
     const model = new PatchModel(p);

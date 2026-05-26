@@ -197,11 +197,12 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
   const smartOut = pickSmartOutVar(ins, atIdx);
   const base: Slot = { ...emptySlot(), fn: code, outVar: smartOut };
   const slot = applyInsertDefaults(base, code);
-  model.insertSlot(instrIdx, atIdx, slot);
-  // First slot just landed in this instrument? Give it a fresh sample
-  // length AND auto-name it with a demoscene-flavoured generated
-  // string — but only if the user hasn't already named it themselves.
-  // Skip if the user already typed something so we don't clobber it.
+  // If this is the first slot landing in the instrument, write the
+  // auto-name + 12 KB default length BEFORE the insertSlot call. The
+  // insert emits a `structure` event which makes app.ts rebuild the
+  // instrument header — that rebuild must see the new name + length
+  // already in place, otherwise the header keeps its stale (empty)
+  // values until something else triggers another rebuild.
   if (filled === 0) {
     if (ins.sampleLength === 0) {
       model.setInstrumentField(instrIdx, 'sampleLength', DEFAULT_SAMPLE_LENGTH);
@@ -210,6 +211,7 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
       model.setInstrumentField(instrIdx, 'name', generateInstrumentName());
     }
   }
+  model.insertSlot(instrIdx, atIdx, slot);
 }
 
 /**
