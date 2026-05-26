@@ -8,6 +8,7 @@ import type { RenderResult } from '../dsp/types';
 import { Player } from '../audio/player';
 import { buildCloneGraph, allDependentsOf } from '../patch/clone-graph';
 import { clampLoopOffset, loopLengthFor } from '../patch/loop-rules';
+import { normalizePatch } from '../patch/normalize';
 import type { CloneGraph } from '../patch/clone-graph';
 import { renderSidebar } from './sidebar';
 import { renderInstrHeader } from './instr-header';
@@ -189,7 +190,8 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>(unset) suffix in dropdown</td><td>Same: that variable hasn't been written yet</td></tr>
                 <tr><td>Clone source dropdown is empty / red</td><td>Clone source must be a LOWER-numbered instrument; instrument 01 can never clone</td></tr>
                 <tr><td>Loop offset</td><td>Always even, ≥ floor(sampleLength/4)×2, ≤ sampleLength−2. The loop_gen slot's offset knob and the wave-viewer's left edge both snap to the same valid set</td></tr>
-                <tr><td>Sample length</td><td>Always even (odd values round down on every keystroke)</td></tr>
+                <tr><td>Drag loop edge in the top wave-viewer</td><td>Hover near the pink left edge — cursor turns into ↔. Drag to retune the offset (auto-snapped to the valid even position)</td></tr>
+                <tr><td>Sample length</td><td>Always even (odd values round down on every keystroke). Patches loaded from .akp are normalised at load so the displayed length is always even</td></tr>
               </tbody>
             </table>
 
@@ -554,6 +556,9 @@ export function bootApp(root: HTMLElement): void {
         loopOffset: ins.loopOffset,
         loopLength: ins.loopLength,
         showLoop,
+        // Renderer emits sampleLength + 1 ticks; report the authoritative
+        // (always even) sampleLength so the meta line never shows odd.
+        instrumentLength: ins.sampleLength,
       });
     }
     if (cycleError) {
@@ -855,6 +860,12 @@ export function bootApp(root: HTMLElement): void {
     handle: FileSystemFileHandle | undefined,
   ): void => {
     model.patch = parseAkp(bytes);
+    // Klang's GUI never enforced the even-sampleLength rule, so .akp files
+    // in the wild can hold odd lengths or out-of-range loop offsets. Fix
+    // them up once at adoption time — the editor's downstream code (the
+    // wave-viewer "len" meta, the loop_gen knob, …) assumes the rules
+    // hold.
+    normalizePatch(model.patch);
     patchFileName = name;
     patchFileHandle = handle;
     nameEl.textContent = patchFileName;

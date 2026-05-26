@@ -100,10 +100,12 @@ export function drawWaveform(
     const rx = Math.max(0, Math.min(W, ex));
     ctx.fillStyle = 'rgba(255,45,146,0.18)';
     ctx.fillRect(lx, 0, rx - lx, H);
-    // edge handles
-    ctx.fillStyle = 'rgba(255,45,146,0.85)';
-    ctx.fillRect(lx, 0, 1, H);
-    ctx.fillRect(rx - 1, 0, 1, H);
+    // Edge handles — 3px thick so they're actually visible. The viewer's
+    // hit zone is wider still (see EDGE_PX in wave-viewer.ts), but the
+    // user needs to SEE the edge in order to aim for it.
+    ctx.fillStyle = 'rgba(255,45,146,0.95)';
+    ctx.fillRect(lx, 0, 3, H);
+    ctx.fillRect(rx - 3, 0, 3, H);
   }
 
   ctx.strokeStyle = color;

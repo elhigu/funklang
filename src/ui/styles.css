@@ -242,12 +242,30 @@
   /* ─── main editor ───────────────────────────────────────── */
   main {
     grid-area: main;
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* `main` itself does NOT scroll any more — only the slot-grid-host
+       child below scrolls. That way the instrument header + wave-viewer
+       + column-header row stay visible while the user scrolls through a
+       long slot list. */
+    overflow: hidden;
     min-width: 0;
     background: var(--bg-0);
     display: flex;
     flex-direction: column;
+  }
+  /* Header + viewer stay pinned at the top of `main`; they're flex
+     items that refuse to shrink. */
+  main > .instr-header,
+  main > .wave-viewer { flex: 0 0 auto; }
+  /* The slot-grid-host absorbs all remaining vertical space and is the
+     scroll container. `min-height: 0` is the standard flex-overflow
+     incantation — without it the host refuses to shrink past content
+     and the scrollbar never appears. The .grid-head inside it is
+     position:sticky so the column header row stays visible too. */
+  main > .slot-grid-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   .instr-header {
     background: var(--bg-1);
@@ -351,6 +369,11 @@
   .slots {
     flex: 1;
     min-width: 0;
+    /* The first row's top-left [+] inserter sits at top:-9px on the
+       slot itself — without breathing room above the first row it gets
+       clipped by the .grid-head's bottom border. Pad the container so
+       the button has somewhere to live. */
+    padding-top: 12px;
   }
   /* 5-column single-row grid. Params and waveform split the remaining
      horizontal space 50/50. The waveform fills the entire right half

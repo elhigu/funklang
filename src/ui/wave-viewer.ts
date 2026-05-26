@@ -18,7 +18,20 @@ export interface WaveViewer {
   setSample(
     sample: Int16Array | null,
     region?:
-      | { loopOffset: number; loopLength: number; showLoop?: boolean | undefined }
+      | {
+          loopOffset: number;
+          loopLength: number;
+          showLoop?: boolean | undefined;
+          /**
+           * Klang's renderer emits `instrument.sampleLength + 1` samples
+           * (one tail tick beyond the audible region, see dsp-reference
+           * §7). When the caller passes the instrument's authoritative
+           * length here, the meta line reports THAT instead of the raw
+           * buffer length — so the user sees the same even value they
+           * just typed into the sample-length field.
+           */
+          instrumentLength?: number | undefined;
+        }
       | undefined,
   ): void;
   destroy(): void;
@@ -36,7 +49,11 @@ interface DragState {
   startLoopLen: number;
 }
 
-const EDGE_PX = 6;
+// Widened from the original 6px — at 6px the hit zone was effectively
+// invisible. The viewer now also paints a thicker handle bar at the
+// loop edge and shows an `ew-resize` cursor while the mouse is inside
+// this zone, so the user can SEE that the edge is grabbable.
+const EDGE_PX = 12;
 
 export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}): WaveViewer {
   const canvas = document.createElement('canvas');
@@ -55,6 +72,9 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
   let loopOffset = 0;
   let loopLength = 0;
   let showLoop = true;
+  // Authoritative instrument sample length for the meta line; falls back
+  // to the rendered buffer's length when the caller didn't pass one.
+  let instrumentLength: number | null = null;
 
   // View window over `sample` in source-sample indices.
   let viewStart = 0;
@@ -77,8 +97,9 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
         ? { start: loopOffset, end: loopOffset + loopLength }
         : undefined,
     });
+    const reportedLen = instrumentLength ?? sample.length;
     meta.textContent =
-      `len ${sample.length} · view ${viewStart}–${viewEnd}` +
+      `len ${reportedLen} · view ${viewStart}–${viewEnd}` +
       ((showLoop && loopLength > 0) ? ` · loop ${loopOffset}+${loopLength}` : '');
   };
 
@@ -112,6 +133,22 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
   }, { passive: false });
 
   let drag: DragState | null = null;
+  // Hover-cursor: when the mouse is within EDGE_PX of the loop edge,
+  // advertise that it's grabbable with an `ew-resize` cursor. Otherwise
+  // fall back to default (or `grabbing` while a pan drag is active —
+  // pan styling is handled by the drag branch below).
+  canvas.addEventListener('mousemove', (e) => {
+    if (drag) return;            // active drag owns the cursor
+    if (!sample) { canvas.style.cursor = ''; return; }
+    if (showLoop && loopLength > 0) {
+      const xL = sampleToX(loopOffset);
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      canvas.style.cursor = Math.abs(mouseX - xL) <= EDGE_PX ? 'ew-resize' : '';
+    } else {
+      canvas.style.cursor = '';
+    }
+  });
   canvas.addEventListener('mousedown', (e) => {
     if (!sample) return;
     e.preventDefault();
@@ -181,6 +218,9 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
         loopLength = region.loopLength;
         // Default to visible (legacy callers don't pass the flag).
         showLoop = region.showLoop !== false;
+        instrumentLength = region.instrumentLength ?? null;
+      } else {
+        instrumentLength = null;
       }
       if (s && (wasEmpty || viewEnd <= viewStart || viewEnd > s.length)) {
         viewStart = 0;
