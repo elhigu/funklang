@@ -1020,6 +1020,11 @@ export function bootApp(root: HTMLElement): void {
   const closeBtn = root.querySelector('#btn-close') as HTMLButtonElement;
   closeBtn.addEventListener('click', () => {
     if (closeBtn.disabled) return;
+    // CLOSE wipes the in-memory patch — autosaves are preserved so the
+    // user can still REVERT, but the live edit state is gone. Confirm
+    // first so a stray click can't nuke unsaved work.
+    const label = patchFileName || 'this patch';
+    if (!confirm(`Close ${label}? Unsaved changes will be lost. (Autosaves stay available under REVERT AUTOSAVE.)`)) return;
     model.patch = emptyPatch();
     patchFileName = '';
     patchFileHandle = undefined;
