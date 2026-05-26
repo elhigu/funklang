@@ -225,6 +225,14 @@
     font-size: 12px;
   }
   .instr-row.empty .name { color: var(--fg-2); font-style: italic; }
+  /* Validation: any slot with an unwritten var-source / var-or-const, or a
+     clone/chordgen with an out-of-order source instrument, flips the row
+     RED. Removes when the user fixes the issue — sidebar re-renders on
+     every structure event. */
+  .instr-row.invalid .name { color: var(--red); }
+  .instr-row.invalid .num  { color: var(--red); }
+  .instr-row.invalid.active .name,
+  .instr-row.invalid.active .num { color: var(--red); }
   .instr-row .size {
     font-size: 10px;
     color: var(--fg-2);

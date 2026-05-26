@@ -180,6 +180,7 @@ export function bootApp(root: HTMLElement): void {
             <h3>Validation</h3>
             <table class="help-kbd">
               <tbody>
+                <tr><td>Red instrument row in the sidebar</td><td>One or more of this instrument's slots has an unwired var-source, an unset var-or-const selector, or a clone/chordgen source that isn't a lower-indexed instrument. Fix the underlying red dropdown and the row returns to normal</td></tr>
                 <tr><td>Red var-source dropdown</td><td>The selected v1..v4 isn't written by any earlier slot — input will be silence</td></tr>
                 <tr><td>(unset) suffix in dropdown</td><td>Same: that variable hasn't been written yet</td></tr>
                 <tr><td>Clone source dropdown is empty / red</td><td>Clone source must be a LOWER-numbered instrument; instrument 01 can never clone</td></tr>
@@ -689,10 +690,13 @@ export function bootApp(root: HTMLElement): void {
       return;
     }
     // Structure changes can rewire the clone graph; rebuild before we decide
-    // which instruments are affected.
+    // which instruments are affected. Any structure event can also flip an
+    // instrument's validity (var-source becoming unwired, clone source
+    // moved out of the legal range, etc.), so always repaint the sidebar.
     if (e.kind === 'structure') {
       rebuildCloneGraph();
       validateOutputTarget();
+      repaint();
     }
     // The active instrument re-renders whenever IT changes OR when any
     // instrument it (transitively) clones changes. Output target also
@@ -705,9 +709,8 @@ export function bootApp(root: HTMLElement): void {
     updateUndoRedoButtons();
     if (!affectsActive) return;
     if (e.kind === 'structure') {
-      // Layout change → full DOM rebuild + sidebar refresh.
+      // Layout change → full DOM rebuild (sidebar already repainted above).
       renderMain();
-      repaint();
     }
     scheduleRender(true);
   });

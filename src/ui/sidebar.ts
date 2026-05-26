@@ -1,4 +1,5 @@
 import type { Patch } from '../patch/types';
+import { isInstrumentValid } from '../patch/validation';
 
 export function renderSidebar(
   root: HTMLElement,
@@ -14,11 +15,16 @@ export function renderSidebar(
     // so an instrument whose array holds only empty slots should look empty
     // in the sidebar too.
     const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
+    // Validation only applies to instruments with any filled slots: an
+    // empty instrument has nothing to be wrong with.
+    const invalid = filled > 0 && !isInstrumentValid(patch, i);
     const li = document.createElement('li');
     const isActive = i === activeIdx;
     li.className = 'instr-row' +
       (filled === 0 ? ' empty' : '') +
+      (invalid ? ' invalid' : '') +
       (isActive ? ' active' : '');
+    if (invalid) li.title = 'This instrument has unwired or invalid inputs — see red dropdowns inside.';
     li.innerHTML =
       `<span class="num">${String(i + 1).padStart(2, '0')}</span>` +
       `<span class="name">${ins.name || '—'}</span>`;
