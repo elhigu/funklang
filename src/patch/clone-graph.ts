@@ -41,6 +41,19 @@ export function buildCloneGraph(patch: Patch): CloneGraph {
 }
 
 /**
+ * Per Klang's ordering rule: instrument N may only clone from instruments
+ * < N. (Instrument 0 has no valid source.) Used both for filtering the
+ * clone-source dropdown and for marking already-stored invalid sources
+ * with a warning.
+ */
+export function isValidCloneSource(
+  activeInstrIdx: number,
+  candidateSrcIdx: number,
+): boolean {
+  return candidateSrcIdx >= 0 && candidateSrcIdx < activeInstrIdx;
+}
+
+/**
  * Walk dependents transitively. If A clones B and B clones C, then
  * editing C should refresh both B and A.
  */

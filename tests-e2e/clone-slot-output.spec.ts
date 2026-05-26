@@ -38,6 +38,9 @@ test('clicking 🔊 inside an expanded clone block targets the SOURCE instrument
 
   // Activate the CLONER (instrument 1).
   await page.locator('.instr-row:not(.empty)').nth(1).click();
+  // Clone blocks now start COLLAPSED — expand so the inner speaker button
+  // is mounted in the DOM.
+  await page.locator('[data-clone-toggle]').first().click();
   await page.waitForTimeout(100);
 
   // MASTER V1 button should be active when nothing else is targeted.

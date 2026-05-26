@@ -67,33 +67,44 @@ export function makeKnob(opts: KnobOptions): Knob {
     opts.onChange(value);
   };
 
-  // Step sizes are range-aware. Fine (plain wheel / arrow) is always ±1.
-  // Coarse (Shift+wheel / Shift+arrow) is ~3% of the value range so a
-  // wide param like freq (0..32767) moves ~983 per tick instead of
-  // imperceptible ±10. Min 1 so tiny ranges still move.
+  // Step sizes are range-aware.
+  //   Fine            = ±1 (held by Shift).
+  //   Coarse (default) = ~3% of the value range so a wide param like
+  //                     freq (0..32767) moves ~983 per tick instead of
+  //                     imperceptible ±1.
+  // Ranges smaller than COARSE_THRESHOLD samples don't need a separate
+  // coarse mode — every step is already meaningful — so we return 1 in
+  // both directions and the Shift modifier becomes a no-op.
+  const COARSE_THRESHOLD = 64;
   const coarseStep = (): number => Math.max(1, Math.round(range * 0.03));
+  const hasCoarse = (): boolean => range >= COARSE_THRESHOLD;
+  /** Step to apply for a non-Shift event. Coarse on wide ranges, ±1 on narrow. */
+  const wheelDefault = (): number => hasCoarse() ? coarseStep() : 1;
+  /** Step to apply when Shift is held. Always ±1 (fine). */
+  const shiftStep = (): number => 1;
 
-  // wheel: ±1, shift ±coarse
+  // wheel: COARSE by default (or ±1 on small ranges), Shift → fine ±1.
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault();
-    const step = e.shiftKey ? coarseStep() : 1;
+    const step = e.shiftKey ? shiftStep() : wheelDefault();
     const dir = e.deltaY < 0 ? 1 : -1;
     emit(value + step * dir);
   };
   el.addEventListener('wheel', onWheel, { passive: false });
 
-  // Arrow keys when bar is focused:
-  //   Up/Down    = fine ±1
-  //   Left/Right = coarse ±(~3% of range)  ("moving across the slider")
-  //   Shift+any  = always coarse (lets touch-typists use the up/down keys
-  //                they're already on without reaching for left/right)
+  // Arrow keys when bar is focused — same default/shift inversion as the
+  // wheel, plus dedicated Left/Right = coarse (for users who reach for
+  // horizontal direction):
+  //   Up / Down   = coarse by default (fine when Shift held)
+  //   Left / Right = always coarse (no Shift needed)
+  // On small ranges, coarseStep collapses to 1 so all four arrows do ±1.
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      emit(value + (e.shiftKey ? coarseStep() : 1));
+      emit(value + (e.shiftKey ? shiftStep() : wheelDefault()));
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      emit(value - (e.shiftKey ? coarseStep() : 1));
+      emit(value - (e.shiftKey ? shiftStep() : wheelDefault()));
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       emit(value + coarseStep());

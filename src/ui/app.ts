@@ -154,11 +154,12 @@ export function bootApp(root: HTMLElement): void {
               <tbody>
                 <tr><td>Click anywhere on the bar</td><td>Set value to that position; bar gains focus</td></tr>
                 <tr><td>Drag</td><td>Value follows the mouse X (release to commit)</td></tr>
-                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Fine ±1</td></tr>
-                <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Coarse (~3% of the slider's full range)</td></tr>
-                <tr><td><kbd>Shift</kbd>+arrow</td><td>Coarse from any direction</td></tr>
-                <tr><td>Wheel over the slider</td><td>Fine ±1</td></tr>
-                <tr><td><kbd>Shift</kbd>+wheel</td><td>Coarse (~3% of range)</td></tr>
+                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Coarse (~3% of the slider's range)</td></tr>
+                <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd></td><td>Fine ±1</td></tr>
+                <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Always coarse</td></tr>
+                <tr><td>Wheel over the slider</td><td>Coarse (~3% of range)</td></tr>
+                <tr><td><kbd>Shift</kbd>+wheel</td><td>Fine ±1</td></tr>
+                <tr><td><i>(small ranges)</i></td><td>Sliders with fewer than 64 values are always ±1 — no separate coarse mode</td></tr>
                 <tr><td>Double-click the value</td><td>Type exact value (<kbd>↑</kbd>/<kbd>↓</kbd> step in the editor too)</td></tr>
                 <tr><td>Right-click</td><td>Reset to default</td></tr>
               </tbody>
@@ -171,8 +172,19 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Click slot function name</td><td>Change op type (opens the op picker)</td></tr>
                 <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
                 <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
-                <tr><td>Click ▶ on a clone slot</td><td>Expand the source instrument inline (recursive)</td></tr>
+                <tr><td>Click ▶ on a clone slot</td><td>Expand the source instrument inline (collapsed by default)</td></tr>
                 <tr><td>Wheel over a dropdown</td><td>Step through its options</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Validation</h3>
+            <table class="help-kbd">
+              <tbody>
+                <tr><td>Red var-source dropdown</td><td>The selected v1..v4 isn't written by any earlier slot — input will be silence</td></tr>
+                <tr><td>(unset) suffix in dropdown</td><td>Same: that variable hasn't been written yet</td></tr>
+                <tr><td>Clone source dropdown is empty / red</td><td>Clone source must be a LOWER-numbered instrument; instrument 01 can never clone</td></tr>
+                <tr><td>Loop offset</td><td>Always even, ≥ floor(sampleLength/4)×2, ≤ sampleLength−2. The loop_gen slot's offset knob and the wave-viewer's left edge both snap to the same valid set</td></tr>
+                <tr><td>Sample length</td><td>Always even (odd values round down on every keystroke)</td></tr>
               </tbody>
             </table>
 
@@ -283,12 +295,17 @@ export function bootApp(root: HTMLElement): void {
         if (!ins) return;
         const snapped = clampLoopOffset(ins.sampleLength, rawOffset);
         const newLen = loopLengthFor(ins.sampleLength, snapped);
+        const changed = snapped !== ins.loopOffset || newLen !== ins.loopLength;
         if (snapped !== ins.loopOffset) {
           model.setInstrumentField(activeIdx, 'loopOffset', snapped);
         }
         if (newLen !== ins.loopLength) {
           model.setInstrumentField(activeIdx, 'loopLength', newLen);
         }
+        // Force a slot-grid rebuild so the loop_gen slot's `offset` knob
+        // also picks up the new value (otherwise it sticks at whatever
+        // ins.loopOffset was when its row was last rendered).
+        if (changed) model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
       },
     });
 

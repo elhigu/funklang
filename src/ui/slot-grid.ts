@@ -11,7 +11,13 @@ import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
 import { opByCode, resetSlotForOp } from '../dsp/op-metadata';
 import { clampLoopOffset, loopLengthFor, minLoopOffset, maxLoopOffset } from '../patch/loop-rules';
+import { isValidCloneSource } from '../patch/clone-graph';
 import type { ParamDef } from '../dsp/op-metadata';
+
+// Per-clone-slot expansion state, preserved across re-renders. Keyed by
+// the slot object itself so it survives `moveSlot` reordering and is
+// reclaimed by GC when the slot is removed entirely.
+const cloneExpanded = new WeakMap<Slot, boolean>();
 
 export interface SlotGridOptions {
   /** Recursion depth for clone expansion (0 = top level). */
@@ -280,6 +286,13 @@ interface RefSelectOpts {
   count: number;
   /** Label provider — defaults to `${i+1}. <name>`. */
   labelFor: (idx: number) => string;
+  /**
+   * If provided, returns true when index `i` is a valid choice. Invalid
+   * indices are OMITTED from the dropdown. If the current value isn't
+   * valid, the dropdown still surfaces it (with a red `.var-unset` style)
+   * so the user can SEE the bogus reference and pick a real one.
+   */
+  validFor?: ((i: number) => boolean) | undefined;
   title?: string | undefined;
   onChange: (v: number) => void;
 }
@@ -287,12 +300,22 @@ function makeRefSelect(opts: RefSelectOpts): HTMLSelectElement {
   const sel = document.createElement('select');
   sel.className = 'param-ref-select';
   if (opts.title) sel.title = opts.title;
+  let curIsInvalid = false;
   for (let i = 0; i < opts.count; i++) {
+    const valid = opts.validFor ? opts.validFor(i) : true;
+    if (!valid && i !== opts.value) continue;   // hide invalid options
     const optEl = document.createElement('option');
     optEl.value = String(i);
-    optEl.textContent = opts.labelFor(i);
-    if (i === opts.value) optEl.selected = true;
+    optEl.textContent = valid ? opts.labelFor(i) : `${opts.labelFor(i)} (invalid)`;
+    if (i === opts.value) {
+      optEl.selected = true;
+      if (!valid) curIsInvalid = true;
+    }
     sel.appendChild(optEl);
+  }
+  if (curIsInvalid) {
+    sel.classList.add('var-unset');
+    sel.title = (sel.title ? sel.title + ' — ' : '') + 'current source is not a valid choice';
   }
   sel.addEventListener('change', () => {
     const v = parseInt(sel.value, 10);
@@ -369,7 +392,14 @@ function renderParam(
         allowNone: param.type.allowNone ?? true,
         availableVars: writtenVarsBefore(model, instrIdx, slotIdx),
         title: param.type.label,
-        onChange: writeValue,
+        onChange: (v) => {
+          writeValue(v);
+          // Force the row to rebuild so this dropdown's .var-unset class
+          // and the (unset) suffixes in the option list reflect the new
+          // value (the underlying availableVars set didn't change, but
+          // the SELECTED option may now be unset/valid).
+          model.events.emit({ instrIdx, kind: 'structure' });
+        },
       });
       wrap.appendChild(sel);
       break;
@@ -448,6 +478,9 @@ function renderParam(
         if (!Number.isFinite(v)) return;
         model.setSlotParam(instrIdx, slotIdx, selFieldKey, v);
         applyMode(v);
+        // Force row rebuild so the .var-unset class + (unset) suffixes
+        // reflect the new selector value immediately.
+        model.events.emit({ instrIdx, kind: 'structure' });
       });
       break;
     }
@@ -482,6 +515,11 @@ function renderParam(
             ? `${String(i + 1).padStart(2, '0')} ${name}`
             : String(i + 1).padStart(2, '0');
         },
+        // Klang ordering rule: clone/chordgen source must be a LOWER
+        // instrument index than this one. (Instrument 0 has no valid
+        // source at all — its dropdown will be empty except for whatever
+        // bogus value the patch already stored.)
+        validFor: (i) => isValidCloneSource(instrIdx, i),
         title: param.type.label,
         onChange: (v) => {
           writeValue(v);
@@ -638,7 +676,13 @@ function renderRow(
         max: maxOff,
         defaultValue: minOff,
         onChange: (v) => {
+          // The user's wheel/arrow stepping doesn't know the loop-rules
+          // even-only constraint, so snap here and write the snapped
+          // value to BOTH the model and back into the knob's own
+          // display — otherwise the knob shows the unclamped value
+          // (e.g. an odd number) until the next full row rebuild.
           const snapped = clampLoopOffset(ins.sampleLength, v);
+          if (snapped !== v) offsetKnob.setValue(snapped);
           if (snapped !== ins.loopOffset) {
             model.setInstrumentField(instrIdx, 'loopOffset', snapped);
           }
@@ -717,8 +761,15 @@ function renderRow(
     const expandedHost = document.createElement('div');
     wrap.appendChild(expandedHost);
     const toggle = row.querySelector('[data-clone-toggle]') as HTMLButtonElement;
-    let expanded = depth < 2;
+    // Per user feedback: clone blocks start COLLAPSED by default. The
+    // current instrument's details should be the focus; the user clicks
+    // ▶ when they actually want to drill into the source. Subsequent
+    // re-renders (caused by editing inside the expanded block, like
+    // changing the source dropdown) preserve the prior state via
+    // `cloneExpanded` so the block doesn't collapse on the user.
+    let expanded = cloneExpanded.get(slot) ?? false;
     const draw = (): void => {
+      cloneExpanded.set(slot, expanded);
       toggle.textContent = expanded ? '▼' : '▶';
       if (!expanded) { expandedHost.innerHTML = ''; return; }
       // Bounds check + cycle catch.

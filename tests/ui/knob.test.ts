@@ -10,70 +10,87 @@ function getVal(k: { el: HTMLElement }): HTMLElement {
 }
 
 describe('makeKnob — wheel', () => {
-  it('wheel up = +1, wheel down = -1', () => {
-    const cb = vi.fn();
-    const k = makeKnob({ label: 'g', value: 100, onChange: cb });
-    const wheelUp = new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true });
-    k.el.dispatchEvent(wheelUp);
-    expect(k.getValue()).toBe(101);
-    expect(cb).toHaveBeenCalledWith(101);
-
-    const wheelDown = new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true });
-    k.el.dispatchEvent(wheelDown);
-    expect(k.getValue()).toBe(100);
-    expect(cb).toHaveBeenLastCalledWith(100);
-  });
-  it('shift + wheel uses range-aware coarse step (~3% of range)', () => {
+  it('wheel = COARSE by default on a wide range (≥ 64)', () => {
     const cb = vi.fn();
     // range = 255 → coarseStep = round(255 * 0.03) = 8
+    const k = makeKnob({ label: 'g', value: 100, max: 255, onChange: cb });
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(108);
+    expect(cb).toHaveBeenLastCalledWith(108);
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(100);
+  });
+  it('Shift+wheel = FINE ±1 (regardless of range)', () => {
+    const cb = vi.fn();
     const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(58);
+    expect(k.getValue()).toBe(51);   // fine
   });
-  it('coarse step scales with a wide range (i16)', () => {
+  it('coarse scales with wide ranges — i16 freq moves ~1966/tick', () => {
     const cb = vi.fn();
     // range = 65535 → coarseStep = round(65535 * 0.03) = 1966
     const k = makeKnob({ label: 'freq', value: 0, min: -32768, max: 32767, onChange: cb });
-    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(1966);
   });
-  it('coarse step floors at 1 for tiny ranges', () => {
+  it('ranges smaller than 64 have NO coarse mode — every step is ±1', () => {
     const cb = vi.fn();
-    // range = 3 → 3% = 0.09 → clamped to 1
+    // range = 3 → below threshold → wheel default IS fine.
     const k = makeKnob({ label: 'mode', value: 0, max: 3, onChange: cb });
-    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(1);
+    // Shift+wheel also ±1.
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(2);
+  });
+  it('range exactly 63 is below threshold (fine only); 64 is at threshold (coarse)', () => {
+    const cb1 = vi.fn();
+    const k1 = makeKnob({ label: 'a', value: 0, max: 63, onChange: cb1 });
+    k1.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+    expect(k1.getValue()).toBe(1);   // fine (63 < 64)
+    const cb2 = vi.fn();
+    const k2 = makeKnob({ label: 'b', value: 0, max: 64, onChange: cb2 });
+    k2.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+    expect(k2.getValue()).toBe(2);   // round(64 * 0.03) = 2
   });
 });
 
 describe('makeKnob — arrow keys', () => {
-  it('ArrowUp/Down = ±1', () => {
+  it('ArrowUp/Down = COARSE by default on wide ranges', () => {
     const cb = vi.fn();
-    const k = makeKnob({ label: 'g', value: 10, onChange: cb });
+    const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
     const bar = getBar(k);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(11);
+    expect(k.getValue()).toBe(58);  // +coarse 8
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(10);
+    expect(k.getValue()).toBe(50);
   });
-  it('Shift+arrow uses range-aware coarse step (~3% of range)', () => {
+  it('Shift+ArrowUp/Down = FINE ±1', () => {
     const cb = vi.fn();
     const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
     const bar = getBar(k);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(58);  // 50 + 8 (3% of 255)
+    expect(k.getValue()).toBe(51);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(50);
   });
-
-  it('ArrowRight/Left = coarse step (always, no Shift needed)', () => {
+  it('ArrowRight/Left = coarse step (always)', () => {
     const cb = vi.fn();
     const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
     const bar = getBar(k);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(58);   // +coarse 8
+    expect(k.getValue()).toBe(58);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(50);
+  });
+  it('small ranges (<64): every arrow does ±1', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'mode', value: 0, max: 3, onChange: cb });
+    const bar = getBar(k);
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(1);
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(2);
   });
 });
 
@@ -128,7 +145,8 @@ describe('makeKnob — position-based drag', () => {
     bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
     expect(document.activeElement).toBe(bar);
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+    // Shift+ArrowUp = fine ±1 from the clicked-to position.
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(129);    // 128 + 1
     k.el.remove();
   });

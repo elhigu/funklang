@@ -42,6 +42,9 @@ test('editing a clone source\'s parameters propagates to the active instrument\'
 
   // Activate the cloner (instrument 1, second non-empty row).
   await page.locator('.instr-row:not(.empty)').nth(1).click();
+  // Clone blocks now start COLLAPSED — expand the first one so the source's
+  // knobs are present in the DOM (the fallback path below needs them).
+  await page.locator('[data-clone-toggle]').first().click();
   // Wait for the wave-viewer to be populated and stable.
   await page.waitForTimeout(200);
 

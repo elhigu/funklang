@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCloneGraph, allDependentsOf } from '../../src/patch/clone-graph';
+import { buildCloneGraph, allDependentsOf, isValidCloneSource } from '../../src/patch/clone-graph';
 import { emptyPatch, emptySlot } from '../../src/patch/types';
 
 describe('clone-graph', () => {
@@ -44,5 +44,24 @@ describe('clone-graph', () => {
     // Changes to C should bubble to both B and A.
     const deps = allDependentsOf(g, 0);
     expect([...deps].sort()).toEqual([1, 2]);
+  });
+});
+
+describe('isValidCloneSource', () => {
+  it.each([
+    [0, 0, false],     // self
+    [0, 1, false],     // higher
+    [1, 0, true],      // first valid case
+    [1, 1, false],     // self
+    [1, 2, false],     // higher
+    [2, 0, true],
+    [2, 1, true],
+    [2, 2, false],
+    [2, 3, false],
+    [30, 29, true],
+    [30, 30, false],
+    [5, -1, false],    // negative
+  ])('active=%i, src=%i → %j', (active, src, expected) => {
+    expect(isValidCloneSource(active, src)).toBe(expected);
   });
 });

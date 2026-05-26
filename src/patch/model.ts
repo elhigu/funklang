@@ -5,6 +5,7 @@ import { EventBus } from './events';
 import type { PatchChange } from './events';
 import { N_INSTRUMENTS, N_SLOTS_MAX } from './types';
 import type { Instrument, Patch, Slot } from './types';
+import { clampLoopOffset } from './loop-rules';
 
 export class PatchModel {
   readonly events = new EventBus<PatchChange>();
@@ -23,9 +24,11 @@ export class PatchModel {
     slot[key] = value;
     // Changing `fn` is structural — the slot's whole param schema changes,
     // so the UI needs to rebuild the row (new knobs, new labels) rather
-    // than just refresh the existing waveform tap. Emit 'structure' for fn,
-    // 'param' for everything else.
-    if (key === 'fn') {
+    // than just refresh the existing waveform tap.
+    // Changing `outVar` is structural for OTHER slots: it widens (or
+    // narrows) the set of variables earlier slots have written to, which
+    // affects the var-source warning colours rendered by LATER slots.
+    if (key === 'fn' || key === 'outVar') {
       this.events.emit({ instrIdx, kind: 'structure' });
     } else {
       this.events.emit({
@@ -70,7 +73,27 @@ export class PatchModel {
     value: Instrument[K],
   ): void {
     const instr = this.instr(instrIdx);
+    // Klang requires even sample lengths. Round DOWN to the nearest even
+    // value as a defensive floor — the UI already does this on input but
+    // a stray caller (history-restore, future API, …) shouldn't be able
+    // to put an odd value into the model.
+    if (key === 'sampleLength' && typeof value === 'number') {
+      const v = value | 0;
+      (value as unknown as number) = Math.max(0, v - (v & 1));
+    }
     instr[key] = value;
+
+    // Changing sampleLength can invalidate loopOffset (it might now be
+    // out of [minLoopOffset, maxLoopOffset]). Snap and recompute the
+    // derived loopLength inline so the model is internally consistent
+    // by the time the UI re-renders.
+    if (key === 'sampleLength') {
+      const snappedOffset = clampLoopOffset(instr.sampleLength, instr.loopOffset);
+      if (snappedOffset !== instr.loopOffset) instr.loopOffset = snappedOffset;
+      const newLen = Math.max(0, instr.sampleLength - instr.loopOffset);
+      if (newLen !== instr.loopLength) instr.loopLength = newLen;
+    }
+
     this.events.emit({
       instrIdx,
       kind: 'meta',

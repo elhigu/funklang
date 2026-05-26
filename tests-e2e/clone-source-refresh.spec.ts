@@ -63,6 +63,9 @@ test('clone block title refreshes when the source dropdown changes', async ({ pa
   // Pick the cloner instrument (3rd in the sidebar = 1-based "03").
   await page.locator('.instr-row:not(.empty)').nth(2).click();
 
+  // Clone blocks now start COLLAPSED — expand the first one explicitly.
+  await page.locator('[data-clone-toggle]').first().click();
+
   // The clone block title should mention "A".
   const title = page.locator('.clone-block-title').first();
   await expect(title).toContainText('from instrument 01');
@@ -71,8 +74,10 @@ test('clone block title refreshes when the source dropdown changes', async ({ pa
   // Change the source via the instr-ref dropdown. The clone slot's
   // source-instrument widget is the only `.param-ref-select` on the
   // page (clone is the only op in our test patch that uses one).
+  // Pass the option value as a string (index option only matches when
+  // every option is present; we now hide invalid sources).
   const sourceSelect = page.locator('.param-ref-select').first();
-  await sourceSelect.selectOption({ index: 1 });   // pick instrument 1 ("B")
+  await sourceSelect.selectOption('1');             // pick instrument index 1 ("B")
 
   // Title should refresh to mention "B" / "02".
   await expect(title).toContainText('from instrument 02');
