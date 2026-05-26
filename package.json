@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "e2e": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test",
     "e2e:headed": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test --headed --workers=1",
-    "e2e:slow": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test --headed --workers=1 --slow-mo=400",
+    "e2e:slow": "PLAYWRIGHT_SLOW_MO=400 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test --headed --workers=1",
     "e2e:ui": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test --ui",
     "e2e:debug": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test --debug",
     "e2e:report": "playwright show-report",
