@@ -986,6 +986,12 @@
     position: static;
     opacity: 0.85;
   }
+  .slot.empty-placeholder .empty-placeholder-hint {
+    margin-left: 12px;
+    color: var(--fg-2);
+    font-size: 11px;
+    font-style: italic;
+  }
 
   /* Delete button lives in the slot #-column, near the slot number. Stacks
      vertically beneath the # for compactness. Hidden until the row is

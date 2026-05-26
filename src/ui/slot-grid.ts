@@ -261,6 +261,14 @@ function makeEmptyPlaceholder(model: PatchModel, instrIdx: number, disabled: boo
     void tryInsertAt(model, instrIdx, 0);
   });
   ph.appendChild(btn);
+  // Guide text so the user understands what the [+] does — adding the
+  // first slot also auto-names the instrument (demoscene generator) and
+  // sets sampleLength to the 12 KB default.
+  const hint = document.createElement('span');
+  hint.className = 'empty-placeholder-hint';
+  hint.dataset['emptyHint'] = '1';
+  hint.textContent = 'Add the first slot to initialize this instrument — picks a name and a 12 KB sample length.';
+  ph.appendChild(hint);
   return ph;
 }
 

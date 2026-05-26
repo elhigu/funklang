@@ -90,6 +90,15 @@ describe('slot-grid — corner insert buttons', () => {
     expect(root.querySelectorAll('.slot:not(.empty-placeholder)').length).toBe(0);
   });
 
+  it('the empty-state row carries guide text explaining what the + does', () => {
+    const p = emptyPatch();
+    const model = new PatchModel(p);
+    renderSlotGrid(root, model, 0);
+    const hint = root.querySelector('[data-empty-hint]') as HTMLElement | null;
+    expect(hint).not.toBeNull();
+    expect(hint!.textContent ?? '').toMatch(/initialize|first slot/i);
+  });
+
   it('clicking the empty-state + inserts at index 0', async () => {
     const p = emptyPatch();
     const model = new PatchModel(p);
