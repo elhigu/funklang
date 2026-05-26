@@ -5,8 +5,15 @@
 import { drawWaveform } from './waveform';
 
 export interface WaveViewerOptions {
-  /** Called when the user drags a loop band edge. */
+  /** Called while the user is dragging a loop band edge — fires on
+   *  every mousemove. The host should treat each call as a live
+   *  preview (cheap mutations only). */
   onLoopChange?: ((loopOffset: number, loopLength: number) => void) | undefined;
+  /** Called ONCE when the user releases the mouse after a loop-edge
+   *  drag. Use this for "now I can do the expensive structural
+   *  refresh" work — emitting a structure event during onLoopChange
+   *  would destroy the canvas mid-drag and break the drag handler. */
+  onLoopCommit?: (() => void) | undefined;
 }
 
 export interface WaveViewer {
@@ -205,7 +212,10 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
     // loop-end drag intentionally removed — the loop region's right
     // edge is always pinned to the sample end (loopLength is derived).
   };
-  const onUp = (): void => { drag = null; };
+  const onUp = (): void => {
+    if (drag?.kind === 'loop-start' && opts.onLoopCommit) opts.onLoopCommit();
+    drag = null;
+  };
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
 

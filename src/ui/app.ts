@@ -329,22 +329,28 @@ export function bootApp(root: HTMLElement): void {
         // as `sampleLength − loopOffset`. The wave-viewer's drag emits
         // a raw offset; we snap it to the nearest valid even value per
         // loop-rules, then update BOTH instrument fields so the
-        // serialized .akp stays consistent.
+        // serialized .akp stays consistent. Only meta events fire
+        // here — emitting `structure` mid-drag would destroy the
+        // wave-viewer canvas (renderMain rebuild) and the document-
+        // level mousemove handler would then divide by a zero rect.
         const ins = model.patch.instruments[activeIdx];
         if (!ins) return;
         const snapped = clampLoopOffset(ins.sampleLength, rawOffset);
         const newLen = loopLengthFor(ins.sampleLength, snapped);
-        const changed = snapped !== ins.loopOffset || newLen !== ins.loopLength;
         if (snapped !== ins.loopOffset) {
           model.setInstrumentField(activeIdx, 'loopOffset', snapped);
         }
         if (newLen !== ins.loopLength) {
           model.setInstrumentField(activeIdx, 'loopLength', newLen);
         }
-        // Force a slot-grid rebuild so the loop_gen slot's `offset` knob
-        // also picks up the new value (otherwise it sticks at whatever
-        // ins.loopOffset was when its row was last rendered).
-        if (changed) model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
+      },
+      onLoopCommit: () => {
+        // Drag finished — NOW it's safe to do the structural refresh
+        // that rebuilds the slot-grid so the loop_gen slot's `offset`
+        // knob picks up the new value. (The slot grid is the only
+        // listener that has a stale view of `ins.loopOffset` after
+        // the meta events above.)
+        model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
       },
     });
 
