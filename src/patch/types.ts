@@ -77,6 +77,17 @@ export function emptySlot(): Slot {
   };
 }
 
+/**
+ * Default length applied when the editor TURNS AN EMPTY instrument into a
+ * populated one (first slot inserted). Not used by `emptyInstrument` —
+ * patch slots that have never been touched keep `sampleLength = 0` so the
+ * sidebar shows them as empty.
+ *
+ * User-stated: "New instrument default length should be 12k bytes."
+ * Clarified: "12k is 12*1024" → 12288.
+ */
+export const DEFAULT_SAMPLE_LENGTH = 12 * 1024;
+
 export function emptyInstrument(name = ''): Instrument {
   return {
     name,

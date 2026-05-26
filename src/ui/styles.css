@@ -225,6 +225,19 @@
     font-size: 12px;
   }
   .instr-row.empty .name { color: var(--fg-2); font-style: italic; }
+  /* Hover-revealed ✕ on populated rows — opens a confirm before reset. */
+  .instr-row .instr-del {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--fg-2);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 5px;
+    opacity: 0;
+    transition: opacity 80ms linear, color 80ms linear, border-color 80ms linear;
+  }
+  .instr-row:hover .instr-del { opacity: 0.6; }
+  .instr-row .instr-del:hover { color: var(--red); border-color: var(--red); opacity: 1; }
   /* Validation: any slot with an unwritten var-source / var-or-const, or a
      clone/chordgen with an out-of-order source instrument, flips the row
      RED. Removes when the user fixes the issue — sidebar re-renders on
@@ -343,6 +356,60 @@
     outline: none;
   }
   .meta-num:focus { border-color: var(--amber); }
+
+  /* Per-instrument IMPORT/EXPORT .AKI buttons now live next to the
+     instrument name (moved out of the top toolbar). */
+  .instr-aki-btn {
+    background: var(--bg-2);
+    color: var(--fg-1);
+    border: 1px solid var(--grid);
+    font: inherit;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    margin-left: 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .instr-aki-btn:hover { color: var(--amber); border-color: var(--amber); }
+  .instr-aki-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Sample-length slider that lives alongside the number field. */
+  .length-pair {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .meta-slider {
+    width: 160px;
+    cursor: pointer;
+    accent-color: var(--amber);
+  }
+
+  /* Header hex/dec toggle wrap, styled to match NOTE / OUTPUT wraps. */
+  .base-toggle-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    height: 100%;
+    border-right: 1px solid var(--grid-dim);
+    color: var(--fg-1);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .base-toggle-label { color: var(--fg-2); }
+  .base-toggle-wrap select {
+    background: var(--bg-2);
+    color: var(--amber);
+    border: 1px solid var(--grid);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    outline: none;
+  }
+  .base-toggle-wrap select:focus { border-color: var(--amber); }
 
   /* slot grid header — matches the slot row's 5 columns */
   .grid-head {

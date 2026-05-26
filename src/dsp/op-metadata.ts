@@ -343,11 +343,13 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
     ],
   },
 
-  // ── 19: sh (sample & hold) ────────────────────────────────
+  // ── 19: sample_hold ───────────────────────────────────────
   // Form1.cs case 19 (2081-2086 / 5430-5452):
   //   sh(j, val1 [var], gain-or-gainVal [step, range 0..127])
+  // Renamed in the editor from the cryptic "sh" to its full Klang
+  // documentation name — the underlying C op + binary code stay 19.
   {
-    code: 19, name: 'sh', category: 'ctrl',
+    code: 19, name: 'sample_hold', category: 'ctrl',
     params: [
       { field: 'val1', type: { kind: 'var-source', label: 'in', allowNone: false } },
       { field: 'gainVal', selector: 'gain',
@@ -441,6 +443,25 @@ export function opByCode(code: number): OpDef | undefined {
  * stale data that the new op would misinterpret (e.g. a previous mul's
  * val2Value treated as an enva attack-time literal).
  */
+/**
+ * Per-op factory defaults applied when the editor first inserts a slot of
+ * that op (separate from `resetSlotForOp` which only zeroes irrelevant
+ * fields when the user CHANGES op). Anything not listed here defaults to 0.
+ *
+ * The user-stated defaults so far:
+ *   envd → decay 23, sustain 0, gain 128 — a usable envelope out of the
+ *          box instead of an all-zero one that produces silence.
+ */
+const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
+  8: { val1Value: 23, val2Value: 0, gainVal: 128 },     // envd
+};
+
+/** Apply factory defaults for the given op on top of `base`. */
+export function applyInsertDefaults(base: Slot, opCode: number): Slot {
+  const d = INSERT_DEFAULTS[opCode];
+  return d ? { ...base, ...d } : base;
+}
+
 export function resetSlotForOp(slot: Slot, newOpCode: number): Slot {
   const def = opByCode(newOpCode);
   // Fields used by ANY op as a value OR selector.

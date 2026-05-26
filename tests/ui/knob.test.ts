@@ -26,12 +26,24 @@ describe('makeKnob — wheel', () => {
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(51);   // fine
   });
-  it('coarse scales with wide ranges — i16 freq moves ~1966/tick', () => {
+  it('ranges > 1000 use LOG coarse — step = 3% of current value (not of range)', () => {
     const cb = vi.fn();
-    // range = 65535 → coarseStep = round(65535 * 0.03) = 1966
-    const k = makeKnob({ label: 'freq', value: 0, min: -32768, max: 32767, onChange: cb });
+    // range = 65535, value = 1000 → coarseStep = round(1000 * 0.03) = 30
+    const k = makeKnob({ label: 'freq', value: 1000, min: -32768, max: 32767, onChange: cb });
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(1966);
+    expect(k.getValue()).toBe(1030);
+    // At value = 0 the log step floor is 1 — no monster ±1966 jumps at the bottom.
+    k.setValue(0);
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(1);
+  });
+
+  it('ranges 64..1000 still use LINEAR coarse (3% of the range)', () => {
+    const cb = vi.fn();
+    // range = 255 → linear coarse = round(255 * 0.03) = 8
+    const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
+    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(58);
   });
   it('ranges smaller than 64 have NO coarse mode — every step is ±1', () => {
     const cb = vi.fn();

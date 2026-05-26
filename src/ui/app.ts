@@ -1,6 +1,6 @@
 import { PatchModel } from '../patch/model';
 import { HistoryManager } from '../patch/history';
-import { emptyPatch, N_SLOTS_EDITABLE } from '../patch/types';
+import { emptyPatch, emptyInstrument, N_SLOTS_EDITABLE } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
 import { parseAki, serializeAki } from '../fileio/aki';
 import { renderInstrument, CyclicCloneError } from '../dsp/engine';
@@ -18,6 +18,7 @@ import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, openFileWithHandle, saveFileBytes, saveToHandle } from './file-dialog';
 import { attachWheelStep } from './wheel';
+import { getDisplayBase, setDisplayBase, onDisplayBaseChange } from './number-format';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -101,14 +102,19 @@ export function bootApp(root: HTMLElement): void {
       <header>
         <div class="brand"><div class="dot"></div><span>FUNKLANG.WEB</span></div>
         <div class="menu">
-          <button id="btn-new">NEW</button>
+          <button id="btn-close" title="Close the current patch — gives you a blank project ready to edit. Disabled when nothing has been done.">CLOSE</button>
           <button id="btn-open">OPEN&nbsp;PATCH</button>
           <button id="btn-save">SAVE</button>
           <button id="btn-save-as">SAVE&nbsp;AS</button>
-          <button id="btn-import">IMPORT&nbsp;.AKI</button>
-          <button id="btn-export">EXPORT&nbsp;.AKI</button>
           <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶&nbsp;UNDO</button>
           <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷&nbsp;REDO</button>
+          <label class="base-toggle-wrap" title="Display numbers as decimal or hexadecimal everywhere">
+            <span class="base-toggle-label">BASE</span>
+            <select id="display-base">
+              <option value="dec">DEC</option>
+              <option value="hex">HEX</option>
+            </select>
+          </label>
           <label class="note-select-wrap" title="Audition note (playback rate)">
             <span class="note-select-label">NOTE</span>
             <select id="note-select">${noteOptions}</select>
@@ -173,6 +179,15 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Click slot function name</td><td>Change op type (opens the op picker)</td></tr>
                 <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
                 <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
+                <tr><td>New slot outVar default</td><td>Picks a variable that an earlier slot already reads (so the chain feeds something), falling back to the first unused variable</td></tr>
+                <tr><td>envd defaults</td><td>decay 23, sustain 0, gain 128 — a usable envelope out of the box</td></tr>
+                <tr><td>Sample-length slider</td><td>Sits next to the length number field — drag to set, step 2 (even values only)</td></tr>
+                <tr><td>BASE selector (header)</td><td>Flip every numeric display between decimal and hex. Inputs accept either format ("0x10" works in dec mode too)</td></tr>
+                <tr><td><kbd>Enter</kbd> in a text/number field</td><td>Commits the value and removes focus</td></tr>
+                <tr><td>Click empty instrument row</td><td>Selects it — first inserted slot auto-names the instrument and sets length to 12288 (12 KB)</td></tr>
+                <tr><td>Hover an instrument row</td><td>✕ button appears — reset the instrument (confirms first)</td></tr>
+                <tr><td>CLOSE</td><td>Discards the current patch and opens a fresh, blank project. Disabled when the patch is already empty</td></tr>
+                <tr><td>IMPORT / EXPORT .AKI</td><td>Now lives in the instrument header next to the name — they only ever applied to the active instrument anyway</td></tr>
                 <tr><td>Click <kbd>+</kbd> at a slot's bottom-left corner</td><td>Insert a new slot right after this one</td></tr>
                 <tr><td>Click <kbd>+</kbd> at the FIRST row's top-left corner</td><td>Insert a new slot at the very beginning</td></tr>
                 <tr><td>Empty instrument</td><td>Shows a single placeholder row with a <kbd>+</kbd> button — click it to add the first slot</td></tr>
@@ -214,9 +229,7 @@ export function bootApp(root: HTMLElement): void {
         <div class="sidebar-title">PATCH · INSTRUMENTS</div>
         <ul class="instr-list" id="instr-list"></ul>
       </aside>
-      <main id="main-area">
-        <div style="padding:18px;color:var(--fg-1)">Open a .akp patch and pick an instrument from the left.</div>
-      </main>
+      <main id="main-area"></main>
       <footer>
         <div></div>
         <div class="footer-status">
@@ -286,7 +299,10 @@ export function bootApp(root: HTMLElement): void {
     }
     const headerHost = document.createElement('div');
     mainEl.appendChild(headerHost);
-    renderInstrHeader(headerHost, model, activeIdx);
+    renderInstrHeader(headerHost, model, activeIdx, {
+      onImportAki: () => { void importAkiForActive(); },
+      onExportAki: () => { void exportAkiForActive(); },
+    });
 
     const viewerHost = document.createElement('div');
     viewerHost.className = 'wave-viewer';
@@ -446,12 +462,80 @@ export function bootApp(root: HTMLElement): void {
     // No non-empty instrument anywhere — leave activeIdx alone.
   };
 
+  // .AKI import/export hoisted out of the top menu and into the per-
+  // instrument header. They only ever apply to the active instrument
+  // anyway — keeping the buttons next to the name makes that obvious.
+  let importing = false;
+  const importAkiForActive = async (): Promise<void> => {
+    if (importing) return;
+    importing = true;
+    try {
+      const f = await openFileBytes('.aki');
+      if (!f) return;
+      const ins = parseAki(f.bytes);
+      const stem = f.name.replace(/\.aki$/i, '');
+      if (!ins.name) ins.name = stem;
+      model.patch.instruments[activeIdx] = ins;
+      rebuildCloneGraph();
+      model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
+      renderMain();
+      repaint();
+    } finally {
+      setTimeout(() => { importing = false; }, 300);
+    }
+  };
+  let exporting = false;
+  const exportAkiForActive = async (): Promise<void> => {
+    if (exporting) return;
+    exporting = true;
+    try {
+      const ins = model.patch.instruments[activeIdx];
+      if (!ins) return;
+      const bytes = serializeAki(ins);
+      const stem = (ins.name || `instr_${activeIdx + 1}`).replace(/[^\w.-]+/g, '_');
+      await saveFileBytes(bytes, `${stem}.aki`, '.aki');
+    } finally {
+      setTimeout(() => { exporting = false; }, 300);
+    }
+  };
+
+  // "Nothing to close" = no instrument has any filled slot AND no patch
+  // file is associated. CLOSE button greys out in that state because
+  // clicking it would be a no-op.
+  const patchHasContent = (): boolean => {
+    if (patchFileName) return true;
+    for (const ins of model.patch.instruments) {
+      if (ins.slots.some((s) => s.fn !== 0)) return true;
+    }
+    return false;
+  };
+  const updateCloseButton = (): void => {
+    const btn = root.querySelector('#btn-close') as HTMLButtonElement | null;
+    if (btn) btn.disabled = !patchHasContent();
+  };
+
   const repaint = (): void => {
-    renderSidebar(listEl, model.patch, activeIdx, (i) => {
+    renderSidebar(listEl, model.patch, activeIdx, {
       // Sidebar click also auto-plays (subject to the audio toggle), same
-      // as wheel/arrow nav.
-      selectInstrument(i, { play: true });
+      // as wheel/arrow nav. Empty rows are clickable now too — the slot
+      // grid renders an empty-state placeholder with a [+] button there.
+      onPick: (i) => selectInstrument(i, { play: true }),
+      onDelete: (i) => {
+        const ins = model.patch.instruments[i];
+        if (!ins) return;
+        const label = ins.name || `instrument ${String(i + 1).padStart(2, '0')}`;
+        if (!confirm(`Reset "${label}" — clears the name, sample length and all slots. Cannot be undone with Ctrl+Z. Continue?`)) return;
+        // Reset to a brand-new empty instrument and refresh.
+        model.patch.instruments[i] = emptyInstrument();
+        rebuildCloneGraph();
+        model.events.emit({ instrIdx: i, kind: 'structure' });
+        if (i === activeIdx) {
+          renderMain();
+        }
+        repaint();
+      },
     });
+    updateCloseButton();
   };
 
   // Sidebar wheel + arrow nav. Wheel anywhere over the list scrolls the
@@ -707,6 +791,12 @@ export function bootApp(root: HTMLElement): void {
       validateOutputTarget();
       repaint();
     }
+    // Meta events include the instrument name — the sidebar shows it,
+    // so refresh on every meta event so the list stays in sync as the
+    // user types. (Repaint is cheap: 31 list items.)
+    if (e.kind === 'meta') {
+      repaint();
+    }
     // The active instrument re-renders whenever IT changes OR when any
     // instrument it (transitively) clones changes. Output target also
     // matters because the user may be playing a different instrument
@@ -906,7 +996,12 @@ export function bootApp(root: HTMLElement): void {
       setTimeout(() => { opening = false; }, 300);
     }
   });
-  (root.querySelector('#btn-new') as HTMLButtonElement).addEventListener('click', () => {
+  // CLOSE (was NEW): closing a project leaves you with a fresh, blank
+  // editor — semantically identical to "new". Disabled when the patch
+  // is already in its just-loaded blank state (nothing to close).
+  const closeBtn = root.querySelector('#btn-close') as HTMLButtonElement;
+  closeBtn.addEventListener('click', () => {
+    if (closeBtn.disabled) return;
     model.patch = emptyPatch();
     patchFileName = '';
     patchFileHandle = undefined;
@@ -1038,41 +1133,6 @@ export function bootApp(root: HTMLElement): void {
 
   (root.querySelector('#btn-save-as') as HTMLButtonElement).addEventListener('click', () => { void savePatchAs(); });
   (root.querySelector('#btn-save') as HTMLButtonElement).addEventListener('click', () => { void savePatch(); });
-  // Same re-entrancy guard as OPEN PATCH — protects against double-clicks
-  // in the OS file dialog spilling a second click onto the IMPORT button.
-  let importing = false;
-  (root.querySelector('#btn-import') as HTMLButtonElement).addEventListener('click', async () => {
-    if (importing) return;
-    importing = true;
-    try {
-      const f = await openFileBytes('.aki');
-      if (!f) return;
-      const ins = parseAki(f.bytes);
-      const stem = f.name.replace(/\.aki$/i, '');
-      if (!ins.name) ins.name = stem;
-      model.patch.instruments[activeIdx] = ins;
-      rebuildCloneGraph();
-      model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
-      renderMain();
-      repaint();
-    } finally {
-      setTimeout(() => { importing = false; }, 300);
-    }
-  });
-  let exporting = false;
-  (root.querySelector('#btn-export') as HTMLButtonElement).addEventListener('click', async () => {
-    if (exporting) return;
-    exporting = true;
-    try {
-      const ins = model.patch.instruments[activeIdx];
-      if (!ins) return;
-      const bytes = serializeAki(ins);
-      const stem = (ins.name || `instr_${activeIdx + 1}`).replace(/[^\w.-]+/g, '_');
-      await saveFileBytes(bytes, `${stem}.aki`, '.aki');
-    } finally {
-      setTimeout(() => { exporting = false; }, 300);
-    }
-  });
 
   const noteSelect = root.querySelector('#note-select') as HTMLSelectElement;
   noteSelect.addEventListener('change', () => {
@@ -1083,6 +1143,22 @@ export function bootApp(root: HTMLElement): void {
     playAudition();
   });
   attachWheelStep(noteSelect);
+
+  // Global hex/dec display toggle. Flipping it just re-renders the
+  // active instrument (slot-grid knobs read the current base in their
+  // own paint path) and refreshes the instrument header.
+  const baseSel = root.querySelector('#display-base') as HTMLSelectElement;
+  baseSel.value = getDisplayBase();
+  baseSel.addEventListener('change', () => {
+    setDisplayBase(baseSel.value === 'hex' ? 'hex' : 'dec');
+  });
+  attachWheelStep(baseSel);
+  onDisplayBaseChange(() => {
+    // Every knob / number field reads its display string from
+    // `formatInt` — re-render the whole editor so they update.
+    renderMain();
+    repaint();
+  });
 
   repaint();
   updateUndoRedoButtons();

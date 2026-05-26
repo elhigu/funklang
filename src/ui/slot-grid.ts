@@ -3,13 +3,15 @@
 // OP_DEFS registry in funklang/src/dsp/op-metadata.ts.
 
 import type { PatchModel } from '../patch/model';
-import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot } from '../patch/types';
+import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot, DEFAULT_SAMPLE_LENGTH } from '../patch/types';
 import type { Slot } from '../patch/types';
 import { pickOp, OP_NAME } from './op-picker';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
-import { opByCode, resetSlotForOp } from '../dsp/op-metadata';
+import { opByCode, resetSlotForOp, applyInsertDefaults } from '../dsp/op-metadata';
+import { pickSmartOutVar } from '../patch/smart-out-var';
+import { generateInstrumentName } from './name-generator';
 import { clampLoopOffset, loopLengthFor, minLoopOffset, maxLoopOffset } from '../patch/loop-rules';
 import { isValidCloneSource } from '../patch/clone-graph';
 import type { ParamDef } from '../dsp/op-metadata';
@@ -190,8 +192,24 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
   const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
   if (filled >= N_SLOTS_EDITABLE) return;
   if (ins.slots.length >= N_SLOTS_MAX) return;
-  const slot: Slot = { ...emptySlot(), fn: code, outVar: 1 };
+  // Smart outVar default + per-op factory values (e.g. envd starts
+  // with decay 23 / gain 128 instead of an all-zero envelope).
+  const smartOut = pickSmartOutVar(ins, atIdx);
+  const base: Slot = { ...emptySlot(), fn: code, outVar: smartOut };
+  const slot = applyInsertDefaults(base, code);
   model.insertSlot(instrIdx, atIdx, slot);
+  // First slot just landed in this instrument? Give it a fresh sample
+  // length AND auto-name it with a demoscene-flavoured generated
+  // string — but only if the user hasn't already named it themselves.
+  // Skip if the user already typed something so we don't clobber it.
+  if (filled === 0) {
+    if (ins.sampleLength === 0) {
+      model.setInstrumentField(instrIdx, 'sampleLength', DEFAULT_SAMPLE_LENGTH);
+    }
+    if (!ins.name) {
+      model.setInstrumentField(instrIdx, 'name', generateInstrumentName());
+    }
+  }
 }
 
 /**

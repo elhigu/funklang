@@ -1,11 +1,18 @@
 import type { Patch } from '../patch/types';
 import { isInstrumentValid } from '../patch/validation';
 
+export interface SidebarHandlers {
+  onPick: (i: number) => void;
+  /** User clicked the row's hover-revealed ✕ button. The host runs a
+   *  confirmation dialog and then resets the instrument. */
+  onDelete?: ((i: number) => void) | undefined;
+}
+
 export function renderSidebar(
   root: HTMLElement,
   patch: Patch,
   activeIdx: number,
-  onPick: (i: number) => void,
+  handlers: SidebarHandlers,
 ): void {
   root.innerHTML = '';
   let activeRow: HTMLLIElement | null = null;
@@ -25,10 +32,28 @@ export function renderSidebar(
       (invalid ? ' invalid' : '') +
       (isActive ? ' active' : '');
     if (invalid) li.title = 'This instrument has unwired or invalid inputs — see red dropdowns inside.';
+    const delBtn = filled > 0 && handlers.onDelete
+      ? `<button class="instr-del" data-instr-del title="Reset this instrument">✕</button>`
+      : '';
     li.innerHTML =
       `<span class="num">${String(i + 1).padStart(2, '0')}</span>` +
-      `<span class="name">${ins.name || '—'}</span>`;
-    if (filled > 0) li.addEventListener('click', () => onPick(i));
+      `<span class="name">${ins.name || '—'}</span>` +
+      delBtn;
+    // Empty rows are now clickable too — selecting one is how the user
+    // says "I want to start a new instrument here". The slot-grid renders
+    // an empty-state placeholder with a [+] button for that case.
+    li.addEventListener('click', (e) => {
+      // Don't treat a click on the ✕ button as a row pick.
+      if ((e.target as HTMLElement).closest('[data-instr-del]')) return;
+      handlers.onPick(i);
+    });
+    const del = li.querySelector('[data-instr-del]') as HTMLButtonElement | null;
+    if (del) {
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handlers.onDelete?.(i);
+      });
+    }
     root.appendChild(li);
     if (isActive) activeRow = li;
   }

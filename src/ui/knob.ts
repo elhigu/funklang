@@ -4,6 +4,8 @@
 // steps ±1, dblclick opens a numeric <input> for exact entry, right-click
 // resets to default.
 
+import { formatInt, parseFlexInt } from './number-format';
+
 export interface KnobOptions {
   label: string;
   value: number;
@@ -54,7 +56,7 @@ export function makeKnob(opts: KnobOptions): Knob {
     barEl.setAttribute('aria-valuenow', String(value));
     barEl.setAttribute('aria-valuemin', String(min));
     barEl.setAttribute('aria-valuemax', String(max));
-    valEl.textContent = String(value);
+    valEl.textContent = formatInt(value);
     const oor = value < min || value > max;
     valEl.classList.toggle('out-of-range', oor);
   };
@@ -67,16 +69,23 @@ export function makeKnob(opts: KnobOptions): Knob {
     opts.onChange(value);
   };
 
-  // Step sizes are range-aware.
+  // Step sizes are range-aware (and value-aware on big ranges).
   //   Fine            = ±1 (held by Shift).
-  //   Coarse (default) = ~3% of the value range so a wide param like
-  //                     freq (0..32767) moves ~983 per tick instead of
-  //                     imperceptible ±1.
-  // Ranges smaller than COARSE_THRESHOLD samples don't need a separate
-  // coarse mode — every step is already meaningful — so we return 1 in
-  // both directions and the Shift modifier becomes a no-op.
+  //   Coarse (default) = ~3% of the value range. But on REALLY wide
+  //                     ranges (> LOG_THRESHOLD) a linear 3% means
+  //                     every tick is enormous at the low end (~983
+  //                     per tick on freq 0..32767 even when the value
+  //                     is 5). Switch to "3% of the CURRENT VALUE" so
+  //                     small numbers step small and big numbers step
+  //                     big — the classic logarithmic knob feel.
+  // Ranges smaller than COARSE_THRESHOLD don't need a separate coarse
+  // mode at all; every step is already meaningful.
   const COARSE_THRESHOLD = 64;
-  const coarseStep = (): number => Math.max(1, Math.round(range * 0.03));
+  const LOG_THRESHOLD = 1000;
+  const linearCoarse = (): number => Math.max(1, Math.round(range * 0.03));
+  const logCoarse = (): number => Math.max(1, Math.round(Math.abs(value) * 0.03));
+  const coarseStep = (): number =>
+    range > LOG_THRESHOLD ? logCoarse() : linearCoarse();
   const hasCoarse = (): boolean => range >= COARSE_THRESHOLD;
   /** Step to apply for a non-Shift event. Coarse on wide ranges, ±1 on narrow. */
   const wheelDefault = (): number => hasCoarse() ? coarseStep() : 1;
@@ -155,12 +164,11 @@ export function makeKnob(opts: KnobOptions): Knob {
     if (el.querySelector('input.kedit')) return;
     const input = document.createElement('input');
     input.className = 'kedit';
-    // type=number → native ArrowUp/ArrowDown ±1 step (Shift+arrow ±10 too).
-    input.type = 'number';
-    input.min = String(min);
-    input.max = String(max);
-    input.step = '1';
-    input.value = String(value);
+    // Plain text (not type=number) so users can type "0x1A" hex. Native
+    // ArrowUp/Down ±1 stepping is gone, but the underlying bar widget
+    // still has wheel + arrow stepping, so no real loss.
+    input.type = 'text';
+    input.value = formatInt(value);
     valEl.style.display = 'none';
     el.appendChild(input);
     input.focus();
@@ -169,7 +177,7 @@ export function makeKnob(opts: KnobOptions): Knob {
     const submit = (): void => {
       if (closed) return;
       closed = true;
-      const n = parseInt(input.value, 10);
+      const n = parseFlexInt(input.value);
       if (Number.isFinite(n)) emit(n);
       input.remove();
       valEl.style.display = '';
