@@ -202,6 +202,7 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Empty instrument</td><td>Shows a single placeholder row with a <kbd>+</kbd> button — click it to add the first slot</td></tr>
                 <tr><td>Grey-out <kbd>+</kbd> buttons</td><td>Instrument is at the editor cap (16 slots) — delete one to insert another</td></tr>
                 <tr><td>Click ▶ on a clone slot</td><td>Expand the source instrument inline (collapsed by default)</td></tr>
+                <tr><td>loop_gen is pinned to the bottom</td><td>Picking loop_gen from the op picker always lands at the last slot; inserting any other op when loop_gen exists lands BEFORE it. The bottom-left [+] on the loop_gen row is disabled — only ONE loop_gen per instrument</td></tr>
                 <tr><td>Wheel over a dropdown</td><td>Step through its options</td></tr>
               </tbody>
             </table>

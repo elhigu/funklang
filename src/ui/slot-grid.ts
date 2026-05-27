@@ -192,6 +192,22 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
   const filled = ins.slots.reduce((n, s) => n + (s.fn !== 0 ? 1 : 0), 0);
   if (filled >= N_SLOTS_EDITABLE) return;
   if (ins.slots.length >= N_SLOTS_MAX) return;
+  // loop_gen (op 22) is a post-render side effect that, on the Amiga
+  // runtime, is only honoured when it sits in the LAST slot. Enforce
+  // that here:
+  //   * inserting loop_gen → always lands at the end, regardless of
+  //     the [+] button the user clicked.
+  //   * inserting anything else when loop_gen exists → clamp atIdx so
+  //     it lands BEFORE the loop_gen row, never after it.
+  //   * a second loop_gen on the same instrument is silently rejected
+  //     (the engine only triggers one anyway).
+  const loopGenIdx = ins.slots.findIndex((s) => s.fn === 22);
+  if (code === 22) {
+    if (loopGenIdx >= 0) return;          // already has one
+    atIdx = ins.slots.length;
+  } else if (loopGenIdx >= 0 && atIdx > loopGenIdx) {
+    atIdx = loopGenIdx;
+  }
   // Smart outVar default + per-op factory values (e.g. envd starts
   // with decay 23 / gain 128 instead of an all-zero envelope).
   const smartOut = pickSmartOutVar(ins, atIdx);
@@ -225,19 +241,21 @@ function makeCornerInsertBtn(
   instrIdx: number,
   atIdx: number,
   position: 'before' | 'after',
-  disabled: boolean,
+  disabled: boolean | string,
 ): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.className = `slot-corner-insert slot-corner-insert--${position}`;
   btn.dataset[position === 'before' ? 'insertBefore' : 'insertAfter'] = String(atIdx);
   btn.textContent = '+';
-  btn.title = disabled
-    ? `Instrument is full (max ${N_SLOTS_EDITABLE} slots)`
+  const isDisabled = !!disabled;
+  const disabledReason = typeof disabled === 'string' ? disabled : `Instrument is full (max ${N_SLOTS_EDITABLE} slots)`;
+  btn.title = isDisabled
+    ? disabledReason
     : (position === 'before' ? 'Insert slot before this row' : 'Insert slot after this row');
-  if (disabled) btn.disabled = true;
+  if (isDisabled) btn.disabled = true;
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (disabled) return;
+    if (isDisabled) return;
     void tryInsertAt(model, instrIdx, atIdx);
   });
   btn.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -851,12 +869,18 @@ function renderRow(
   // Corner insert buttons: bottom-left on every row ("+ after"), top-left
   // ONLY on the first visible row ("+ before"). The buttons live on the
   // row itself (position:absolute via CSS) so they hover at the corners
-  // without disturbing the grid layout.
+  // without disturbing the grid layout. The loop_gen (op 22) row is the
+  // hard-coded last slot — its bottom-left + is disabled so the user
+  // can't even attempt to insert after it.
   if (insertCorners) {
     if (insertCorners.showInsertBefore) {
       row.appendChild(makeCornerInsertBtn(model, instrIdx, slotIdx, 'before', insertCorners.full));
     }
-    row.appendChild(makeCornerInsertBtn(model, instrIdx, slotIdx + 1, 'after', insertCorners.full));
+    const afterDisabled: boolean | string =
+      slot.fn === 22 ? 'loop_gen must stay in the last slot — insert above it'
+      : insertCorners.full ? true
+      : false;
+    row.appendChild(makeCornerInsertBtn(model, instrIdx, slotIdx + 1, 'after', afterDisabled));
   }
 
   wrap.appendChild(row);
