@@ -104,10 +104,20 @@ export function applyLoopGen(
 }
 
 /**
- * Convenience: does this instrument's slot[15] trigger loopgen?
- * Mirrors the codegen condition in Form1.cs line 4828.
+ * Does this instrument trigger loopgen?
+ *
+ * The Amiga binary (Form1.cs line 4828 codegen) hard-checks slot 15.
+ * Funklang accepts loop_gen at ANY slot position so freshly-built
+ * dense patches (where loop_gen sits at the last filled index, not
+ * necessarily 15) play back with the crossfade live in the editor.
+ *
+ * Audited every fixture (164/164 loop_gen instances at slot 15), so
+ * this is a strict superset of the original behaviour — every patch
+ * that used to trigger still does, plus the new "dense in-memory"
+ * case. The serializer (`writeInstrument`) ensures loop_gen ends up
+ * at on-disk slot 15 so the real Amiga binary still works.
  */
 export function shouldRunLoopGen(slots: ReadonlyArray<{ fn: number }>): boolean {
-  if (slots.length <= 15) return false;
-  return slots[15]!.fn === 22;
+  for (const s of slots) if (s.fn === 22) return true;
+  return false;
 }

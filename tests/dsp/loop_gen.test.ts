@@ -19,18 +19,22 @@ import { makeMultiPatch, runBoth, fp } from './_dsp_helpers';
 import { emptyPatch } from '../../src/patch/types';
 
 describe('op loop_gen (code 22)', () => {
-  it('shouldRunLoopGen detects slot[15].fn === 22 only', () => {
+  it('shouldRunLoopGen triggers whenever ANY slot has fn === 22', () => {
+    // Was previously slot[15]-only to match the Amiga binary verbatim.
+    // Loosened so freshly-built dense patches (loop_gen at the last
+    // filled index, not necessarily 15) play their loop crossfade in
+    // the editor too. The serializer pads loop_gen to on-disk slot 15
+    // on save so the Amiga binary remains compatible.
     expect(shouldRunLoopGen([])).toBe(false);
     expect(shouldRunLoopGen(Array.from({ length: 15 }, emptySlot))).toBe(false);
     const slots16 = Array.from({ length: 16 }, emptySlot);
     expect(shouldRunLoopGen(slots16)).toBe(false);
     slots16[15]!.fn = 22;
     expect(shouldRunLoopGen(slots16)).toBe(true);
-    slots16[15]!.fn = 21;
-    expect(shouldRunLoopGen(slots16)).toBe(false);
-    // op22 anywhere else is a no-op (Form1.cs only checks slot[15])
-    slots16[0]!.fn = 22;
-    expect(shouldRunLoopGen(slots16)).toBe(false);
+    // Now loop_gen at slot 0 also triggers — the in-memory render
+    // shouldn't care WHERE in the dense array the user put it.
+    const dense = [{ ...emptySlot(), fn: 22 }, { ...emptySlot(), fn: 2 }];
+    expect(shouldRunLoopGen(dense)).toBe(true);
   });
 
   it('applyLoopGen crossfades tail with pre-loop region', () => {

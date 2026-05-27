@@ -102,9 +102,24 @@ function readInstrument(r: BinReader): Instrument {
 function writeInstrument(w: BinWriter, ins: Instrument): void {
   w.cstr(ins.name);
   w.i32(ins.sampleLength);
-  const padded: Slot[] = ins.slots.slice(0, N_SLOTS_MAX);
-  while (padded.length < N_SLOTS_MAX) padded.push(emptySlot());
-  for (const s of padded) writeSlot(w, s, ins);
+  // The Amiga binary checks slot 15 specifically for loop_gen
+  // (Form1.cs line 4828). When the in-memory model has loop_gen at
+  // some OTHER index (typical for freshly-built dense patches),
+  // re-arrange on save so on-disk slot 15 always holds loop_gen.
+  // Non-loop_gen slots keep their model indices to preserve
+  // per-slot `j` indexing used by cmb_flt_n / dly_cyc / counter_*
+  // — that's why the bit-exact suite (all 164 loop_gen fixtures
+  // sit at slot 15) keeps matching refrender after this change.
+  const out: Slot[] = [];
+  for (let i = 0; i < N_SLOTS_MAX; i++) out.push(emptySlot());
+  const loopIdx = ins.slots.findIndex((s) => s.fn === 22);
+  for (let i = 0; i < Math.min(N_SLOTS_MAX, ins.slots.length); i++) {
+    if (i === loopIdx) continue;            // loop_gen handled below
+    if (loopIdx >= 0 && i === 15) continue; // reserve slot 15 when a loop_gen exists
+    out[i] = ins.slots[i]!;
+  }
+  if (loopIdx >= 0) out[15] = ins.slots[loopIdx]!;
+  for (const s of out) writeSlot(w, s, ins);
 }
 
 export function parseAkp(bytes: Uint8Array): Patch {
