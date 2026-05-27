@@ -702,7 +702,7 @@ export function bootApp(root: HTMLElement): void {
    * user audibly hears the loop behaviour the Amiga would produce, not
    * just one-shot the whole buffer.
    */
-  const FINAL_LOOP_REPEATS = 2;
+  const FINAL_LOOP_REPEATS = 1 ;
   const buildFinalAudible = (
     ins: typeof model.patch.instruments[number],
     render: NonNullable<typeof lastRender>,
