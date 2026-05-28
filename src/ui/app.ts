@@ -185,6 +185,9 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Click slot function name</td><td>Change op type (opens the op picker)</td></tr>
                 <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
                 <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
+                <tr><td>Slot reorder scroll</td><td>Moving a slot up/down preserves the slot-grid scroll position — you won't get yanked back to the top</td></tr>
+                <tr><td>mul const value</td><td>Edit the integer knob OR type a float in the sidecar field — they share the same underlying value (val / 32767 ≈ float ∈ [-1.0, 1.0])</td></tr>
+                <tr><td>Clone offset</td><td>Max = source instrument's sample length − 2. Changing source rescales the offset by the SL ratio so the same fractional sample position is preserved (even-snapped)</td></tr>
                 <tr><td>New slot outVar default</td><td>Picks a variable that an earlier slot already reads (so the chain feeds something), falling back to the first unused variable</td></tr>
                 <tr><td>Newly inserted slot defaults</td><td>Per-op factory values applied on insert — e.g. osc_saw/tri/sine = freq 50/gain 64, osc_pulse adds width 63, vol = gain 128, envd = decay 16/sustain 64/gain 64, dly_cyc = gain 128, cmb_flt_n = gain 64 (delay 0, feedback 0), reverb = feedback 64/gain 64, sv_flt_n = cutoff 16/reso 16/LP, distortion = gain 64, sample_hold = step 8. See <code>src/dsp/op-metadata.ts::INSERT_DEFAULTS</code></td></tr>
                 <tr><td>add op input</td><td>val1 is variable-only (no constant); first insert defaults to v1</td></tr>
