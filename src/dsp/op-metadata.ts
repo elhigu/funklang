@@ -200,7 +200,10 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
   {
     code: 9, name: 'add', category: 'mix',
     params: [
-      { field: 'val1', type: { kind: 'var-source', label: 'in1', allowNone: true } },
+      // val1 MUST be V1..V4 per user spec — `allowNone: false` makes the
+      // 0/"—" option still appear (Klang stores 0 for "unwired") but as
+      // a red warning, not a valid choice.
+      { field: 'val1', type: { kind: 'var-source', label: 'in1', allowNone: false } },
       { field: 'val2Value', selector: 'val2',
         type: { kind: 'var-or-const', min: -32768, max: 32830, label: 'in2' } },
     ],
@@ -461,6 +464,7 @@ const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
   6: { gainVal: 64 },                                   // osc_noise
   7: { val1Value: 16, gainVal: 64 },                    // enva
   8: { val1Value: 16, val2Value: 64, gainVal: 64 },     // envd
+  9: { val1: 1, val2Value: 0 },                         // add
 };
 
 /** Apply factory defaults for the given op on top of `base`. */

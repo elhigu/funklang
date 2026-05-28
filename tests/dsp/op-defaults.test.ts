@@ -3,11 +3,6 @@ import { emptySlot } from '../../src/patch/types';
 import { applyInsertDefaults } from '../../src/dsp/op-metadata';
 
 describe('applyInsertDefaults', () => {
-  it('returns the base unchanged for an op with no registered defaults', () => {
-    const base = { ...emptySlot(), fn: 9, outVar: 1 };
-    expect(applyInsertDefaults(base, 9)).toEqual(base);
-  });
-
   it('envd (fn=8) defaults decay=16 sustain=64 gain=64', () => {
     const base = { ...emptySlot(), fn: 8, outVar: 1 };
     const out = applyInsertDefaults(base, 8);
@@ -50,5 +45,12 @@ describe('applyInsertDefaults', () => {
     const out = applyInsertDefaults(base, 7);
     expect(out.val1Value).toBe(16);
     expect(out.gainVal).toBe(64);
+  });
+
+  it('add (fn=9) defaults val1=1 (v1) and val2Value=0', () => {
+    const base = { ...emptySlot(), fn: 9, outVar: 1 };
+    const out = applyInsertDefaults(base, 9);
+    expect(out.val1).toBe(1);
+    expect(out.val2Value).toBe(0);
   });
 });
