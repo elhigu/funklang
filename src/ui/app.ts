@@ -916,6 +916,21 @@ export function bootApp(root: HTMLElement): void {
       return;
     }
 
+    // Plain ArrowUp/ArrowDown steps the sidebar instrument selection
+    // (auto-plays subject to the audio toggle, like the mouse wheel).
+    // Must run BEFORE the `if (!mod) return;` modifier gate below —
+    // otherwise no-modifier arrows never reach the rest of the chain.
+    // Skip when:
+    //   - the user is typing in a field (caret nav inside text inputs)
+    //   - the REVERT AUTOSAVE panel is open (its own listener handles
+    //     arrows for snapshot browsing — we'd otherwise fire twice)
+    const revertOpen = !root.querySelector('#revert-panel')?.classList.contains('hidden');
+    if (!inField && !revertOpen && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) {
+      ev.preventDefault();
+      stepInstrument(ev.key === 'ArrowDown' ? 1 : -1, { play: true });
+      return;
+    }
+
     const mod = ev.ctrlKey || ev.metaKey;
     if (!mod) return;
 
@@ -941,12 +956,6 @@ export function bootApp(root: HTMLElement): void {
     } else if (ev.key === 'y' || ev.key === 'Y') {
       ev.preventDefault();
       history.redo();
-    } else if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
-      // ArrowUp/Down at the global level steps the instrument selection.
-      // (Knob bars have their own keydown handler that stops propagation
-      // via target check above when focused.)
-      ev.preventDefault();
-      stepInstrument(ev.key === 'ArrowDown' ? 1 : -1, { play: true });
     }
   };
   w.__funklangKeydown = keydownHandler;
