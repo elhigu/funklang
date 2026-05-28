@@ -619,6 +619,7 @@ export function bootApp(root: HTMLElement): void {
       // grid renders an empty-state placeholder with a [+] button there.
       onPick: (i) => selectInstrument(i, { play: true }),
       onDelete: removeInstrumentWithConfirm,
+      onMove: (from, to) => model.moveInstrument(from, to),
     });
     updateCloseButton();
   };

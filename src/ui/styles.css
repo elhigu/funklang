@@ -270,6 +270,12 @@
     color: var(--fg-2);
     text-align: right;
   }
+  /* Drag-and-drop reorder: dim the source while it's being dragged and
+     draw an amber edge on the target row indicating where the drop will
+     land (top edge = above this row, bottom edge = below). */
+  .instr-row.dragging { opacity: 0.4; }
+  .instr-row.drop-above { box-shadow: inset 0 2px 0 0 var(--amber); }
+  .instr-row.drop-below { box-shadow: inset 0 -2px 0 0 var(--amber); }
 
   /* ─── main editor ───────────────────────────────────────── */
   main {

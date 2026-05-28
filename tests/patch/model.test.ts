@@ -121,4 +121,77 @@ describe('PatchModel', () => {
       expect(model.patch.instruments[0]!.loopOffset).toBe(2048);
     });
   });
+
+  describe('moveInstrument — drag-and-drop reorder', () => {
+    it('permutes the array (move 3 → 0 pushes 0..2 down by one)', () => {
+      const model = new PatchModel(emptyPatch());
+      for (let i = 0; i < 5; i++) {
+        model.setInstrumentField(i, 'name', String.fromCharCode(65 + i));
+      }
+      model.moveInstrument(3, 0);
+      expect(model.patch.instruments.slice(0, 5).map((i) => i.name)).toEqual(['D', 'A', 'B', 'C', 'E']);
+    });
+
+    it('rewrites clone source indices to follow the moved instrument', () => {
+      const model = new PatchModel(emptyPatch());
+      // Instr 0 = saw, instr 2 = clone-of-0.
+      model.insertSlot(0, 0, { ...emptySlot(), fn: 2, outVar: 1 });
+      model.insertSlot(2, 0, { ...emptySlot(), fn: 17, outVar: 1, gain: 0 });
+      // Move instr 0 → 1. After: original instr 1 sits at 0, saw at 1,
+      // instr 2 untouched. Clone at instr 2 (still at index 2) should now
+      // point at the saw's new home — index 1.
+      model.moveInstrument(0, 1);
+      const cloneSlot = model.patch.instruments[2]!.slots[0]!;
+      expect(cloneSlot.gain).toBe(1);
+    });
+
+    it('resets clone source to 0 when reorder breaks Klang ordering (src >= owner)', () => {
+      const model = new PatchModel(emptyPatch());
+      // Instr 0 = saw, instr 1 = clone-of-0.
+      model.insertSlot(0, 0, { ...emptySlot(), fn: 2, outVar: 1 });
+      model.insertSlot(1, 0, { ...emptySlot(), fn: 17, outVar: 1, gain: 0 });
+      // Move instr 1 → 0 (puts clone BEFORE the saw). The remap puts the
+      // clone at index 0 and the saw at index 1. Clone's old src=0 (the saw)
+      // gets remapped to index 1, but 1 >= 0 (clone's own new index) violates
+      // the ordering rule. Per spec: fall back to 0.
+      model.moveInstrument(1, 0);
+      const cloneSlot = model.patch.instruments[0]!.slots[0]!;
+      expect(cloneSlot.gain).toBe(0);
+    });
+
+    it('handles chordgen (fn=18) the same way as clone (fn=17)', () => {
+      const model = new PatchModel(emptyPatch());
+      model.insertSlot(0, 0, { ...emptySlot(), fn: 2, outVar: 1 });
+      model.insertSlot(3, 0, { ...emptySlot(), fn: 18, outVar: 1, gain: 0 });
+      model.moveInstrument(0, 2);  // saw 0 → 2
+      // Chordgen at instr 3 now points at saw's new home (index 2).
+      const chord = model.patch.instruments[3]!.slots[0]!;
+      expect(chord.gain).toBe(2);
+    });
+
+    it('emits exactly one structure event for the whole reorder', () => {
+      const model = new PatchModel(emptyPatch());
+      model.insertSlot(0, 0, { ...emptySlot(), fn: 2, outVar: 1 });
+      const events = recorder(model);
+      model.moveInstrument(0, 3);
+      expect(events.filter((e) => e.kind === 'structure').length).toBe(1);
+    });
+
+    it('is a no-op when from === to', () => {
+      const model = new PatchModel(emptyPatch());
+      model.setInstrumentField(0, 'name', 'X');
+      const events = recorder(model);
+      model.moveInstrument(2, 2);
+      expect(events.length).toBe(0);
+    });
+
+    it('out-of-range from / to is a silent no-op', () => {
+      const model = new PatchModel(emptyPatch());
+      const events = recorder(model);
+      model.moveInstrument(-1, 0);
+      model.moveInstrument(0, 999);
+      model.moveInstrument(999, 0);
+      expect(events.length).toBe(0);
+    });
+  });
 });

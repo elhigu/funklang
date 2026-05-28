@@ -111,6 +111,41 @@ export class PatchModel {
     });
   }
 
+  /**
+   * Re-permute the instruments array so `from` lands at `to`, shifting
+   * everything between. Then rewrite every `clone`/`chordgen` source
+   * index (slot.gain when fn === 17 || fn === 18) using the inverse
+   * permutation so cross-instrument links survive the reorder. Links
+   * that end up invalid per Klang's ordering rule (src >= owner) reset
+   * to 0 — the sidebar's existing invalid-state styling surfaces this
+   * as a warning.
+   *
+   * Emits ONE structure event for the whole reorder.
+   */
+  moveInstrument(from: number, to: number): void {
+    const n = this.patch.instruments.length;
+    if (from < 0 || from >= n || to < 0 || to >= n || from === to) return;
+    // Snapshot identities before the splice so we can build the old→new
+    // index map by indexOf on the new array.
+    const oldOrder = this.patch.instruments.slice();
+    const [moved] = this.patch.instruments.splice(from, 1);
+    if (!moved) return;
+    this.patch.instruments.splice(to, 0, moved);
+    const remap = new Map<number, number>();
+    for (let i = 0; i < n; i++) {
+      remap.set(i, this.patch.instruments.indexOf(oldOrder[i]!));
+    }
+    for (let i = 0; i < n; i++) {
+      const ins = this.patch.instruments[i]!;
+      for (const slot of ins.slots) {
+        if (slot.fn !== 17 && slot.fn !== 18) continue;
+        const newSrc = remap.get(slot.gain) ?? slot.gain;
+        slot.gain = (newSrc < i) ? newSrc : 0;
+      }
+    }
+    this.events.emit({ instrIdx: to, kind: 'structure' });
+  }
+
   private instr(instrIdx: number): Instrument {
     if (instrIdx < 0 || instrIdx >= N_INSTRUMENTS) {
       throw new RangeError(`instrument index out of range: ${instrIdx}`);

@@ -6,6 +6,8 @@ export interface SidebarHandlers {
   /** User clicked the row's hover-revealed ✕ button. The host runs a
    *  confirmation dialog and then resets the instrument. */
   onDelete?: ((i: number) => void) | undefined;
+  /** Called when the user drops a dragged row onto another row. */
+  onMove?: ((from: number, to: number) => void) | undefined;
 }
 
 export function renderSidebar(
@@ -52,6 +54,50 @@ export function renderSidebar(
       del.addEventListener('click', (e) => {
         e.stopPropagation();
         handlers.onDelete?.(i);
+      });
+    }
+    // Drag SOURCE — only populated rows can be picked up. Empty rows
+    // can be dropped INTO (so the user can move an instrument over a
+    // gap) but you can't drag an empty row anywhere.
+    if (filled > 0 && handlers.onMove) {
+      li.draggable = true;
+      li.addEventListener('dragstart', (e) => {
+        e.dataTransfer?.setData('text/plain', String(i));
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        li.classList.add('dragging');
+      });
+      li.addEventListener('dragend', () => {
+        li.classList.remove('dragging');
+        document.querySelectorAll('.instr-row.drop-above, .instr-row.drop-below')
+          .forEach((el) => el.classList.remove('drop-above', 'drop-below'));
+      });
+    }
+    // Drop TARGET — every row is a drop target. Y-midpoint decides
+    // above/below, same convention as the slot-row drag.
+    if (handlers.onMove) {
+      li.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const rect = li.getBoundingClientRect();
+        const above = (e.clientY - rect.top) < rect.height / 2;
+        li.classList.toggle('drop-above', above);
+        li.classList.toggle('drop-below', !above);
+      });
+      li.addEventListener('dragleave', () => {
+        li.classList.remove('drop-above', 'drop-below');
+      });
+      li.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const fromStr = e.dataTransfer?.getData('text/plain');
+        if (!fromStr) return;
+        const from = parseInt(fromStr, 10);
+        if (!Number.isFinite(from)) return;
+        const rect = li.getBoundingClientRect();
+        const above = (e.clientY - rect.top) < rect.height / 2;
+        let to = above ? i : i + 1;
+        if (from === to || from === to - 1) return;
+        if (to > from) to -= 1;
+        handlers.onMove?.(from, to);
       });
     }
     root.appendChild(li);
