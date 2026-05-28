@@ -92,9 +92,9 @@ describe('mul — fractional sidecar input', () => {
     await new Promise<void>((r) => setTimeout(r, 0));
     const after = (model.events as unknown as { listeners: Set<unknown> }).listeners.size;
     // After cleanup we should have at most one active listener — the one
-    // attached by the most recent render. Allow a small grace for any
-    // observer that hadn't fired yet, but assert the count is bounded.
-    expect(after).toBeLessThan(before + 3);
+    // attached by the most recent render. Without the cleanup this would
+    // be `before + 5` (one new listener per renderSlotGrid call).
+    expect(after).toBeLessThanOrEqual(before + 1);
   });
 
   it('the sidecar is present ONLY on mul (fn=10), not on add (fn=9)', () => {
