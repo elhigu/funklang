@@ -22,4 +22,16 @@ describe('op-picker', () => {
     expect((desc as HTMLElement).textContent ?? '').toMatch(/-32768/);
     document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
+
+  it('imported_sample (fn=20) is marked unsupported and rendered as a disabled card', () => {
+    const imp = OP_DEFS.find((o) => o.code === 20)!;
+    expect(imp.unsupported).toBe(true);
+    document.body.innerHTML = '';
+    void pickOp();
+    const card = document.querySelector('[data-op-code="20"]') as HTMLButtonElement;
+    expect(card).not.toBeNull();
+    expect(card.disabled).toBe(true);
+    expect(card.classList.contains('op-picker-card-unsupported')).toBe(true);
+    document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
 });

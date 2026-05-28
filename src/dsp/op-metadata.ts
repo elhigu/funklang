@@ -44,6 +44,8 @@ export interface OpDef {
   category: 'osc' | 'mix' | 'env' | 'filter' | 'fx' | 'ctrl' | 'cross';
   /** Optional short doc shown in the op picker. */
   description?: string;
+  /** Picker disables this op when true; the engine still no-ops gracefully. */
+  unsupported?: boolean;
   params: ParamDef[];
 }
 
@@ -368,6 +370,8 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
   //   ONE param: import index, stored in `gain`. No other slot fields used.
   {
     code: 20, name: 'imported', category: 'cross',
+    description: 'Plays an externally imported sample. NOT YET IMPLEMENTED in funklang.',
+    unsupported: true,
     params: [
       { field: 'gain', type: { kind: 'sample-ref', label: 'sample' } },
     ],

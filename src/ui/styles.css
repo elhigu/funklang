@@ -1158,6 +1158,13 @@
     font-size: 10px;
     line-height: 1.3;
   }
+  .op-picker-card-unsupported {
+    opacity: 0.45;
+    cursor: not-allowed !important;
+  }
+  .op-picker-card-unsupported:hover {
+    background: inherit !important;
+  }
 
   /* clone-block container */
   .clone-block {

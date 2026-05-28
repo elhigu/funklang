@@ -65,3 +65,12 @@ must hide / disable higher-or-equal indices.
 > "When playing looped sound just 2 loops is enough."
 
 Derived: `FINAL_LOOP_REPEATS = 2` in [funklang/src/ui/app.ts](../src/ui/app.ts).
+
+## 2026-05-29 — Imported sample + vocoder support status
+
+> "Imported sample and vocoder are currently not supported. Actually I dont think
+>  vocoder is going to be implemented at all."
+
+Derived:
+- `imported_sample` (op 20) is shown in the op-picker but disabled (`unsupported: true`).
+- `vocoder` (op 24 in Klang's enum) is NOT in `OP_DEFS` and won't be added.

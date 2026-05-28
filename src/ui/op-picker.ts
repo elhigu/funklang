@@ -82,6 +82,10 @@ export function pickOp(): Promise<number | null> {
           descEl.textContent = def.description;
           btn.appendChild(descEl);
         }
+        if (def.unsupported) {
+          btn.disabled = true;
+          btn.classList.add('op-picker-card-unsupported');
+        }
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           done(def.code);
