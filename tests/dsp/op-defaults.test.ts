@@ -10,9 +10,7 @@ describe('applyInsertDefaults', () => {
     expect(out.outVar).toBe(3);
   });
 
-  it('returns the base unchanged when there is no INSERT_DEFAULTS entry for the op', () => {
-    // chordgen (fn=18) — no entry. (Same contract pinned by the chordgen
-    // test below; this one names what the function CONTRACT is.)
+  it('returns the base unchanged when there is no INSERT_DEFAULTS entry (chordgen fn=18)', () => {
     const base = { ...emptySlot(), fn: 18, outVar: 1 };
     expect(applyInsertDefaults(base, 18)).toEqual(base);
   });
@@ -116,10 +114,5 @@ describe('applyInsertDefaults', () => {
   it('sample_hold (fn=19) defaults step to 8', () => {
     const base = { ...emptySlot(), fn: 19, outVar: 1 };
     expect(applyInsertDefaults(base, 19).gainVal).toBe(8);
-  });
-
-  it('chordgen (fn=18) has no INSERT_DEFAULTS entry — applyInsertDefaults is identity', () => {
-    const base = { ...emptySlot(), fn: 18, outVar: 1 };
-    expect(applyInsertDefaults(base, 18)).toEqual(base);
   });
 });
