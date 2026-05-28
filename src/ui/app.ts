@@ -307,7 +307,42 @@ export function bootApp(root: HTMLElement): void {
     }
   };
 
+  /**
+   * Build a stable CSS selector for `el` based on its ancestor chain inside
+   * `root`, using tag+data-* attributes. Used to find the equivalent element
+   * after a `renderMain()` wipe so we can put focus back. Returns null if
+   * the element isn't inside `root`.
+   */
+  const focusSelector = (el: HTMLElement, root: HTMLElement): string | null => {
+    if (!root.contains(el)) return null;
+    const parts: string[] = [];
+    let cur: HTMLElement | null = el;
+    while (cur && cur !== root) {
+      let part = cur.tagName.toLowerCase();
+      for (const attr of Array.from(cur.attributes)) {
+        if (attr.name.startsWith('data-')) {
+          part += `[${attr.name}="${CSS.escape(attr.value)}"]`;
+        }
+      }
+      // Disambiguate by class only when no data-* attrs anchored it.
+      if (!part.includes('[') && cur.classList.length > 0) {
+        for (const cls of Array.from(cur.classList)) part += `.${CSS.escape(cls)}`;
+      }
+      parts.unshift(part);
+      cur = cur.parentElement;
+    }
+    return parts.join(' > ');
+  };
+
   const renderMain = (): void => {
+    // Capture which element (if any) is focused inside mainEl so we can
+    // restore focus after the rebuild. Otherwise a select-change that
+    // fires a structure event yanks focus away mid-interaction — the
+    // user hits ArrowDown on a clone-source dropdown and the next arrow
+    // press hits the body instead.
+    const ae = document.activeElement as HTMLElement | null;
+    const focusSel = ae ? focusSelector(ae, mainEl) : null;
+
     mainEl.innerHTML = '';
     const ins = model.patch.instruments[activeIdx];
     if (!ins) {
@@ -390,6 +425,15 @@ export function bootApp(root: HTMLElement): void {
     runRender();
     refreshOutputMasterBtn();
     updateLabels();
+
+    // Restore focus to whatever the user was on before this rebuild.
+    // querySelector matches the first equivalent element under the new
+    // DOM tree — for slot-grid widgets the data-* anchors (data-slot,
+    // data-row-idx, …) make this unambiguous.
+    if (focusSel) {
+      const target = mainEl.querySelector(focusSel) as HTMLElement | null;
+      if (target) target.focus();
+    }
   };
 
   /** Re-tag .selected / .active on slot rows without rebuilding the grid. */
