@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { emptySlot } from '../../src/patch/types';
-import { applyInsertDefaults } from '../../src/dsp/op-metadata';
+import { applyInsertDefaults, opByCode } from '../../src/dsp/op-metadata';
 
 describe('applyInsertDefaults', () => {
   it('envd (fn=8) defaults decay=16 sustain=64 gain=64', () => {
@@ -59,5 +59,18 @@ describe('applyInsertDefaults', () => {
     const out = applyInsertDefaults(base, 11);
     expect(out.freqVal).toBe(0);
     expect(out.gainVal).toBe(128);
+  });
+
+  it('cmb_flt_n (fn=12) defaults delay/fbk to 0 and gain to 64', () => {
+    const base = { ...emptySlot(), fn: 12, outVar: 1 };
+    const out = applyInsertDefaults(base, 12);
+    expect(out.freqVal).toBe(0);
+    expect(out.val2Value).toBe(0);
+    expect(out.gainVal).toBe(64);
+  });
+
+  it('cmb_flt_n labels feedback as "feedback" (not "fbk")', () => {
+    const fb = opByCode(12)!.params.find((p) => p.field === 'val2Value')!;
+    expect((fb.type as { label: string }).label).toBe('feedback');
   });
 });
