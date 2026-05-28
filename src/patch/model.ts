@@ -114,8 +114,8 @@ export class PatchModel {
   /**
    * Re-permute the instruments array so `from` lands at `to`, shifting
    * everything between. Then rewrite every `clone`/`chordgen` source
-   * index (slot.gain when fn === 17 || fn === 18) using the inverse
-   * permutation so cross-instrument links survive the reorder. Links
+   * index (slot.gain when fn === 17 || fn === 18) using a forward old→new
+   * index map so cross-instrument links survive the reorder. Links
    * that end up invalid per Klang's ordering rule (src >= owner) reset
    * to 0 — the sidebar's existing invalid-state styling surfaces this
    * as a warning.

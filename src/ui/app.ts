@@ -157,6 +157,7 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Click instrument</td><td>Select + audition (if audio toggle is on)</td></tr>
                 <tr><td>Mouse wheel over list</td><td>Step ± to previous / next non-empty instrument</td></tr>
                 <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Same — wraps around past the ends</td></tr>
+                <tr><td>Drag an instrument row</td><td>Reorder instruments in the sidebar. Clone/chordgen sources auto-rewire to follow the moved instrument; links that would violate Klang's "source must be a lower-numbered instrument" rule reset to instrument 01</td></tr>
               </tbody>
             </table>
 
@@ -612,6 +613,26 @@ export function bootApp(root: HTMLElement): void {
     repaint();
   };
 
+  // Reorder an instrument AND remap the three host-side indices
+  // (activeIdx / selection / outputTarget) that currently point at
+  // OLD positions in the array. Mirrors the splice the model does:
+  //   - from itself maps to to
+  //   - indices the splice walks over shift by ±1
+  // Used by both the sidebar drag handler and __funklangModel so the
+  // E2E shim and real drag UX behave identically.
+  const moveInstrumentWithRemap = (from: number, to: number): void => {
+    const adjust = (idx: number): number => {
+      if (idx === from) return to;
+      if (from < idx && idx <= to) return idx - 1;  // shifted left by the splice-out
+      if (to <= idx && idx < from) return idx + 1;  // shifted right by the splice-in
+      return idx;
+    };
+    activeIdx = adjust(activeIdx);
+    selection = { instrIdx: adjust(selection.instrIdx), slotIdx: selection.slotIdx };
+    outputTarget = { instrIdx: adjust(outputTarget.instrIdx), slotIdx: outputTarget.slotIdx };
+    model.moveInstrument(from, to);
+  };
+
   const repaint = (): void => {
     renderSidebar(listEl, model.patch, activeIdx, {
       // Sidebar click also auto-plays (subject to the audio toggle), same
@@ -619,7 +640,7 @@ export function bootApp(root: HTMLElement): void {
       // grid renders an empty-state placeholder with a [+] button there.
       onPick: (i) => selectInstrument(i, { play: true }),
       onDelete: removeInstrumentWithConfirm,
-      onMove: (from, to) => model.moveInstrument(from, to),
+      onMove: moveInstrumentWithRemap,
     });
     updateCloseButton();
   };
@@ -1411,5 +1432,9 @@ export function bootApp(root: HTMLElement): void {
 
   // Expose the model on window so E2E tests can drive moves and edits
   // without simulating DOM drag-and-drop (brittle in headless browsers).
-  (window as unknown as { __funklangModel?: PatchModel }).__funklangModel = model;
+  // moveInstrument is wrapped so the host-side activeIdx / selection /
+  // outputTarget follow the reorder — same path the real drag uses.
+  const shim = Object.create(model) as PatchModel & { moveInstrument: (from: number, to: number) => void };
+  shim.moveInstrument = moveInstrumentWithRemap;
+  (window as unknown as { __funklangModel?: PatchModel }).__funklangModel = shim;
 }

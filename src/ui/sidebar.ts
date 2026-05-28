@@ -59,22 +59,22 @@ export function renderSidebar(
     // Drag SOURCE — only populated rows can be picked up. Empty rows
     // can be dropped INTO (so the user can move an instrument over a
     // gap) but you can't drag an empty row anywhere.
-    if (filled > 0 && handlers.onMove) {
-      li.draggable = true;
-      li.addEventListener('dragstart', (e) => {
-        e.dataTransfer?.setData('text/plain', String(i));
-        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-        li.classList.add('dragging');
-      });
-      li.addEventListener('dragend', () => {
-        li.classList.remove('dragging');
-        document.querySelectorAll('.instr-row.drop-above, .instr-row.drop-below')
-          .forEach((el) => el.classList.remove('drop-above', 'drop-below'));
-      });
-    }
     // Drop TARGET — every row is a drop target. Y-midpoint decides
     // above/below, same convention as the slot-row drag.
     if (handlers.onMove) {
+      if (filled > 0) {
+        li.draggable = true;
+        li.addEventListener('dragstart', (e) => {
+          e.dataTransfer?.setData('text/plain', String(i));
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+          li.classList.add('dragging');
+        });
+        li.addEventListener('dragend', () => {
+          li.classList.remove('dragging');
+          document.querySelectorAll('.instr-row.drop-above, .instr-row.drop-below')
+            .forEach((el) => el.classList.remove('drop-above', 'drop-below'));
+        });
+      }
       li.addEventListener('dragover', (e) => {
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';

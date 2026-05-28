@@ -41,3 +41,35 @@ test('moveInstrument permutes the sidebar and remaps clone sources', async ({ pa
   await expect(page.locator('.instr-row').nth(0).locator('.name')).toHaveText('MID');
   await expect(page.locator('.instr-row').nth(1).locator('.name')).toHaveText('SRC');
 });
+
+test('dragging the active instrument keeps the active highlight on the moved row', async ({ page }) => {
+  await page.goto('/');
+
+  const bytes: number[] = await page.evaluate(async () => {
+    const { emptyPatch, emptySlot } = await import('/src/patch/types.ts');
+    const { serializeAkp } = await import('/src/fileio/akp.ts');
+    const p = emptyPatch();
+    for (let i = 0; i < 3; i++) {
+      p.instruments[i]!.name = `INST_${i}`;
+      p.instruments[i]!.sampleLength = 256;
+      p.instruments[i]!.slots.push({ ...emptySlot(), fn: 2, outVar: 1, freqVal: 50, gainVal: 64 });
+    }
+    return Array.from(serializeAkp(p));
+  });
+  await page.setInputFiles('#hidden-file-input', {
+    name: 'active-move.akp', mimeType: 'application/octet-stream', buffer: Buffer.from(bytes),
+  });
+
+  // Click instrument 0 (already active by default, but explicit).
+  await page.locator('.instr-row:not(.empty)').first().click();
+  await expect(page.locator('.instr-row.active .name')).toHaveText('INST_0');
+
+  // Move INST_0 to position 2 (the third populated row).
+  await page.evaluate(() => {
+    const w = window as unknown as { __funklangModel?: { moveInstrument: (from: number, to: number) => void } };
+    w.__funklangModel?.moveInstrument(0, 2);
+  });
+
+  // The amber-active row should still be INST_0 — now at position 2.
+  await expect(page.locator('.instr-row.active .name')).toHaveText('INST_0');
+});
