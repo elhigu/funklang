@@ -8,16 +8,12 @@ describe('applyInsertDefaults', () => {
     expect(applyInsertDefaults(base, 9)).toEqual(base);
   });
 
-  it('merges registered fields on top of the base (envd → currently {23,0,128})', () => {
-    // Lock in the CURRENT envd defaults; a later task overwrites this
-    // assertion to match the new spec.
+  it('envd (fn=8) defaults decay=16 sustain=64 gain=64', () => {
     const base = { ...emptySlot(), fn: 8, outVar: 1 };
     const out = applyInsertDefaults(base, 8);
-    expect(out.val1Value).toBe(23);
-    expect(out.val2Value).toBe(0);
-    expect(out.gainVal).toBe(128);
-    expect(out.fn).toBe(8);
-    expect(out.outVar).toBe(1);
+    expect(out.val1Value).toBe(16);
+    expect(out.val2Value).toBe(64);
+    expect(out.gainVal).toBe(64);
   });
 
   it('vol (fn=1) defaults gainVal to 128', () => {
