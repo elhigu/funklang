@@ -85,4 +85,12 @@ describe('applyInsertDefaults', () => {
     const fb = opByCode(13)!.params.find((p) => p.field === 'val2Value')!;
     expect((fb.type as { label: string }).label).toBe('feedback');
   });
+
+  it('sv_flt_n (fn=15) defaults cutoff=16 reso=16 mode=LP (gain field = 0)', () => {
+    const base = { ...emptySlot(), fn: 15, outVar: 1 };
+    const out = applyInsertDefaults(base, 15);
+    expect(out.freqVal).toBe(16);
+    expect(out.val2Value).toBe(16);
+    expect(out.gain).toBe(0);
+  });
 });
