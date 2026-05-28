@@ -93,4 +93,9 @@ describe('applyInsertDefaults', () => {
     expect(out.val2Value).toBe(16);
     expect(out.gain).toBe(0);
   });
+
+  it('distortion (fn=16) defaults gainVal to 64', () => {
+    const base = { ...emptySlot(), fn: 16, outVar: 1 };
+    expect(applyInsertDefaults(base, 16).gainVal).toBe(64);
+  });
 });
