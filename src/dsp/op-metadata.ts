@@ -465,6 +465,7 @@ const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
   7: { val1Value: 16, gainVal: 64 },                    // enva
   8: { val1Value: 16, val2Value: 64, gainVal: 64 },     // envd
   9: { val1: 1, val2Value: 0 },                         // add
+  11: { gainVal: 128 },                                 // dly_cyc
 };
 
 /** Apply factory defaults for the given op on top of `base`. */

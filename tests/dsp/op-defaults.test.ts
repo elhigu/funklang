@@ -53,4 +53,11 @@ describe('applyInsertDefaults', () => {
     expect(out.val1).toBe(1);
     expect(out.val2Value).toBe(0);
   });
+
+  it('dly_cyc (fn=11) defaults freqVal=0 (delay), gainVal=128', () => {
+    const base = { ...emptySlot(), fn: 11, outVar: 1 };
+    const out = applyInsertDefaults(base, 11);
+    expect(out.freqVal).toBe(0);
+    expect(out.gainVal).toBe(128);
+  });
 });
