@@ -347,6 +347,11 @@ export function bootApp(root: HTMLElement): void {
     const ae = document.activeElement as HTMLElement | null;
     const focusSel = ae ? focusSelector(ae, mainEl) : null;
 
+    // Capture slot-grid scrollTop so structural rebuilds (move slot,
+    // insert/delete slot, etc.) don't snap the user back to the top
+    // when they're working at the bottom of a long instrument.
+    const prevScrollTop = gridHostEl?.scrollTop ?? 0;
+
     mainEl.innerHTML = '';
     const ins = model.patch.instruments[activeIdx];
     if (!ins) {
@@ -437,6 +442,16 @@ export function bootApp(root: HTMLElement): void {
     if (focusSel) {
       const target = mainEl.querySelector(focusSel) as HTMLElement | null;
       if (target) target.focus();
+    }
+
+    // Restore the captured scroll position. The new gridHost element
+    // is a fresh DOM node; querySelector picks it up here rather than
+    // relying on the stale `gridHostEl` reference (which may already
+    // point at the NEW host if it was updated earlier in renderMain —
+    // safer to look it up directly).
+    if (prevScrollTop > 0) {
+      const newGridHost = mainEl.querySelector('.slot-grid-host') as HTMLElement | null;
+      if (newGridHost) newGridHost.scrollTop = prevScrollTop;
     }
   };
 
@@ -1397,4 +1412,8 @@ export function bootApp(root: HTMLElement): void {
   renderMain();
   repaint();
   updateUndoRedoButtons();
+
+  // Expose the model on window so E2E tests can drive moves and edits
+  // without simulating DOM drag-and-drop (brittle in headless browsers).
+  (window as unknown as { __funklangModel?: PatchModel }).__funklangModel = model;
 }
