@@ -1,8 +1,9 @@
 // Horizontal slider knob: label on the left, a wide CSS-rendered track in
 // the middle (clickable + draggable to set value by X position), value on
-// the right. The track is focusable; ArrowUp/ArrowDown fine-tune ±1, wheel
-// steps ±1, dblclick opens a numeric <input> for exact entry, right-click
-// resets to default.
+// the right. The track is focusable; ArrowUp/ArrowDown fine-tune by `step`
+// (1 normally), wheel steps coarse (range-aware), Shift multiplies any of
+// those by 16 for big jumps, dblclick opens a numeric <input> for exact
+// entry, right-click resets to default.
 
 import { formatInt, parseFlexInt } from './number-format';
 
@@ -15,9 +16,9 @@ export interface KnobOptions {
   /**
    * Granularity of legal values, defaulting to 1. When `step > 1` every
    * source of mutation (wheel, arrow keys, drag-to-position, numeric
-   * editor) snaps to the nearest multiple of `step`, AND the fine /
-   * Shift modifier moves by `step` instead of ±1 — so loop_gen offset
-   * (step = 2) feels right: even values only, even on Shift+wheel.
+   * editor) snaps to the nearest multiple of `step`. ArrowUp/Down moves
+   * by `step`; Shift+ArrowUp/Down moves by `16 × step` — so loop_gen
+   * offset (step = 2) feels right: even values only, even on Shift.
    */
   step?: number | undefined;
   /**
@@ -31,6 +32,9 @@ export interface KnobOptions {
    *
    * Only valid for ranges where min >= 0; mixed-sign power mapping is
    * not well defined, so we silently fall back to linear in that case.
+   *
+   * Wheel/arrow stepping is unaffected (those still move by additive
+   * `coarseStep` / `step`).
    */
   scale?: 'linear' | 'pow' | undefined;
   /**
@@ -134,18 +138,23 @@ export function makeKnob(opts: KnobOptions): Knob {
   };
 
   // Step sizes are range-aware (and value-aware on big ranges).
-  //   Fine            = ±1 (held by Shift).
-  //   Coarse (default) = ~3% of the value range. But on REALLY wide
-  //                     ranges (> LOG_THRESHOLD) a linear 3% means
-  //                     every tick is enormous at the low end (~983
-  //                     per tick on freq 0..32767 even when the value
-  //                     is 5). Switch to "3% of the CURRENT VALUE" so
-  //                     small numbers step small and big numbers step
-  //                     big — the classic logarithmic knob feel.
-  // Ranges smaller than COARSE_THRESHOLD don't need a separate coarse
-  // mode at all; every step is already meaningful.
+  //   Step (Up/Down)   = `step` (1 by default; 2 on even-only knobs).
+  //   Coarse (wheel / Left/Right) = ~3% of the value range. But on REALLY
+  //                     wide ranges (> LOG_THRESHOLD) a linear 3% means
+  //                     every tick is enormous at the low end (~983 per
+  //                     tick on freq 0..32767 even when the value is 5).
+  //                     Switch to "3% of the CURRENT VALUE" so small
+  //                     numbers step small and big numbers step big —
+  //                     the classic logarithmic knob feel.
+  //   Ranges smaller than COARSE_THRESHOLD have no separate coarse mode;
+  //   `coarseStep()` collapses to `step` so all four arrows / wheel feel
+  //   the same.
+  //   Shift modifier  = MULTIPLIES whatever the base step is by SHIFT_MULT.
+  //                     Lets the user blast through wide ranges quickly
+  //                     while still leaving Up/Down for unit-precise tweaks.
   const COARSE_THRESHOLD = 64;
   const LOG_THRESHOLD = 1000;
+  const SHIFT_MULT = 16;
   /** Round a raw step UP to the nearest multiple of `step`. Guarantees
    *  that wheel/arrow events always move by a legal increment when the
    *  knob is even-only (step = 2) or any other granularity. */
@@ -153,42 +162,48 @@ export function makeKnob(opts: KnobOptions): Knob {
     Math.max(step, Math.round(raw / step) * step);
   const linearCoarse = (): number => toStep(range * 0.03);
   const logCoarse = (): number => toStep(Math.abs(value) * 0.03);
-  const coarseStep = (): number =>
-    range > LOG_THRESHOLD ? logCoarse() : linearCoarse();
-  const hasCoarse = (): boolean => range >= COARSE_THRESHOLD;
-  /** Step to apply for a non-Shift event. Coarse on wide ranges, ±step on narrow. */
-  const wheelDefault = (): number => hasCoarse() ? coarseStep() : step;
-  /** Step to apply when Shift is held. Fine = ±step (always a legal increment). */
-  const shiftStep = (): number => step;
+  /** Range-aware coarse magnitude. On narrow ranges (< COARSE_THRESHOLD)
+   *  collapses to `step` — no real coarse mode is needed there. */
+  const coarseStep = (): number => {
+    if (range < COARSE_THRESHOLD) return step;
+    return range > LOG_THRESHOLD ? logCoarse() : linearCoarse();
+  };
+  const wheelDefault = (): number => coarseStep();
+  const wheelShifted = (): number => SHIFT_MULT * coarseStep();
+  const arrowFine = (): number => step;
+  const arrowFineShifted = (): number => SHIFT_MULT * step;
+  const arrowCoarse = (): number => coarseStep();
+  const arrowCoarseShifted = (): number => SHIFT_MULT * coarseStep();
 
-  // wheel: COARSE by default (or ±1 on small ranges), Shift → fine ±1.
+  // wheel: coarse by default; Shift → 16 × coarse for big jumps.
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault();
-    const step = e.shiftKey ? shiftStep() : wheelDefault();
     const dir = e.deltaY < 0 ? 1 : -1;
-    emit(value + step * dir);
+    const mag = e.shiftKey ? wheelShifted() : wheelDefault();
+    emit(value + mag * dir);
   };
   el.addEventListener('wheel', onWheel, { passive: false });
 
-  // Arrow keys when bar is focused — same default/shift inversion as the
-  // wheel, plus dedicated Left/Right = coarse (for users who reach for
-  // horizontal direction):
-  //   Up / Down   = coarse by default (fine when Shift held)
-  //   Left / Right = always coarse (no Shift needed)
-  // On small ranges, coarseStep collapses to 1 so all four arrows do ±1.
+  // Arrow keys when bar is focused:
+  //   Up / Down            = ± step  (single-unit precision)
+  //   Shift + Up / Down    = ± 16 × step
+  //   Left / Right         = ± coarse step (range-aware)
+  //   Shift + Left / Right = ± 16 × coarse step
+  // On small ranges (< COARSE_THRESHOLD) coarseStep collapses to `step`,
+  // so Left/Right end up identical to Up/Down.
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      emit(value + (e.shiftKey ? shiftStep() : wheelDefault()));
+      emit(value + (e.shiftKey ? arrowFineShifted() : arrowFine()));
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      emit(value - (e.shiftKey ? shiftStep() : wheelDefault()));
+      emit(value - (e.shiftKey ? arrowFineShifted() : arrowFine()));
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      emit(value + coarseStep());
+      emit(value + (e.shiftKey ? arrowCoarseShifted() : arrowCoarse()));
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      emit(value - coarseStep());
+      emit(value - (e.shiftKey ? arrowCoarseShifted() : arrowCoarse()));
     }
   };
   barEl.addEventListener('keydown', onKey);

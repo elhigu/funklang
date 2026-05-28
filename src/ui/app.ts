@@ -165,12 +165,13 @@ export function bootApp(root: HTMLElement): void {
               <tbody>
                 <tr><td>Click anywhere on the bar</td><td>Set value to that position; bar gains focus</td></tr>
                 <tr><td>Drag</td><td>Value follows the mouse X (release to commit)</td></tr>
-                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Coarse (~3% of the slider's range)</td></tr>
-                <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd></td><td>Fine ±1</td></tr>
-                <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Always coarse</td></tr>
-                <tr><td>Wheel over the slider</td><td>Coarse (~3% of range)</td></tr>
-                <tr><td><kbd>Shift</kbd>+wheel</td><td>Fine ±1</td></tr>
-                <tr><td><i>(small ranges)</i></td><td>Sliders with fewer than 64 values are always ±1 — no separate coarse mode</td></tr>
+                <tr><td>Wheel over the slider</td><td>Coarse step (range-aware: ~3 % of range or log on freq knobs)</td></tr>
+                <tr><td><kbd>Shift</kbd>+wheel</td><td>16 × coarse step (big jumps)</td></tr>
+                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>± step (1 normally; 2 for even-only knobs like loop offset / sample length)</td></tr>
+                <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd></td><td>± 16 × step</td></tr>
+                <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>± coarse step (range-aware)</td></tr>
+                <tr><td><kbd>Shift</kbd>+<kbd>←</kbd> / <kbd>→</kbd></td><td>± 16 × coarse step</td></tr>
+                <tr><td><i>(small ranges)</i></td><td>Sliders with fewer than 64 values have no separate coarse mode — coarse collapses to ± step</td></tr>
                 <tr><td>Double-click the value</td><td>Type exact value (<kbd>↑</kbd>/<kbd>↓</kbd> step in the editor too)</td></tr>
                 <tr><td>Right-click</td><td>Reset to default</td></tr>
               </tbody>
@@ -189,7 +190,7 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>cmb_flt_n / reverb feedback label</td><td>Re-labelled from <code>fbk</code> to <code>feedback</code> (no behaviour change)</td></tr>
                 <tr><td>imported_sample, vocoder</td><td>Marked unsupported in the op picker (no engine codegen)</td></tr>
                 <tr><td>Sample length</td><td>The instrument header's length is the same horizontal knob the slot rows use — click/drag the bar to set, dblclick to type, wheel for coarse/fine. Step 2 (even only)</td></tr>
-                <tr><td>Even-only fields</td><td>For knobs with step=2 (loop_gen offset, sample length) Shift+wheel moves ±2 and every step (drag / wheel / arrow / numeric editor) snaps to the nearest even value</td></tr>
+                <tr><td>Even-only fields</td><td>For knobs with step=2 (loop_gen offset, sample length) every mutation (drag / wheel / arrow / numeric editor) snaps to the nearest even value; ArrowUp = ±2, Shift+ArrowUp = ±32</td></tr>
                 <tr><td>Frequency knobs</td><td>Drag uses a SOFT power-curve taper (bar midpoint ≈ 25 % of the range) so the low end is reachable without becoming the whole bar. Wheel / arrows still step linearly</td></tr>
                 <tr><td>BASE selector (header)</td><td>Flip every numeric display between decimal and hex. Inputs accept either format ("0x10" works in dec mode too)</td></tr>
                 <tr><td><kbd>Enter</kbd> in a text/number field</td><td>Commits the value and removes focus</td></tr>

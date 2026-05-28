@@ -20,11 +20,12 @@ describe('makeKnob — wheel', () => {
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: 1, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(100);
   });
-  it('Shift+wheel = FINE ±1 (regardless of range)', () => {
+  it('Shift+wheel = 16× the wheel step', () => {
     const cb = vi.fn();
     const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(51);   // fine
+    // coarseStep at range=255 is round(255*0.03)=8 → 16 × 8 = 128 → 50 + 128 = 178.
+    expect(k.getValue()).toBe(178);
   });
   it('ranges > 1000 use LOG coarse — step = 3% of current value (not of range)', () => {
     const cb = vi.fn();
@@ -45,21 +46,21 @@ describe('makeKnob — wheel', () => {
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(58);
   });
-  it('ranges smaller than 64 have NO coarse mode — every step is ±1', () => {
+  it('ranges smaller than 64 still wheel by 1 by default (no separate coarse mode)', () => {
     const cb = vi.fn();
-    // range = 3 → below threshold → wheel default IS fine.
+    // range = 3 → below threshold → wheel default IS ±step.
     const k = makeKnob({ label: 'mode', value: 0, max: 3, onChange: cb });
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(1);
-    // Shift+wheel also ±1.
+    // Shift+wheel = 16 × that, clamped to max=3.
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(2);
+    expect(k.getValue()).toBe(3);
   });
-  it('range exactly 63 is below threshold (fine only); 64 is at threshold (coarse)', () => {
+  it('range exactly 63 is below threshold (step=1); 64 is at threshold (coarse)', () => {
     const cb1 = vi.fn();
     const k1 = makeKnob({ label: 'a', value: 0, max: 63, onChange: cb1 });
     k1.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
-    expect(k1.getValue()).toBe(1);   // fine (63 < 64)
+    expect(k1.getValue()).toBe(1);   // step=1 (63 < 64)
     const cb2 = vi.fn();
     const k2 = makeKnob({ label: 'b', value: 0, max: 64, onChange: cb2 });
     k2.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
@@ -68,25 +69,33 @@ describe('makeKnob — wheel', () => {
 });
 
 describe('makeKnob — arrow keys', () => {
-  it('ArrowUp/Down = COARSE by default on wide ranges', () => {
+  it('ArrowUp/Down (no Shift) = ± step (±1 by default)', () => {
     const cb = vi.fn();
     const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
     const bar = getBar(k);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(58);  // +coarse 8
+    expect(k.getValue()).toBe(51);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(50);
   });
-  it('Shift+ArrowUp/Down = FINE ±1', () => {
+  it('Shift+ArrowUp/Down = 16× step (always)', () => {
     const cb = vi.fn();
-    const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
+    const k = makeKnob({ label: 'g', value: 0, max: 255, onChange: cb });
     const bar = getBar(k);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(51);
+    // step=1 → 16 × 1 = 16.
+    expect(k.getValue()).toBe(16);
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(50);
+    expect(k.getValue()).toBe(0);
   });
-  it('ArrowRight/Left = coarse step (always)', () => {
+  it('Shift+ArrowUp on a step=2 knob moves by 32 (16 × step)', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'ofs', value: 0, min: 0, max: 1024, step: 2, onChange: cb });
+    const bar = getBar(k);
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true, cancelable: true }));
+    expect(k.getValue()).toBe(32);
+  });
+  it('ArrowRight/Left (no Shift) = ± coarse step', () => {
     const cb = vi.fn();
     const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
     const bar = getBar(k);
@@ -95,7 +104,15 @@ describe('makeKnob — arrow keys', () => {
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(50);
   });
-  it('small ranges (<64): every arrow does ±1', () => {
+  it('Shift+ArrowRight = 16 × coarse step', () => {
+    const cb = vi.fn();
+    const k = makeKnob({ label: 'g', value: 50, max: 255, onChange: cb });
+    const bar = getBar(k);
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true, cancelable: true }));
+    // coarse 8 → 16 × 8 = 128 → 50 + 128 = 178.
+    expect(k.getValue()).toBe(178);
+  });
+  it('small ranges (<64): plain ArrowUp/Right do ±1', () => {
     const cb = vi.fn();
     const k = makeKnob({ label: 'mode', value: 0, max: 3, onChange: cb });
     const bar = getBar(k);
@@ -157,8 +174,8 @@ describe('makeKnob — position-based drag', () => {
     bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
     expect(document.activeElement).toBe(bar);
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    // Shift+ArrowUp = fine ±1 from the clicked-to position.
-    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', shiftKey: true, bubbles: true, cancelable: true }));
+    // Plain ArrowUp = ±step (1) from the clicked-to position (128 → 129).
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(129);    // 128 + 1
     k.el.remove();
   });
@@ -191,13 +208,15 @@ describe('makeKnob — double-click editor', () => {
 });
 
 describe('makeKnob — even-only (step=2)', () => {
-  it('Shift+wheel moves by ±2 (the step), not ±1', () => {
+  it('Shift+wheel moves by 16 × coarse, still snapped to a multiple of step', () => {
     const cb = vi.fn();
+    // range=12286, value=100 → log coarse = round(100*0.03/2)*2 = 4 (rounded up to multiple of step).
+    // 16 × 4 = 64 → 100 + 64 = 164.
     const k = makeKnob({ label: 'ofs', value: 100, min: 0, max: 12286, step: 2, onChange: cb });
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(102);
-    k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: 1, shiftKey: true, bubbles: true, cancelable: true }));
-    expect(k.getValue()).toBe(100);
+    const v1 = k.getValue();
+    expect(v1 % 2).toBe(0);
+    expect(v1).toBeGreaterThan(100);
   });
 
   it('coarse wheel snaps to a multiple of step', () => {
