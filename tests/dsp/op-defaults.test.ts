@@ -36,4 +36,12 @@ describe('applyInsertDefaults', () => {
     expect(out.freqVal).toBe(50);
     expect(out.gainVal).toBe(64);
   });
+
+  it('osc_pulse (fn=5) defaults freqVal=50 gainVal=64 widthVal=63', () => {
+    const base = { ...emptySlot(), fn: 5, outVar: 1 };
+    const out = applyInsertDefaults(base, 5);
+    expect(out.freqVal).toBe(50);
+    expect(out.gainVal).toBe(64);
+    expect(out.widthVal).toBe(63);
+  });
 });
