@@ -71,8 +71,17 @@ export function pickOp(): Promise<number | null> {
       for (const def of g.defs) {
         const btn = document.createElement('button');
         btn.className = 'op-picker-btn';
-        btn.textContent = def.name;
-        btn.dataset['opCode'] = String(def.code);
+        btn.setAttribute('data-op-code', String(def.code));
+        const nameEl = document.createElement('span');
+        nameEl.className = 'op-picker-name';
+        nameEl.textContent = def.name;
+        btn.appendChild(nameEl);
+        if (def.description) {
+          const descEl = document.createElement('span');
+          descEl.className = 'op-picker-desc';
+          descEl.textContent = def.description;
+          btn.appendChild(descEl);
+        }
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           done(def.code);
@@ -82,6 +91,14 @@ export function pickOp(): Promise<number | null> {
       sect.appendChild(grid);
       inner.appendChild(sect);
     }
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'op-picker-cancel';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      done(null);
+    });
+    inner.appendChild(cancelBtn);
     overlay.appendChild(inner);
     inner.addEventListener('click', (e) => e.stopPropagation());
     overlay.addEventListener('click', () => done(null));

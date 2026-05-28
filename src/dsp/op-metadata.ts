@@ -42,6 +42,8 @@ export interface OpDef {
   code: number;
   name: string;
   category: 'osc' | 'mix' | 'env' | 'filter' | 'fx' | 'ctrl' | 'cross';
+  /** Optional short doc shown in the op picker. */
+  description?: string;
   params: ParamDef[];
 }
 
@@ -271,6 +273,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
   // Form1.cs case 14 (1985-1988): ONLY val1 (var-source, "-/V1..V4").
   {
     code: 14, name: 'ctrl', category: 'ctrl',
+    description: 'Scales an audio signal (-32768..32767) down to a 0..127 control range — useful for feeding an oscillator output into a filter cutoff or similar param input.',
     params: [
       { field: 'val1', type: { kind: 'var-source', label: 'in', allowNone: false } },
     ],
