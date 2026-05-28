@@ -168,8 +168,8 @@ export function makeKnob(opts: KnobOptions): Knob {
   };
   const wheelDefault = (): number => coarseStep();
   const wheelShifted = (): number => SHIFT_MULT * coarseStep();
-  const arrowFine = (): number => step;
-  const arrowFineShifted = (): number => SHIFT_MULT * step;
+  const arrowStep = (): number => step;
+  const arrowStepShifted = (): number => SHIFT_MULT * step;
   const arrowCoarse = (): number => coarseStep();
   const arrowCoarseShifted = (): number => SHIFT_MULT * coarseStep();
 
@@ -192,10 +192,10 @@ export function makeKnob(opts: KnobOptions): Knob {
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      emit(value + (e.shiftKey ? arrowFineShifted() : arrowFine()));
+      emit(value + (e.shiftKey ? arrowStepShifted() : arrowStep()));
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      emit(value - (e.shiftKey ? arrowFineShifted() : arrowFine()));
+      emit(value - (e.shiftKey ? arrowStepShifted() : arrowStep()));
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       emit(value + (e.shiftKey ? arrowCoarseShifted() : arrowCoarse()));

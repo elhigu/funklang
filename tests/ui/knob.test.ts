@@ -210,13 +210,11 @@ describe('makeKnob — double-click editor', () => {
 describe('makeKnob — even-only (step=2)', () => {
   it('Shift+wheel moves by 16 × coarse, still snapped to a multiple of step', () => {
     const cb = vi.fn();
-    // range=12286, value=100 → log coarse = round(100*0.03/2)*2 = 4 (rounded up to multiple of step).
-    // 16 × 4 = 64 → 100 + 64 = 164.
+    // range=12286, value=100 → log coarse = toStep(round(100*0.03)) = 4
+    // (since 3 rounds to 2*step=4 via Math.round(3/2)*2). 16 × 4 = 64 → 164.
     const k = makeKnob({ label: 'ofs', value: 100, min: 0, max: 12286, step: 2, onChange: cb });
     k.el.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, shiftKey: true, bubbles: true, cancelable: true }));
-    const v1 = k.getValue();
-    expect(v1 % 2).toBe(0);
-    expect(v1).toBeGreaterThan(100);
+    expect(k.getValue()).toBe(164);
   });
 
   it('coarse wheel snaps to a multiple of step', () => {
