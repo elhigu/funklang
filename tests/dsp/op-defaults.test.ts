@@ -4,9 +4,9 @@ import { applyInsertDefaults } from '../../src/dsp/op-metadata';
 
 describe('applyInsertDefaults', () => {
   it('returns the base unchanged for an op with no registered defaults', () => {
-    // vol (fn=1) has no entry yet — it gets one in a later task.
-    const base = { ...emptySlot(), fn: 1, outVar: 1 };
-    expect(applyInsertDefaults(base, 1)).toEqual(base);
+    // osc_noise (fn=6) has no entry yet — it gets one in a later task.
+    const base = { ...emptySlot(), fn: 6, outVar: 1 };
+    expect(applyInsertDefaults(base, 6)).toEqual(base);
   });
 
   it('merges registered fields on top of the base (envd → currently {23,0,128})', () => {
@@ -19,5 +19,10 @@ describe('applyInsertDefaults', () => {
     expect(out.gainVal).toBe(128);
     expect(out.fn).toBe(8);
     expect(out.outVar).toBe(1);
+  });
+
+  it('vol (fn=1) defaults gainVal to 128', () => {
+    const base = { ...emptySlot(), fn: 1, outVar: 1 };
+    expect(applyInsertDefaults(base, 1).gainVal).toBe(128);
   });
 });

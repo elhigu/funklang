@@ -453,7 +453,8 @@ export function opByCode(code: number): OpDef | undefined {
  *          box instead of an all-zero one that produces silence.
  */
 const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
-  8: { val1Value: 23, val2Value: 0, gainVal: 128 },     // envd
+  1: { gainVal: 128 },                                  // vol
+  8: { val1Value: 23, val2Value: 0, gainVal: 128 },     // envd (revised in Task 7)
 };
 
 /** Apply factory defaults for the given op on top of `base`. */
