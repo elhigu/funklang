@@ -78,4 +78,47 @@ describe('PatchModel', () => {
       coalesceKey: { instrIdx: 5, slotIdx: -1, field: 'name' },
     }]);
   });
+
+  describe('setInstrumentField sampleLength — loopOffset auto-rescale', () => {
+    it('halving sampleLength halves loopOffset (same fractional position)', () => {
+      const model = new PatchModel(emptyPatch());
+      model.setInstrumentField(0, 'sampleLength', 12288);
+      // Bump loopOffset to the user-stated test value of 0x1CFE = 7422 →
+      // snaps even = 7422, well inside [6144, 12286].
+      model.setInstrumentField(0, 'loopOffset', 7422);
+      // Now shrink sample length to 6144 — old fraction was 7422/12288 ≈ 0.604.
+      model.setInstrumentField(0, 'sampleLength', 6144);
+      const ins = model.patch.instruments[0]!;
+      // Linear rescale → 7422 * (6144/12288) = 3711 → after even-snap = 3710,
+      // then clampLoopOffset([min=3072, max=6142]) leaves it alone.
+      expect(ins.loopOffset).toBe(3710);
+      expect(ins.loopLength).toBe(ins.sampleLength - ins.loopOffset);
+    });
+
+    it('doubling sampleLength doubles loopOffset', () => {
+      const model = new PatchModel(emptyPatch());
+      model.setInstrumentField(0, 'sampleLength', 4096);
+      model.setInstrumentField(0, 'loopOffset', 3072);   // 0.75 of SL
+      model.setInstrumentField(0, 'sampleLength', 8192);
+      const ins = model.patch.instruments[0]!;
+      // 3072 * 2 = 6144 → already even, inside [4096, 8190].
+      expect(ins.loopOffset).toBe(6144);
+    });
+
+    it('setting sampleLength to an unchanged value is a no-op for loopOffset', () => {
+      const model = new PatchModel(emptyPatch());
+      model.setInstrumentField(0, 'sampleLength', 4096);
+      model.setInstrumentField(0, 'loopOffset', 2048);
+      model.setInstrumentField(0, 'sampleLength', 4096);
+      expect(model.patch.instruments[0]!.loopOffset).toBe(2048);
+    });
+
+    it('growing from sampleLength 0 does NOT divide by zero — clamp still applies', () => {
+      const model = new PatchModel(emptyPatch());
+      model.setInstrumentField(0, 'sampleLength', 4096);
+      // oldSL=0 short-circuits the rescaling guard; the legal-range
+      // clamp then snaps loopOffset (was 0) up to minLoopOffset(4096) = 2048.
+      expect(model.patch.instruments[0]!.loopOffset).toBe(2048);
+    });
+  });
 });

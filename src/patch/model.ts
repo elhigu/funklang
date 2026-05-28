@@ -81,13 +81,21 @@ export class PatchModel {
       const v = value | 0;
       (value as unknown as number) = Math.max(0, v - (v & 1));
     }
+    // Capture sampleLength BEFORE the assignment so we can rescale
+    // loopOffset proportionally — user-stated rule: the loop region
+    // should keep the same fractional position when the sample is
+    // resized. Otherwise lowering sampleLength can pin loopOffset to
+    // the new maximum and shrink the loop to almost nothing.
+    const oldSL = instr.sampleLength;
     instr[key] = value;
 
-    // Changing sampleLength can invalidate loopOffset (it might now be
-    // out of [minLoopOffset, maxLoopOffset]). Snap and recompute the
-    // derived loopLength inline so the model is internally consistent
-    // by the time the UI re-renders.
     if (key === 'sampleLength') {
+      const newSL = instr.sampleLength;
+      if (oldSL > 0 && newSL > 0 && instr.loopOffset > 0 && oldSL !== newSL) {
+        // Scale linearly: newOffset / newSL == oldOffset / oldSL.
+        instr.loopOffset = Math.round(instr.loopOffset * newSL / oldSL);
+      }
+      // Snap to the legal even range for the new sampleLength.
       const snappedOffset = clampLoopOffset(instr.sampleLength, instr.loopOffset);
       if (snappedOffset !== instr.loopOffset) instr.loopOffset = snappedOffset;
       const newLen = Math.max(0, instr.sampleLength - instr.loopOffset);
