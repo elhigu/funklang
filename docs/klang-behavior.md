@@ -73,4 +73,4 @@ Derived: `FINAL_LOOP_REPEATS = 2` in [funklang/src/ui/app.ts](../src/ui/app.ts).
 
 Derived:
 - `imported_sample` (op 20) is shown in the op-picker but disabled (`unsupported: true`).
-- `vocoder` (op 24 in Klang's enum) is NOT in `OP_DEFS` and won't be added.
+- `vocoder` (op 24) IS in `OP_DEFS` so the picker can show it for existing patches, but it's marked `unsupported: true` and disabled. Klang's `synthnodes.h` has no codegen case for it either — funklang's engine no-ops the slot.

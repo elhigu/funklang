@@ -430,6 +430,8 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
   // users editing existing patches can see/edit them.
   {
     code: 24, name: 'vocoder', category: 'cross',
+    description: 'Vocoder — modulator × carrier. NOT IMPLEMENTED in funklang (no codegen case in synthnodes.h either). Not planned.',
+    unsupported: true,
     params: [
       { field: 'val1', type: { kind: 'var-source', label: 'mod', allowNone: false } },
       { field: 'val2', type: { kind: 'var-source', label: 'carrier', allowNone: false } },

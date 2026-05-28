@@ -34,4 +34,16 @@ describe('op-picker', () => {
     expect(card.classList.contains('op-picker-card-unsupported')).toBe(true);
     document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
+
+  it('vocoder (fn=24) is marked unsupported and rendered as a disabled card', () => {
+    const v = OP_DEFS.find((o) => o.code === 24)!;
+    expect(v.unsupported).toBe(true);
+    document.body.innerHTML = '';
+    void pickOp();
+    const card = document.querySelector('[data-op-code="24"]') as HTMLButtonElement;
+    expect(card).not.toBeNull();
+    expect(card.disabled).toBe(true);
+    expect(card.classList.contains('op-picker-card-unsupported')).toBe(true);
+    document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
 });
