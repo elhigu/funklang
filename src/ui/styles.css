@@ -891,6 +891,20 @@
   .param-const-knob.disabled { opacity: 0.35; pointer-events: none; }
   .param-const-knob .klabel { display: none; }
 
+  /* mul (fn=10) — fractional sidecar editor that mirrors val2Value/32767. */
+  .param-mul-frac {
+    width: 78px;
+    margin-left: 6px;
+    background: var(--bg-0);
+    border: 1px solid var(--grid-dim);
+    color: var(--fg-0);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 2px 5px;
+    outline: none;
+  }
+  .param-mul-frac:focus { border-color: var(--amber); }
+
   /* waveform canvas */
   /* Wave-cell fills the slot's right half. Canvas stretches edge-to-edge
      inside it; speaker/delete buttons float in the top corners so they

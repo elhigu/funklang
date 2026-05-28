@@ -565,6 +565,44 @@ function renderParam(
       knob.el.addEventListener('dblclick', (e) => e.stopPropagation());
       wrap.appendChild(knob.el);
 
+      // Mul (fn=10) — sidecar fractional editor for val2Value. The
+      // underlying field is the same int (-32767..32767-ish); we just
+      // surface a /32767 view for users who think in floats.
+      if (slot.fn === 10 && param.field === 'val2Value') {
+        const frac = document.createElement('input');
+        frac.type = 'text';
+        frac.className = 'param-mul-frac';
+        frac.title = 'val2Value / 32767 — same field, fractional view';
+        const refresh = (): void => {
+          frac.value = ((slot.val2Value | 0) / 32767).toFixed(4);
+        };
+        refresh();
+        const commit = (): void => {
+          const f = parseFloat(frac.value);
+          if (!Number.isFinite(f)) { refresh(); return; }
+          const clamped = Math.max(-1, Math.min(1, f));
+          const next = Math.round(clamped * 32767);
+          writeValue(next);
+          refresh();
+        };
+        frac.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); frac.blur(); }
+          else if (e.key === 'Escape') { e.preventDefault(); refresh(); frac.blur(); }
+        });
+        frac.addEventListener('blur', commit);
+        // Keep the float in sync if the int knob is dragged. The slot
+        // grid rebuilds on structure events so this listener will be
+        // dropped automatically when the row is re-rendered.
+        model.events.on((ev) => {
+          if (ev.kind === 'param' && ev.instrIdx === instrIdx
+              && ev.coalesceKey?.field === 'val2Value'
+              && ev.coalesceKey?.slotIdx === slotIdx) {
+            refresh();
+          }
+        });
+        wrap.appendChild(frac);
+      }
+
       const applyMode = (mode: number): void => {
         if (mode === 0) {
           knob.el.classList.remove('disabled');
