@@ -444,15 +444,10 @@ export function bootApp(root: HTMLElement): void {
       if (target) target.focus();
     }
 
-    // Restore the captured scroll position. The new gridHost element
-    // is a fresh DOM node; querySelector picks it up here rather than
-    // relying on the stale `gridHostEl` reference (which may already
-    // point at the NEW host if it was updated earlier in renderMain —
-    // safer to look it up directly).
-    if (prevScrollTop > 0) {
-      const newGridHost = mainEl.querySelector('.slot-grid-host') as HTMLElement | null;
-      if (newGridHost) newGridHost.scrollTop = prevScrollTop;
-    }
+    // Restore the captured scroll position. `gridHostEl` has been
+    // reassigned to the freshly-built host earlier in this rebuild,
+    // so it points at the new node — no need to re-querySelector.
+    if (prevScrollTop > 0 && gridHostEl) gridHostEl.scrollTop = prevScrollTop;
   };
 
   /** Re-tag .selected / .active on slot rows without rebuilding the grid. */

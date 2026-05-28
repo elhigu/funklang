@@ -28,8 +28,9 @@ test('moving a slot does not reset the slot-grid scroll position', async ({ page
   );
   expect(before).toBeGreaterThan(0);
 
-  // Sanity-check that the E2E shim is wired up — without it, the test
-  // would silently pass (moveSlot would be a no-op, scrollTop unchanged).
+  // Sanity-check that the E2E shim is wired up — gives a clearer failure
+  // message than the TypeError that would otherwise surface from the
+  // moveSlot evaluate block below.
   const hasModel = await page.evaluate(() =>
     typeof (window as unknown as { __funklangModel?: unknown }).__funklangModel === 'object'
   );
