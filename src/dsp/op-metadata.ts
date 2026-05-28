@@ -473,6 +473,7 @@ const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
   13: { val2Value: 64, gainVal: 64 },                   // reverb
   15: { freqVal: 16, val2Value: 16 },                   // sv_flt_n (gain byte=0 → LP)
   16: { gainVal: 64 },                                  // distortion
+  19: { gainVal: 8 },                                   // sample_hold (step)
 };
 
 /** Apply factory defaults for the given op on top of `base`. */

@@ -98,4 +98,9 @@ describe('applyInsertDefaults', () => {
     const base = { ...emptySlot(), fn: 16, outVar: 1 };
     expect(applyInsertDefaults(base, 16).gainVal).toBe(64);
   });
+
+  it('sample_hold (fn=19) defaults step to 8', () => {
+    const base = { ...emptySlot(), fn: 19, outVar: 1 };
+    expect(applyInsertDefaults(base, 19).gainVal).toBe(8);
+  });
 });
