@@ -573,11 +573,17 @@ function renderParam(
         frac.type = 'text';
         frac.className = 'param-mul-frac';
         frac.title = 'val2Value / 32767 — same field, fractional view';
+        let reverting = false;
         const refresh = (): void => {
           frac.value = ((slot.val2Value | 0) / 32767).toFixed(4);
         };
         refresh();
         const commit = (): void => {
+          // Escape teardown calls frac.blur() which would otherwise trigger
+          // this listener and write back the (already-reverted) value as a
+          // fresh param event. The guard suppresses that redundant write
+          // while still letting legitimate blur (e.g. clicking away) commit.
+          if (reverting) return;
           const f = parseFloat(frac.value);
           if (!Number.isFinite(f)) { refresh(); return; }
           const clamped = Math.max(-1, Math.min(1, f));
@@ -587,19 +593,33 @@ function renderParam(
         };
         frac.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); commit(); frac.blur(); }
-          else if (e.key === 'Escape') { e.preventDefault(); refresh(); frac.blur(); }
+          else if (e.key === 'Escape') {
+            e.preventDefault();
+            reverting = true;
+            refresh();
+            frac.blur();
+            reverting = false;
+          }
         });
         frac.addEventListener('blur', commit);
-        // Keep the float in sync if the int knob is dragged. The slot
-        // grid rebuilds on structure events so this listener will be
-        // dropped automatically when the row is re-rendered.
-        model.events.on((ev) => {
+        // Keep the float in sync if the int knob is dragged. Capture the
+        // disposer so we can detach the listener when this row is rebuilt
+        // — otherwise each slot-grid re-render would stack a fresh listener
+        // on the bus while the orphaned ones live forever.
+        const off = model.events.on((ev) => {
           if (ev.kind === 'param' && ev.instrIdx === instrIdx
               && ev.coalesceKey?.field === 'val2Value'
               && ev.coalesceKey?.slotIdx === slotIdx) {
             refresh();
           }
         });
+        // The slot-grid rebuilds by replacing whole subtrees, so frac becomes
+        // disconnected after a structure event. Watch the document for that
+        // and clean both the subscription and the observer in one go.
+        const obs = new MutationObserver(() => {
+          if (!frac.isConnected) { off(); obs.disconnect(); }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
         wrap.appendChild(frac);
       }
 

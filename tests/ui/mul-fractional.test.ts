@@ -48,14 +48,22 @@ describe('mul — fractional sidecar input', () => {
     expect(model.patch.instruments[0]!.slots[0]!.val2Value).toBe(Math.round(0.5 * 32767));
   });
 
-  it('Escape reverts the input without writing', () => {
+  it('Escape reverts the input without writing (no model event emitted)', () => {
     const model = mountMul(8192);
     renderSlotGrid(root, model, 0);
     const frac = root.querySelector('.param-mul-frac') as HTMLInputElement;
+    // jsdom's element.blur() is a no-op unless the element is actually focused
+    // — without this the original bug (Escape triggering a redundant commit
+    // via the blur listener) silently passes the test.
+    frac.focus();
+    const events: Array<{ kind: string }> = [];
+    model.events.on((e) => events.push({ kind: e.kind }));
     frac.value = '0.99';
     frac.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     // val2Value unchanged at 8192.
     expect(model.patch.instruments[0]!.slots[0]!.val2Value).toBe(8192);
+    // No model events emitted as a consequence of Escape.
+    expect(events.length).toBe(0);
     // The input reverted to the original 8192/32767.
     expect(parseFloat(frac.value)).toBeCloseTo(8192 / 32767, 3);
   });
@@ -69,6 +77,24 @@ describe('mul — fractional sidecar input', () => {
     expect(model.patch.instruments[0]!.slots[0]!.val2Value).toBe(32767);
     // Input reflects the clamped value.
     expect(parseFloat(frac.value)).toBeCloseTo(1, 3);
+  });
+
+  it('re-rendering the row does not accumulate listeners on the model event bus', async () => {
+    const model = mountMul(0);
+    renderSlotGrid(root, model, 0);
+    // Force the row to rebuild several times by re-running renderSlotGrid.
+    // Each call subscribes one listener; without cleanup the count would
+    // grow linearly with each call.
+    const before = (model.events as unknown as { listeners: Set<unknown> }).listeners.size;
+    for (let i = 0; i < 5; i++) renderSlotGrid(root, model, 0);
+    // MutationObserver callbacks are scheduled as microtasks — let them run
+    // before sampling the listener count.
+    await new Promise<void>((r) => setTimeout(r, 0));
+    const after = (model.events as unknown as { listeners: Set<unknown> }).listeners.size;
+    // After cleanup we should have at most one active listener — the one
+    // attached by the most recent render. Allow a small grace for any
+    // observer that hadn't fired yet, but assert the count is bounded.
+    expect(after).toBeLessThan(before + 3);
   });
 
   it('the sidecar is present ONLY on mul (fn=10), not on add (fn=9)', () => {
