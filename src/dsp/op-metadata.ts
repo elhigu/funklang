@@ -459,6 +459,7 @@ const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
   4: { freqVal: 50, gainVal: 64 },                      // osc_sine
   5: { freqVal: 50, gainVal: 64, widthVal: 63 },        // osc_pulse
   6: { gainVal: 64 },                                   // osc_noise
+  7: { val1Value: 16, gainVal: 64 },                    // enva
   8: { val1Value: 23, val2Value: 0, gainVal: 128 },     // envd (revised in Task 7)
 };
 

@@ -48,4 +48,11 @@ describe('applyInsertDefaults', () => {
     const base = { ...emptySlot(), fn: 6, outVar: 1 };
     expect(applyInsertDefaults(base, 6).gainVal).toBe(64);
   });
+
+  it('enva (fn=7) defaults val1Value=16 (attack), gainVal=64', () => {
+    const base = { ...emptySlot(), fn: 7, outVar: 1 };
+    const out = applyInsertDefaults(base, 7);
+    expect(out.val1Value).toBe(16);
+    expect(out.gainVal).toBe(64);
+  });
 });
