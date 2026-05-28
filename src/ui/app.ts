@@ -189,7 +189,7 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>add op input</td><td>val1 is variable-only (no constant); first insert defaults to v1</td></tr>
                 <tr><td>cmb_flt_n / reverb feedback label</td><td>Re-labelled from <code>fbk</code> to <code>feedback</code> (no behaviour change)</td></tr>
                 <tr><td>imported_sample, vocoder</td><td>Marked unsupported in the op picker (no engine codegen)</td></tr>
-                <tr><td>Sample length</td><td>The instrument header's length is the same horizontal knob the slot rows use — click/drag the bar to set, dblclick to type, wheel for coarse/fine. Step 2 (even only)</td></tr>
+                <tr><td>Sample length</td><td>The instrument header's length is the same horizontal knob the slot rows use — click/drag the bar to set, dblclick to type, wheel for coarse (Shift × 16). Step 2 (even only)</td></tr>
                 <tr><td>Even-only fields</td><td>For knobs with step=2 (loop_gen offset, sample length) every mutation (drag / wheel / arrow / numeric editor) snaps to the nearest even value; ArrowUp = ±2, Shift+ArrowUp = ±32</td></tr>
                 <tr><td>Frequency knobs</td><td>Drag uses a SOFT power-curve taper (bar midpoint ≈ 25 % of the range) so the low end is reachable without becoming the whole bar. Wheel / arrows still step linearly</td></tr>
                 <tr><td>BASE selector (header)</td><td>Flip every numeric display between decimal and hex. Inputs accept either format ("0x10" works in dec mode too)</td></tr>

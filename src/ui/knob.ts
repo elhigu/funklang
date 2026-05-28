@@ -26,15 +26,13 @@ export interface KnobOptions {
    * (default) is the classic uniform mapping. `'pow'` uses a power
    * curve `value = min + range * ratio ^ scalePow` so small values
    * get a bigger slice of the bar — useful for parameters like audio
-   * frequency where the low end is otherwise unreachable. Wheel /
-   * arrow stepping is unaffected (those still move by additive
-   * `coarseStep` / `shiftStep`).
+   * frequency where the low end is otherwise unreachable.
    *
    * Only valid for ranges where min >= 0; mixed-sign power mapping is
    * not well defined, so we silently fall back to linear in that case.
    *
-   * Wheel/arrow stepping is unaffected (those still move by additive
-   * `coarseStep` / `step`).
+   * Wheel/arrow stepping is unaffected — those still move by additive
+   * `coarseStep` / `step` (× SHIFT_MULT when Shift is held).
    */
   scale?: 'linear' | 'pow' | undefined;
   /**
