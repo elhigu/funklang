@@ -208,8 +208,8 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
   } else if (loopGenIdx >= 0 && atIdx > loopGenIdx) {
     atIdx = loopGenIdx;
   }
-  // Smart outVar default + per-op factory values (e.g. envd starts
-  // with decay 23 / gain 128 instead of an all-zero envelope).
+  // Smart outVar default + per-op factory values from
+  // `INSERT_DEFAULTS` (see `src/dsp/op-metadata.ts`).
   const smartOut = pickSmartOutVar(ins, atIdx);
   const base: Slot = { ...emptySlot(), fn: code, outVar: smartOut };
   const slot = applyInsertDefaults(base, code);

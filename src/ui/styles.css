@@ -1165,6 +1165,22 @@
   .op-picker-card-unsupported:hover {
     background: inherit !important;
   }
+  .op-picker-cancel {
+    display: block;
+    margin: 12px auto 0;
+    background: var(--bg-2);
+    color: var(--fg-1);
+    border: 1px solid var(--grid);
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    padding: 5px 14px;
+    cursor: pointer;
+    letter-spacing: 0.8px;
+  }
+  .op-picker-cancel:hover {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
 
   /* clone-block container */
   .clone-block {

@@ -3,6 +3,20 @@ import { emptySlot } from '../../src/patch/types';
 import { applyInsertDefaults, opByCode } from '../../src/dsp/op-metadata';
 
 describe('applyInsertDefaults', () => {
+  it('preserves fn and outVar — defaults merge ON TOP of the base, not replace it', () => {
+    const base = { ...emptySlot(), fn: 8, outVar: 3 };
+    const out = applyInsertDefaults(base, 8);
+    expect(out.fn).toBe(8);
+    expect(out.outVar).toBe(3);
+  });
+
+  it('returns the base unchanged when there is no INSERT_DEFAULTS entry for the op', () => {
+    // chordgen (fn=18) — no entry. (Same contract pinned by the chordgen
+    // test below; this one names what the function CONTRACT is.)
+    const base = { ...emptySlot(), fn: 18, outVar: 1 };
+    expect(applyInsertDefaults(base, 18)).toEqual(base);
+  });
+
   it('envd (fn=8) defaults decay=16 sustain=64 gain=64', () => {
     const base = { ...emptySlot(), fn: 8, outVar: 1 };
     const out = applyInsertDefaults(base, 8);
@@ -104,12 +118,8 @@ describe('applyInsertDefaults', () => {
     expect(applyInsertDefaults(base, 19).gainVal).toBe(8);
   });
 
-  it('chordgen (fn=18) defaults n1=n2=n3=0 and shift=0', () => {
+  it('chordgen (fn=18) has no INSERT_DEFAULTS entry — applyInsertDefaults is identity', () => {
     const base = { ...emptySlot(), fn: 18, outVar: 1 };
-    const out = applyInsertDefaults(base, 18);
-    expect(out.freq).toBe(0);
-    expect(out.width).toBe(0);
-    expect(out.val1).toBe(0);
-    expect(out.val2Value).toBe(0);
+    expect(applyInsertDefaults(base, 18)).toEqual(base);
   });
 });

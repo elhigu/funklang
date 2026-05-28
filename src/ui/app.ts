@@ -184,7 +184,10 @@ export function bootApp(root: HTMLElement): void {
                 <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
                 <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
                 <tr><td>New slot outVar default</td><td>Picks a variable that an earlier slot already reads (so the chain feeds something), falling back to the first unused variable</td></tr>
-                <tr><td>envd defaults</td><td>decay 23, sustain 0, gain 128 — a usable envelope out of the box</td></tr>
+                <tr><td>Newly inserted slot defaults</td><td>Per-op factory values applied on insert — e.g. osc_saw/tri/sine = freq 50/gain 64, osc_pulse adds width 63, vol = gain 128, envd = decay 16/sustain 64/gain 64, dly_cyc = gain 128, cmb_flt_n = gain 64 (delay 0, feedback 0), reverb = feedback 64/gain 64, sv_flt_n = cutoff 16/reso 16/LP, distortion = gain 64, sample_hold = step 8. See <code>src/dsp/op-metadata.ts::INSERT_DEFAULTS</code></td></tr>
+                <tr><td>add op input</td><td>val1 is variable-only (no constant); first insert defaults to v1</td></tr>
+                <tr><td>cmb_flt_n / reverb feedback label</td><td>Re-labelled from <code>fbk</code> to <code>feedback</code> (no behaviour change)</td></tr>
+                <tr><td>imported_sample, vocoder</td><td>Marked unsupported in the op picker (no engine codegen)</td></tr>
                 <tr><td>Sample length</td><td>The instrument header's length is the same horizontal knob the slot rows use — click/drag the bar to set, dblclick to type, wheel for coarse/fine. Step 2 (even only)</td></tr>
                 <tr><td>Even-only fields</td><td>For knobs with step=2 (loop_gen offset, sample length) Shift+wheel moves ±2 and every step (drag / wheel / arrow / numeric editor) snaps to the nearest even value</td></tr>
                 <tr><td>Frequency knobs</td><td>Drag uses a SOFT power-curve taper (bar midpoint ≈ 25 % of the range) so the low end is reachable without becoming the whole bar. Wheel / arrows still step linearly</td></tr>

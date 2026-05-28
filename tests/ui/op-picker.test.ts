@@ -26,7 +26,6 @@ describe('op-picker', () => {
   it('imported_sample (fn=20) is marked unsupported and rendered as a disabled card', () => {
     const imp = OP_DEFS.find((o) => o.code === 20)!;
     expect(imp.unsupported).toBe(true);
-    document.body.innerHTML = '';
     void pickOp();
     const card = document.querySelector('[data-op-code="20"]') as HTMLButtonElement;
     expect(card).not.toBeNull();
@@ -38,7 +37,6 @@ describe('op-picker', () => {
   it('vocoder (fn=24) is marked unsupported and rendered as a disabled card', () => {
     const v = OP_DEFS.find((o) => o.code === 24)!;
     expect(v.unsupported).toBe(true);
-    document.body.innerHTML = '';
     void pickOp();
     const card = document.querySelector('[data-op-code="24"]') as HTMLButtonElement;
     expect(card).not.toBeNull();

@@ -460,9 +460,9 @@ export function opByCode(code: number): OpDef | undefined {
  * that op (separate from `resetSlotForOp` which only zeroes irrelevant
  * fields when the user CHANGES op). Anything not listed here defaults to 0.
  *
- * The user-stated defaults so far:
- *   envd → decay 23, sustain 0, gain 128 — a usable envelope out of the
- *          box instead of an all-zero one that produces silence.
+ * Authoritative source of user-stated defaults — see the help modal for a
+ * user-facing summary. Add new entries here (and a matching test in
+ * `tests/dsp/op-defaults.test.ts`) when the spec changes.
  */
 const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
   1: { gainVal: 128 },                                  // vol
