@@ -466,12 +466,23 @@ function renderParam(
 
   switch (param.type.kind) {
     case 'const-int': {
+      // Clone op (fn=17) `val2Value` is the SOURCE-sample read offset. Its
+      // valid range is dictated by the source instrument's sampleLength —
+      // max = SL − 2 (Klang reads pairs of bytes, so the last legal start
+      // is SL − 2), with a defensive floor of 2 when the source has no
+      // sample yet. Step is 2 because the engine treats offset as a
+      // 2-byte stride.
+      const isCloneOffset = slot.fn === 17 && param.field === 'val2Value';
+      const cloneMax = isCloneOffset
+        ? Math.max(2, (model.patch.instruments[slot.gain]?.sampleLength ?? param.type.max) - 2)
+        : param.type.max;
       const knob = makeKnob({
         label: param.type.label,
         value: slot[param.field] as number,
         min: param.type.min,
-        max: param.type.max,
+        max: cloneMax,
         scale: param.type.scale,
+        ...(isCloneOffset ? { step: 2 } : {}),
         defaultValue: 0,
         onChange: writeValue,
       });
@@ -681,6 +692,27 @@ function renderParam(
         validFor: (i) => isValidCloneSource(instrIdx, i),
         title: param.type.label,
         onChange: (v) => {
+          // Clone op (fn=17): switching the source instrument rescales
+          // val2Value so the FRACTION of the source sample is preserved.
+          // new_offset = round(old_offset * new_SL / old_SL), then snap
+          // to even and clamp to [0, new_SL - 2]. Write the rescaled
+          // offset BEFORE the source change so any param/structure
+          // listener that re-reads the slot sees consistent state.
+          // Guard against old SL = 0 (no division by zero — leave offset
+          // alone in that case).
+          if (slot.fn === 17 && param.field === 'gain') {
+            const oldSrc = model.patch.instruments[slot.gain];
+            const newSrc = model.patch.instruments[v];
+            if (oldSrc && newSrc && oldSrc.sampleLength > 0 && newSrc.sampleLength > 0) {
+              const oldOffset = slot.val2Value | 0;
+              const scaled = Math.round(oldOffset * newSrc.sampleLength / oldSrc.sampleLength);
+              const even = scaled - (scaled & 1);
+              const clamped = Math.max(0, Math.min(newSrc.sampleLength - 2, even));
+              if (clamped !== oldOffset) {
+                model.setSlotParam(instrIdx, slotIdx, 'val2Value', clamped);
+              }
+            }
+          }
           writeValue(v);
           // Changing a clone/chordgen source instrument is structural,
           // not parametric — the expanded clone block, title, dependency
