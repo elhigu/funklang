@@ -73,4 +73,16 @@ describe('applyInsertDefaults', () => {
     const fb = opByCode(12)!.params.find((p) => p.field === 'val2Value')!;
     expect((fb.type as { label: string }).label).toBe('feedback');
   });
+
+  it('reverb (fn=13) defaults feedback=64 gain=64', () => {
+    const base = { ...emptySlot(), fn: 13, outVar: 1 };
+    const out = applyInsertDefaults(base, 13);
+    expect(out.val2Value).toBe(64);
+    expect(out.gainVal).toBe(64);
+  });
+
+  it('reverb labels feedback as "feedback"', () => {
+    const fb = opByCode(13)!.params.find((p) => p.field === 'val2Value')!;
+    expect((fb.type as { label: string }).label).toBe('feedback');
+  });
 });

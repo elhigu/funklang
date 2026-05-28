@@ -261,7 +261,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
     params: [
       { field: 'val1', type: { kind: 'var-source', label: 'in', allowNone: false } },
       { field: 'val2Value', selector: 'val2',
-        type: { kind: 'var-or-const', min: 0, max: 127, label: 'fbk' } },
+        type: { kind: 'var-or-const', min: 0, max: 127, label: 'feedback' } },
       { field: 'gainVal', selector: 'gain',
         type: { kind: 'var-or-const', min: 0, max: 128, label: 'gain' } },
     ],
@@ -467,6 +467,7 @@ const INSERT_DEFAULTS: Record<number, Partial<Slot>> = {
   9: { val1: 1, val2Value: 0 },                         // add
   11: { gainVal: 128 },                                 // dly_cyc
   12: { gainVal: 64 },                                  // cmb_flt_n
+  13: { val2Value: 64, gainVal: 64 },                   // reverb
 };
 
 /** Apply factory defaults for the given op on top of `base`. */
