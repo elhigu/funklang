@@ -25,4 +25,15 @@ describe('applyInsertDefaults', () => {
     const base = { ...emptySlot(), fn: 1, outVar: 1 };
     expect(applyInsertDefaults(base, 1).gainVal).toBe(128);
   });
+
+  it.each([
+    { code: 2, name: 'osc_saw' },
+    { code: 3, name: 'osc_tri' },
+    { code: 4, name: 'osc_sine' },
+  ])('$name (fn=$code) defaults freqVal=50 gainVal=64', ({ code }) => {
+    const base = { ...emptySlot(), fn: code, outVar: 1 };
+    const out = applyInsertDefaults(base, code);
+    expect(out.freqVal).toBe(50);
+    expect(out.gainVal).toBe(64);
+  });
 });
