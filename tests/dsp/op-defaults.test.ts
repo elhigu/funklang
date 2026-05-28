@@ -103,4 +103,13 @@ describe('applyInsertDefaults', () => {
     const base = { ...emptySlot(), fn: 19, outVar: 1 };
     expect(applyInsertDefaults(base, 19).gainVal).toBe(8);
   });
+
+  it('chordgen (fn=18) defaults n1=n2=n3=0 and shift=0', () => {
+    const base = { ...emptySlot(), fn: 18, outVar: 1 };
+    const out = applyInsertDefaults(base, 18);
+    expect(out.freq).toBe(0);
+    expect(out.width).toBe(0);
+    expect(out.val1).toBe(0);
+    expect(out.val2Value).toBe(0);
+  });
 });
