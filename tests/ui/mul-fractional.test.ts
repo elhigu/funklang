@@ -106,4 +106,24 @@ describe('mul — fractional sidecar input', () => {
     renderSlotGrid(root, model, 0);
     expect(root.querySelector('.param-mul-frac')).toBeNull();
   });
+
+  it('the sidecar is enabled in const mode (val2 selector = 0)', () => {
+    const model = mountMul(16384);   // mountMul sets val2: 0 (const)
+    renderSlotGrid(root, model, 0);
+    const frac = root.querySelector('.param-mul-frac') as HTMLInputElement;
+    expect(frac.disabled).toBe(false);
+  });
+
+  it('the sidecar is DISABLED when val2 is sourced from a variable', () => {
+    const p = emptyPatch();
+    p.instruments[0]!.name = 'A';
+    p.instruments[0]!.sampleLength = 256;
+    // val2 = 2 → the literal val2Value is ignored, sidecar must disable.
+    p.instruments[0]!.slots.push({ ...emptySlot(), fn: 10, outVar: 1, val1: 1, val2: 2, val2Value: 0 });
+    const model = new PatchModel(p);
+    renderSlotGrid(root, model, 0);
+    const frac = root.querySelector('.param-mul-frac') as HTMLInputElement;
+    expect(frac.disabled).toBe(true);
+    expect(frac.classList.contains('disabled')).toBe(true);
+  });
 });

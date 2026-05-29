@@ -284,6 +284,11 @@ export function bootApp(root: HTMLElement): void {
   // call updateSlotWaves / viewer.setSample without rebuilding the DOM.
   let gridHostEl: HTMLElement | null = null;
   let waveViewer: WaveViewer | null = null;
+  // Which instrument the slot-grid host was last rendered for. Used to
+  // decide whether a captured scrollTop should be restored: only when the
+  // rebuild is for the SAME instrument (a structural edit), never when the
+  // user switched to a different instrument (which should start at top).
+  let gridHostInstrIdx: number | null = null;
   let lastRender: RenderResult | null = null;
   let cycleError: CyclicCloneError | null = null;
 
@@ -353,13 +358,17 @@ export function bootApp(root: HTMLElement): void {
 
     // Capture slot-grid scrollTop so structural rebuilds (move slot,
     // insert/delete slot, etc.) don't snap the user back to the top
-    // when they're working at the bottom of a long instrument.
-    const prevScrollTop = gridHostEl?.scrollTop ?? 0;
+    // when they're working at the bottom of a long instrument. Only
+    // honoured when the rebuild targets the SAME instrument — switching
+    // instruments should start at the top, not inherit the old scroll.
+    const sameInstrument = gridHostInstrIdx === activeIdx;
+    const prevScrollTop = sameInstrument ? (gridHostEl?.scrollTop ?? 0) : 0;
 
     mainEl.innerHTML = '';
     const ins = model.patch.instruments[activeIdx];
     if (!ins) {
       gridHostEl = null;
+      gridHostInstrIdx = null;
       waveViewer = null;
       return;
     }
@@ -409,6 +418,7 @@ export function bootApp(root: HTMLElement): void {
     gridHost.className = 'slot-grid-host';
     mainEl.appendChild(gridHost);
     gridHostEl = gridHost;
+    gridHostInstrIdx = activeIdx;
     renderSlotGrid(gridHost, model, activeIdx, {
       selectedSlot: selection.instrIdx === activeIdx ? selection.slotIdx : null,
       outputSlot: outputTarget.slotIdx,

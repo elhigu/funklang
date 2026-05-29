@@ -910,6 +910,10 @@
     outline: none;
   }
   .param-mul-frac:focus { border-color: var(--amber); }
+  .param-mul-frac:disabled, .param-mul-frac.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
   /* waveform canvas */
   /* Wave-cell fills the slot's right half. Canvas stretches edge-to-edge

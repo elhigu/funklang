@@ -578,11 +578,15 @@ function renderParam(
 
       // Mul (fn=10) — sidecar fractional editor for val2Value. The
       // underlying field is the same int (-32767..32767-ish); we just
-      // surface a /32767 view for users who think in floats.
+      // surface a /32767 view for users who think in floats. Hoisted so
+      // applyMode() can disable it in lock-step with the knob when the
+      // value is sourced from a variable rather than the literal.
+      let mulFrac: HTMLInputElement | null = null;
       if (slot.fn === 10 && param.field === 'val2Value') {
         const frac = document.createElement('input');
         frac.type = 'text';
         frac.className = 'param-mul-frac';
+        mulFrac = frac;
         frac.title = 'val2Value / 32767 — same field, fractional view';
         let reverting = false;
         const refresh = (): void => {
@@ -635,10 +639,13 @@ function renderParam(
       }
 
       const applyMode = (mode: number): void => {
-        if (mode === 0) {
-          knob.el.classList.remove('disabled');
-        } else {
-          knob.el.classList.add('disabled');
+        const literal = mode === 0;
+        knob.el.classList.toggle('disabled', !literal);
+        // The mul fractional sidecar edits the same literal field, so it
+        // must disable alongside the knob when a variable drives the value.
+        if (mulFrac) {
+          mulFrac.disabled = !literal;
+          mulFrac.classList.toggle('disabled', !literal);
         }
       };
       applyMode(curSelector);
