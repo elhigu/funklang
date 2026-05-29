@@ -54,22 +54,39 @@ export function bytesToInt16WithLoop(
   return out;
 }
 
+/**
+ * Fixed vertical-scale buckets (half-height denominators). A waveform snaps
+ * UP to the smallest bucket that contains its peak. Quantising to a small
+ * ladder — rather than auto-fitting each cell to its own peak — keeps
+ * amplitudes COMPARABLE across slots: two ~30k oscillators both land on
+ * 32768, two small control signals both land on 256. Small signals still
+ * become visible (a 0..127 tap fills ~half the 256-scaled cell) without a
+ * 0..127 wiggle drowning on a ±32k axis.
+ */
+export const WAVE_SCALE_BUCKETS = [256, 4096, 32768] as const;
+
+function bucketFor(peak: number): number {
+  for (const b of WAVE_SCALE_BUCKETS) if (peak <= b) return b;
+  return WAVE_SCALE_BUCKETS[WAVE_SCALE_BUCKETS.length - 1]!;
+}
+
 export interface WaveStats {
   /** Smallest sample value in the window. */
   min: number;
   /** Largest sample value in the window. */
   max: number;
-  /** Symmetric vertical scale = max(|min|, |max|), floored at 1. Used as
-   *  the half-height denominator so a small-range signal (e.g. a 0..127
-   *  control output) fills the cell instead of sitting flat on a ±32k
-   *  axis. */
+  /** Raw symmetric peak = max(|min|, |max|), floored at 1. */
   peak: number;
+  /** Display scale: `peak` snapped up to the nearest WAVE_SCALE_BUCKETS
+   *  value. This is the half-height denominator drawWaveform divides by. */
+  scale: number;
 }
 
 /**
- * Min / max / symmetric-peak of a sample window. Pure — no canvas. Returns
- * null for an empty/absent buffer. Used both to autoscale the waveform
- * vertically and to surface the numeric min/max next to the display.
+ * Min / max / symmetric-peak / bucketed display-scale of a sample window.
+ * Pure — no canvas. Returns null for an empty/absent buffer. Used both to
+ * scale the waveform vertically (via `scale`) and to surface the numeric
+ * min/max next to the display.
  */
 export function waveStats(
   samples: Int16Array | null,
@@ -88,7 +105,7 @@ export function waveStats(
     if (v > max) max = v;
   }
   const peak = Math.max(1, Math.abs(min), Math.abs(max));
-  return { min, max, peak };
+  return { min, max, peak, scale: bucketFor(peak) };
 }
 
 export interface WaveOptions {
@@ -129,12 +146,12 @@ export function drawWaveform(
   const span = Math.max(1, end - start);
   const halfH = H / 2 - 1;
 
-  // Autoscale vertically to the window's own peak so a small-range signal
-  // (control voltages, env outputs, a 0..127 ctrl tap) fills the display
-  // instead of rendering as a flat sliver on a fixed ±32768 axis. Floored
-  // at 1 so a silent buffer can't divide by zero.
+  // Scale vertically to a fixed bucket (256 / 4096 / 32768) chosen from the
+  // window's peak. Quantising keeps amplitudes comparable across slots
+  // while still lifting a small-range signal (control voltage, env, a
+  // 0..127 ctrl tap) off the zero line. See WAVE_SCALE_BUCKETS.
   const stats = waveStats(samples, start, end);
-  const peak = stats ? stats.peak : 1;
+  const peak = stats ? stats.scale : WAVE_SCALE_BUCKETS[0];
 
   // loop region overlay first (so it's under the line)
   if (options.loopRegion && options.loopRegion.end > options.loopRegion.start) {

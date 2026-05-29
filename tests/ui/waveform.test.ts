@@ -7,28 +7,42 @@ describe('waveStats', () => {
     expect(waveStats(new Int16Array(0))).toBeNull();
   });
 
-  it('reports min/max and a symmetric peak for bipolar audio', () => {
+  it('reports raw min/max/peak and snaps the display scale to the 32k bucket for audio', () => {
     const s = new Int16Array([0, 30000, -32768, 12000, -5000]);
     const st = waveStats(s)!;
     expect(st.min).toBe(-32768);
     expect(st.max).toBe(30000);
-    // peak = max(|min|,|max|) → 32768, floored at 1.
-    expect(st.peak).toBe(32768);
+    expect(st.peak).toBe(32768);   // raw symmetric peak
+    expect(st.scale).toBe(32768);  // bucket: peak 32768 → 32768
   });
 
-  it('uses a SMALL peak for a 0..127 control signal (no ±32k scale)', () => {
+  it('a 0..127 control signal snaps to the 256 bucket (visible, not ±32k)', () => {
     const s = new Int16Array([0, 64, 127, 32, 100]);
     const st = waveStats(s)!;
-    expect(st.min).toBe(0);
-    expect(st.max).toBe(127);
-    expect(st.peak).toBe(127);   // NOT 32768 — small signals fill the cell
+    expect(st.peak).toBe(127);
+    expect(st.scale).toBe(256);
   });
 
-  it('floors peak at 1 for an all-zero (silent) buffer — no divide-by-zero', () => {
+  it('a mid-range signal snaps to the 4096 bucket — comparable across slots', () => {
+    // Two signals of peak 2000 and 3000 should BOTH land on the 4096 bucket
+    // so their thumbnails are directly comparable in amplitude.
+    expect(waveStats(new Int16Array([0, 2000, -1500]))!.scale).toBe(4096);
+    expect(waveStats(new Int16Array([0, 3000, -2500]))!.scale).toBe(4096);
+  });
+
+  it('bucket boundaries: 256→256, 257→4096, 4096→4096, 4097→32768', () => {
+    expect(waveStats(new Int16Array([256]))!.scale).toBe(256);
+    expect(waveStats(new Int16Array([257]))!.scale).toBe(4096);
+    expect(waveStats(new Int16Array([4096]))!.scale).toBe(4096);
+    expect(waveStats(new Int16Array([4097]))!.scale).toBe(32768);
+  });
+
+  it('a silent buffer floors peak at 1 and uses the smallest (256) bucket', () => {
     const st = waveStats(new Int16Array([0, 0, 0]))!;
     expect(st.min).toBe(0);
     expect(st.max).toBe(0);
     expect(st.peak).toBe(1);
+    expect(st.scale).toBe(256);
   });
 
   it('peak is symmetric — a negative-only signal still scales by |min|', () => {
@@ -36,6 +50,7 @@ describe('waveStats', () => {
     expect(st.min).toBe(-100);
     expect(st.max).toBe(-7);
     expect(st.peak).toBe(100);
+    expect(st.scale).toBe(256);
   });
 
   it('honours start/end slicing', () => {
@@ -45,6 +60,7 @@ describe('waveStats', () => {
     expect(st.min).toBe(5);
     expect(st.max).toBe(9);
     expect(st.peak).toBe(9);
+    expect(st.scale).toBe(256);
   });
 });
 
