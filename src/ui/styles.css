@@ -1187,18 +1187,29 @@
     padding: 6px 8px;
     cursor: pointer;
     text-align: left;
+    /* Single-line, fixed-height cards so the grid stays a tidy matrix —
+       long names ellipsize rather than wrap. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
   }
   .op-picker-btn:hover {
     background: var(--bg-3);
     color: var(--amber);
     border-color: var(--amber);
   }
-  .op-picker-desc {
-    display: block;
-    margin-top: 4px;
-    color: var(--fg-2);
-    font-size: 10px;
-    line-height: 1.3;
+  /* Description strip at the modal bottom, driven by hover/focus. Fixed
+     min-height so the modal doesn't jump as the text length changes. */
+  .op-picker-detail {
+    margin-top: 12px;
+    padding: 8px 10px;
+    min-height: 34px;
+    border: 1px solid var(--grid-dim);
+    background: var(--bg-0);
+    color: var(--fg-1);
+    font-size: 11px;
+    line-height: 1.4;
   }
   .op-picker-card-unsupported {
     opacity: 0.45;

@@ -13,13 +13,39 @@ describe('op-picker', () => {
     expect(ctrl.description).toContain('0..127');
   });
 
-  it('pickOp renders the description as .op-picker-desc when an op card is rendered', () => {
+  it('cards are name-only (uniform height) and carry the description on data-op-desc + title', () => {
     void pickOp();
     const ctrlCard = document.querySelector('[data-op-code="14"]') as HTMLElement | null;
     expect(ctrlCard).not.toBeNull();
-    const desc = ctrlCard!.querySelector('.op-picker-desc');
-    expect(desc).not.toBeNull();
-    expect((desc as HTMLElement).textContent ?? '').toMatch(/-32768/);
+    // No inline description span inside the card any more — name only.
+    expect(ctrlCard!.querySelector('.op-picker-desc')).toBeNull();
+    expect(ctrlCard!.textContent).toBe('ctrl');
+    // Description lives on the data attribute + title for the strip/tooltip.
+    expect(ctrlCard!.dataset['opDesc'] ?? '').toMatch(/-32768/);
+    expect(ctrlCard!.title).toMatch(/-32768/);
+    document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+
+  it('hovering a card populates the .op-picker-detail strip with its description', () => {
+    void pickOp();
+    const detail = document.querySelector('.op-picker-detail') as HTMLElement;
+    expect(detail).not.toBeNull();
+    // Default hint before any hover.
+    expect(detail.textContent).toMatch(/hover/i);
+    const ctrlCard = document.querySelector('[data-op-code="14"]') as HTMLElement;
+    ctrlCard.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    expect(detail.textContent).toContain('ctrl');
+    expect(detail.textContent).toMatch(/-32768/);
+    document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+
+  it('hovering an op with no description shows just its name in the strip', () => {
+    void pickOp();
+    const detail = document.querySelector('.op-picker-detail') as HTMLElement;
+    // vol (fn=1) has no description.
+    const vol = document.querySelector('[data-op-code="1"]') as HTMLElement;
+    vol.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    expect(detail.textContent).toBe('vol');
     document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 

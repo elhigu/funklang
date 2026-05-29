@@ -59,6 +59,19 @@ export function pickOp(): Promise<number | null> {
     const inner = document.createElement('div');
     inner.className = 'op-picker';
     inner.innerHTML = `<div class="op-picker-title">PICK OPERATOR</div>`;
+
+    // One description strip at the bottom of the modal, updated as the user
+    // hovers / focuses a card. Keeping descriptions OUT of the cards means
+    // every card is a uniform single-line height — no more one tall card
+    // (ctrl's long blurb) stretching its whole grid row.
+    const detail = document.createElement('div');
+    detail.className = 'op-picker-detail';
+    const DETAIL_HINT = 'Hover an operator for details.';
+    detail.textContent = DETAIL_HINT;
+    const showDetail = (def: OpDef): void => {
+      detail.textContent = def.description ? `${def.name} — ${def.description}` : def.name;
+    };
+
     for (const g of groupedDefs()) {
       const sect = document.createElement('div');
       sect.className = 'op-picker-group';
@@ -72,20 +85,18 @@ export function pickOp(): Promise<number | null> {
         const btn = document.createElement('button');
         btn.className = 'op-picker-btn';
         btn.setAttribute('data-op-code', String(def.code));
-        const nameEl = document.createElement('span');
-        nameEl.className = 'op-picker-name';
-        nameEl.textContent = def.name;
-        btn.appendChild(nameEl);
+        btn.textContent = def.name;        // name only → uniform card height
         if (def.description) {
-          const descEl = document.createElement('span');
-          descEl.className = 'op-picker-desc';
-          descEl.textContent = def.description;
-          btn.appendChild(descEl);
+          // Carried for the detail strip + as a native tooltip fallback.
+          btn.dataset['opDesc'] = def.description;
+          btn.title = def.description;
         }
         if (def.unsupported) {
           btn.disabled = true;
           btn.classList.add('op-picker-card-unsupported');
         }
+        btn.addEventListener('mouseenter', () => showDetail(def));
+        btn.addEventListener('focus', () => showDetail(def));
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           done(def.code);
@@ -95,6 +106,7 @@ export function pickOp(): Promise<number | null> {
       sect.appendChild(grid);
       inner.appendChild(sect);
     }
+    inner.appendChild(detail);
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'op-picker-cancel';
     cancelBtn.textContent = 'Cancel';
