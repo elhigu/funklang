@@ -54,6 +54,43 @@ export function bytesToInt16WithLoop(
   return out;
 }
 
+export interface WaveStats {
+  /** Smallest sample value in the window. */
+  min: number;
+  /** Largest sample value in the window. */
+  max: number;
+  /** Symmetric vertical scale = max(|min|, |max|), floored at 1. Used as
+   *  the half-height denominator so a small-range signal (e.g. a 0..127
+   *  control output) fills the cell instead of sitting flat on a ±32k
+   *  axis. */
+  peak: number;
+}
+
+/**
+ * Min / max / symmetric-peak of a sample window. Pure — no canvas. Returns
+ * null for an empty/absent buffer. Used both to autoscale the waveform
+ * vertically and to surface the numeric min/max next to the display.
+ */
+export function waveStats(
+  samples: Int16Array | null,
+  start = 0,
+  end?: number,
+): WaveStats | null {
+  if (!samples || samples.length === 0) return null;
+  const lo = Math.max(0, start);
+  const hi = Math.min(samples.length, end ?? samples.length);
+  if (hi <= lo) return null;
+  let min = samples[lo]!;
+  let max = samples[lo]!;
+  for (let i = lo + 1; i < hi; i++) {
+    const v = samples[i]!;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  const peak = Math.max(1, Math.abs(min), Math.abs(max));
+  return { min, max, peak };
+}
+
 export interface WaveOptions {
   width?: number | undefined;
   height?: number | undefined;
@@ -70,14 +107,14 @@ export function drawWaveform(
   canvas: HTMLCanvasElement,
   samples: Int16Array | null,
   options: WaveOptions = {},
-): void {
+): WaveStats | null {
   const W = options.width ?? canvas.width;
   const H = options.height ?? canvas.height;
   if (canvas.width !== W) canvas.width = W;
   if (canvas.height !== H) canvas.height = H;
   const color = options.color ?? '#ffb14e';
   const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) return null;
 
   ctx.fillStyle = '#050507';
   ctx.fillRect(0, 0, W, H);
@@ -85,12 +122,19 @@ export function drawWaveform(
   ctx.fillStyle = '#2a2a3c';
   ctx.fillRect(0, (H / 2) | 0, W, 1);
 
-  if (!samples || samples.length === 0) return;
+  if (!samples || samples.length === 0) return null;
 
   const start = Math.max(0, options.start ?? 0);
   const end = Math.min(samples.length, options.end ?? samples.length);
   const span = Math.max(1, end - start);
   const halfH = H / 2 - 1;
+
+  // Autoscale vertically to the window's own peak so a small-range signal
+  // (control voltages, env outputs, a 0..127 ctrl tap) fills the display
+  // instead of rendering as a flat sliver on a fixed ±32768 axis. Floored
+  // at 1 so a silent buffer can't divide by zero.
+  const stats = waveStats(samples, start, end);
+  const peak = stats ? stats.peak : 1;
 
   // loop region overlay first (so it's under the line)
   if (options.loopRegion && options.loopRegion.end > options.loopRegion.start) {
@@ -123,11 +167,12 @@ export function drawWaveform(
       if (v > hi) hi = v;
     }
     if (lo > hi) { lo = samples[i0] ?? 0; hi = lo; }
-    const yHi = H / 2 - (hi / 32768) * halfH;
-    const yLo = H / 2 - (lo / 32768) * halfH;
+    const yHi = H / 2 - (hi / peak) * halfH;
+    const yLo = H / 2 - (lo / peak) * halfH;
     if (x === 0) ctx.moveTo(x, yHi);
     else ctx.lineTo(x, yHi);
     ctx.lineTo(x, yLo);
   }
   ctx.stroke();
+  return stats;
 }

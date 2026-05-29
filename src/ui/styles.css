@@ -948,6 +948,24 @@
     text-align: right;
     line-height: 1.2;
   }
+  /* Per-slot waveform min/max readout (max / min). Pinned bottom-left over
+     the autoscaled thumbnail so the user can read the absolute amplitude —
+     the autoscale fills the cell regardless of true level, so these numbers
+     are the only absolute reference. */
+  .wave-cell .wave-minmax {
+    position: absolute;
+    left: 16px;
+    bottom: 8px;
+    z-index: 2;
+    font-size: 9px;
+    line-height: 1;
+    color: var(--fg-1);
+    background: rgba(5, 5, 7, 0.7);
+    padding: 1px 3px;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.3px;
+  }
 
   /* ─── footer / transport ────────────────────────────────── */
   footer {

@@ -83,7 +83,13 @@ export function updateSlotWaves(root: HTMLElement, slotTaps: Int16Array[]): void
     // blurry/pixelated when the wave-cell column is wider than 320.
     const W = Math.max(64, cv.clientWidth | 0);
     const H = Math.max(24, cv.clientHeight | 0);
-    drawWaveform(cv, tap, { width: W, height: H });
+    const stats = drawWaveform(cv, tap, { width: W, height: H });
+    // Surface the tap's numeric min/max next to its thumbnail. The
+    // waveform is autoscaled to its own peak, so the label is what tells
+    // the user the ABSOLUTE amplitude (a 0..127 control tap and a full
+    // ±32k audio tap both fill the cell — only these numbers disambiguate).
+    const label = slotEl.querySelector('[data-wave-minmax]') as HTMLElement | null;
+    if (label) label.textContent = stats ? `${stats.max} / ${stats.min}` : '';
   }
 }
 
@@ -820,6 +826,7 @@ function renderRow(
     <div class="col col-params"><div class="params" data-knobs></div></div>
     <div class="col wave-cell">
       <canvas class="wave" width="320" height="40" data-wave></canvas>
+      <span class="wave-minmax" data-wave-minmax></span>
       ${speakerBtn}
     </div>
   `;

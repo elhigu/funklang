@@ -95,7 +95,7 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
       meta.textContent = '(no sample)';
       return;
     }
-    drawWaveform(canvas, sample, {
+    const stats = drawWaveform(canvas, sample, {
       width: W,
       height: H,
       start: viewStart,
@@ -107,6 +107,7 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
     const reportedLen = instrumentLength ?? sample.length;
     meta.textContent =
       `len ${reportedLen} · view ${viewStart}–${viewEnd}` +
+      (stats ? ` · min ${stats.min} max ${stats.max}` : '') +
       ((showLoop && loopLength > 0) ? ` · loop ${loopOffset}+${loopLength}` : '');
   };
 
