@@ -24,7 +24,7 @@ import {
   emptySlot,
 } from '../patch/types';
 import type { ImportedSample, Instrument, Patch, Slot } from '../patch/types';
-import { isPostRenderOp } from '../dsp/op-metadata';
+import { isPostRenderOp } from '../schema/op-metadata';
 
 function readSlot(r: BinReader, ins: Instrument): Slot {
   const slot: Slot = {

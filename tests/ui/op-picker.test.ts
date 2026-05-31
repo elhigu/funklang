@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OP_DEFS } from '../../src/dsp/op-metadata';
+import { OP_DEFS } from '../../src/schema/op-metadata';
 import { pickOp } from '../../src/ui/op-picker';
 
 beforeEach(() => { document.body.innerHTML = ''; });

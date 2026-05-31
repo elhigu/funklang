@@ -1,6 +1,6 @@
 // Slot-grid component: filled rows only, with [+] insertion targets and
 // hover-revealed delete. Per-op param rendering is strictly driven by the
-// OP_DEFS registry in funklang/src/dsp/op-metadata.ts.
+// OP_DEFS registry in funklang/src/schema/op-metadata.ts.
 
 import type { PatchModel } from '../patch/model';
 import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot, DEFAULT_SAMPLE_LENGTH } from '../patch/types';
@@ -9,12 +9,12 @@ import { pickOp, OP_NAME } from './op-picker';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
-import { opByCode, resetSlotForOp, applyInsertDefaults, isPostRenderOp } from '../dsp/op-metadata';
+import { opByCode, resetSlotForOp, applyInsertDefaults, isPostRenderOp } from '../schema/op-metadata';
 import { pickSmartOutVar } from '../patch/smart-out-var';
 import { generateInstrumentName } from './name-generator';
 import { clampLoopOffset, loopLengthFor, minLoopOffset, maxLoopOffset } from '../patch/loop-rules';
 import { isValidCloneSource } from '../patch/clone-graph';
-import type { ParamDef } from '../dsp/op-metadata';
+import type { ParamDef } from '../schema/op-metadata';
 
 // Per-clone-slot expansion state, preserved across re-renders. Keyed by
 // the slot object itself so it survives `moveSlot` reordering and is
@@ -215,7 +215,7 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
     atIdx = loopGenIdx;
   }
   // Smart outVar default + per-op factory values from
-  // `INSERT_DEFAULTS` (see `src/dsp/op-metadata.ts`).
+  // `INSERT_DEFAULTS` (see `src/schema/op-metadata.ts`).
   const smartOut = pickSmartOutVar(ins, atIdx);
   const base: Slot = { ...emptySlot(), fn: code, outVar: smartOut };
   const slot = applyInsertDefaults(base, code);

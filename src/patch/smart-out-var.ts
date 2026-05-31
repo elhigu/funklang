@@ -19,7 +19,7 @@
 //      truly "free" variable.
 //   4. Last resort: 1 — every var is in use, just pick the first.
 
-import { opByCode } from '../dsp/op-metadata';
+import { opByCode } from '../schema/op-metadata';
 import type { Instrument } from './types';
 
 export function pickSmartOutVar(ins: Instrument, atIdx: number): number {

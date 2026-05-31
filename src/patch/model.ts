@@ -6,7 +6,7 @@ import type { PatchChange } from './events';
 import { N_INSTRUMENTS, N_SLOTS_MAX } from './types';
 import type { Instrument, Patch, Slot } from './types';
 import { clampLoopOffset } from './loop-rules';
-import { isCrossInstrumentOp } from '../dsp/op-metadata';
+import { isCrossInstrumentOp } from '../schema/op-metadata';
 
 /**
  * Where does an index that pointed at OLD instrument position `idx` land

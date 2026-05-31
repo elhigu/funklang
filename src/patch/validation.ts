@@ -5,7 +5,7 @@
 // The rules here mirror EXACTLY what the slot-grid paints as `.var-unset`
 // red so the sidebar can never disagree with the row-level indicators.
 
-import { opByCode } from '../dsp/op-metadata';
+import { opByCode } from '../schema/op-metadata';
 import { isValidCloneSource } from './clone-graph';
 import type { Patch, Slot } from './types';
 

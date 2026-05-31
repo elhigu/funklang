@@ -3,8 +3,8 @@
 // all come from OP_DEFS (single source of truth) so adding/renaming an op
 // only requires an op-metadata.ts edit.
 
-import { OP_DEFS } from '../dsp/op-metadata';
-import type { OpDef } from '../dsp/op-metadata';
+import { OP_DEFS } from '../schema/op-metadata';
+import type { OpDef } from '../schema/op-metadata';
 
 /** Backwards-compat lookup table — code → display name. */
 export const OP_NAME: Record<number, string> = (() => {

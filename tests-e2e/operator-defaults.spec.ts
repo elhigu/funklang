@@ -27,7 +27,7 @@ test('every op insert applies the spec-mandated defaults via the deployed bundle
     const expected = EXPECTED[code]!;
     const fields = await page.evaluate(async (code: number) => {
       const { emptySlot } = await import('/src/patch/types.ts');
-      const { applyInsertDefaults } = await import('/src/dsp/op-metadata.ts');
+      const { applyInsertDefaults } = await import('/src/schema/op-metadata.ts');
       const base = { ...emptySlot(), fn: code, outVar: 1 };
       const slot = applyInsertDefaults(base, code);
       // Return only the value-bearing fields; serialisable by Playwright.

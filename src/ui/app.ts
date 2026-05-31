@@ -4,7 +4,7 @@ import { emptyPatch, emptyInstrument, N_SLOTS_EDITABLE } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
 import { parseAki, serializeAki } from '../fileio/aki';
 import { renderInstrument, CyclicCloneError } from '../dsp/engine';
-import { isPostRenderOp } from '../dsp/op-metadata';
+import { isPostRenderOp } from '../schema/op-metadata';
 import type { RenderResult } from '../dsp/types';
 import { Player } from '../audio/player';
 import { buildCloneGraph, allDependentsOf } from '../patch/clone-graph';

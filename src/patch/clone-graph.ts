@@ -10,7 +10,7 @@
 // don't bother with incremental updates.
 
 import type { Patch } from './types';
-import { isCrossInstrumentOp } from '../dsp/op-metadata';
+import { isCrossInstrumentOp } from '../schema/op-metadata';
 
 export interface CloneGraph {
   /** sources.get(I) = set of instrument indices I clones FROM. */

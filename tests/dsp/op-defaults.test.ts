@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { emptySlot } from '../../src/patch/types';
 import {
   applyInsertDefaults, opByCode, isCrossInstrumentOp, isPostRenderOp,
-} from '../../src/dsp/op-metadata';
+} from '../../src/schema/op-metadata';
 
 describe('op trait predicates', () => {
   it('isCrossInstrumentOp is true only for clone (17) and chordgen (18)', () => {
