@@ -6,6 +6,7 @@ import type { PatchChange } from './events';
 import { N_INSTRUMENTS, N_SLOTS_MAX } from './types';
 import type { Instrument, Patch, Slot } from './types';
 import { clampLoopOffset } from './loop-rules';
+import { isCrossInstrumentOp } from '../dsp/op-metadata';
 
 /**
  * Where does an index that pointed at OLD instrument position `idx` land
@@ -154,7 +155,7 @@ export class PatchModel {
     for (let i = 0; i < n; i++) {
       const ins = this.patch.instruments[i]!;
       for (const slot of ins.slots) {
-        if (slot.fn !== 17 && slot.fn !== 18) continue;
+        if (!isCrossInstrumentOp(slot.fn)) continue;
         const newSrc = remap.get(slot.gain) ?? slot.gain;
         slot.gain = (newSrc < i) ? newSrc : 0;
       }

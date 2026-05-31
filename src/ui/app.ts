@@ -4,6 +4,7 @@ import { emptyPatch, emptyInstrument, N_SLOTS_EDITABLE } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
 import { parseAki, serializeAki } from '../fileio/aki';
 import { renderInstrument, CyclicCloneError } from '../dsp/engine';
+import { isPostRenderOp } from '../dsp/op-metadata';
 import type { RenderResult } from '../dsp/types';
 import { Player } from '../audio/player';
 import { buildCloneGraph, allDependentsOf } from '../patch/clone-graph';
@@ -567,7 +568,7 @@ export function bootApp(root: HTMLElement): void {
     slotIdx: number,
   ): Int16Array {
     const slot = ins.slots[slotIdx];
-    if (slot?.fn === 22 && render.bytes.length > 0) {
+    if (slot && isPostRenderOp(slot.fn) && render.bytes.length > 0) {
       return bytesToInt16(render.bytes);
     }
     return render.slotTaps[slotIdx] ?? new Int16Array(0);
@@ -719,8 +720,9 @@ export function bootApp(root: HTMLElement): void {
 
     // For final output (slotIdx == null) and for the loop_gen slot's tap
     // we want the looped bytes; intermediate slot taps stay one-shot.
-    const targetIsLoopGenSlot = outputTarget.slotIdx != null
-      && renderIns.slots[outputTarget.slotIdx]?.fn === 22;
+    const loopGenSlot = outputTarget.slotIdx != null
+      ? renderIns.slots[outputTarget.slotIdx] : undefined;
+    const targetIsLoopGenSlot = !!loopGenSlot && isPostRenderOp(loopGenSlot.fn);
     const sample = (outputTarget.slotIdx != null && !targetIsLoopGenSlot)
       ? slotDisplayTap(renderIns, render, outputTarget.slotIdx)
       : buildFinalAudible(renderIns, render, outputTarget.instrIdx);

@@ -10,6 +10,7 @@
 // don't bother with incremental updates.
 
 import type { Patch } from './types';
+import { isCrossInstrumentOp } from '../dsp/op-metadata';
 
 export interface CloneGraph {
   /** sources.get(I) = set of instrument indices I clones FROM. */
@@ -24,8 +25,8 @@ export function buildCloneGraph(patch: Patch): CloneGraph {
   for (let i = 0; i < patch.instruments.length; i++) {
     const ins = patch.instruments[i]!;
     for (const slot of ins.slots) {
-      // Both clone (17) and chordgen (18) pull from a source instrument.
-      if (slot.fn !== 17 && slot.fn !== 18) continue;
+      // clone + chordgen pull from a source instrument (slot.gain).
+      if (!isCrossInstrumentOp(slot.fn)) continue;
       const src = slot.gain;
       if (src < 0 || src >= patch.instruments.length) continue;
       if (src === i) continue; // self-references are ignored

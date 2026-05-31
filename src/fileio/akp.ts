@@ -24,6 +24,7 @@ import {
   emptySlot,
 } from '../patch/types';
 import type { ImportedSample, Instrument, Patch, Slot } from '../patch/types';
+import { isPostRenderOp } from '../dsp/op-metadata';
 
 function readSlot(r: BinReader, ins: Instrument): Slot {
   const slot: Slot = {
@@ -112,7 +113,7 @@ function writeInstrument(w: BinWriter, ins: Instrument): void {
   // sit at slot 15) keeps matching refrender after this change.
   const out: Slot[] = [];
   for (let i = 0; i < N_SLOTS_MAX; i++) out.push(emptySlot());
-  const loopIdx = ins.slots.findIndex((s) => s.fn === 22);
+  const loopIdx = ins.slots.findIndex((s) => isPostRenderOp(s.fn));
   for (let i = 0; i < Math.min(N_SLOTS_MAX, ins.slots.length); i++) {
     if (i === loopIdx) continue;            // loop_gen handled below
     if (loopIdx >= 0 && i === 15) continue; // reserve slot 15 when a loop_gen exists

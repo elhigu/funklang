@@ -46,6 +46,20 @@ export interface OpDef {
   description?: string;
   /** Picker disables this op when true; the engine still no-ops gracefully. */
   unsupported?: boolean;
+  /**
+   * Pulls a sample from ANOTHER instrument (clone, chordgen) — the source
+   * instrument index lives in `slot.gain`. Drives the clone-dependency
+   * graph, the moveInstrument source-remap, and the inline source viewer.
+   * (The DSP engine keeps its own literal `fn===17/18` checks: those ARE
+   * the synthesis semantics, not editor metadata.)
+   */
+  crossInstrument?: boolean;
+  /**
+   * A post-render side effect that owns the instrument's last slot rather
+   * than producing per-tick output (loop_gen). Drives the serializer's
+   * slot-15 placement and the editor's loop-overlay / pinned-last-slot UI.
+   */
+  postRender?: boolean;
   params: ParamDef[];
 }
 
@@ -320,7 +334,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
   //   offset:    val2Value (const, 0..32767)
   // The codegen reads `arrayfrequency > 0` to pick var vs literal for transpose.
   {
-    code: 17, name: 'clone', category: 'cross',
+    code: 17, name: 'clone', category: 'cross', crossInstrument: true,
     params: [
       { field: 'freqVal', selector: 'freq',
         type: { kind: 'var-or-const', min: -16384, max: 32830, label: 'transpose' } },
@@ -340,7 +354,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
   // The note pickers are byte-indices into chordgen's hard-coded interval
   // table (synthnodes.h lines 180-194 list 12 intervals). 0 means "skip".
   {
-    code: 18, name: 'chordgen', category: 'cross',
+    code: 18, name: 'chordgen', category: 'cross', crossInstrument: true,
     params: [
       { field: 'gain', type: { kind: 'instr-ref', label: 'source' } },
       { field: 'freq',  type: { kind: 'const-int', min: 0, max: 12, label: 'note1' } },
@@ -399,7 +413,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
   // which is owned by the instrument header, not the slot row).
   // Trigger is hard-coded to slot index 15.
   {
-    code: 22, name: 'loop_gen', category: 'cross',
+    code: 22, name: 'loop_gen', category: 'cross', postRender: true,
     params: [],
   },
 
@@ -444,6 +458,17 @@ for (const def of OP_DEFS) OP_BY_CODE.set(def.code, def);
 
 export function opByCode(code: number): OpDef | undefined {
   return OP_BY_CODE.get(code);
+}
+
+/** Does op `fn` pull a sample from another instrument (clone / chordgen)?
+ *  Its source-instrument index is stored in `slot.gain`. */
+export function isCrossInstrumentOp(fn: number): boolean {
+  return OP_BY_CODE.get(fn)?.crossInstrument === true;
+}
+
+/** Is op `fn` a post-render side effect that owns the last slot (loop_gen)? */
+export function isPostRenderOp(fn: number): boolean {
+  return OP_BY_CODE.get(fn)?.postRender === true;
 }
 
 /**

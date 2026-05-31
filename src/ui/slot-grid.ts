@@ -9,7 +9,7 @@ import { pickOp, OP_NAME } from './op-picker';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
-import { opByCode, resetSlotForOp, applyInsertDefaults } from '../dsp/op-metadata';
+import { opByCode, resetSlotForOp, applyInsertDefaults, isPostRenderOp } from '../dsp/op-metadata';
 import { pickSmartOutVar } from '../patch/smart-out-var';
 import { generateInstrumentName } from './name-generator';
 import { clampLoopOffset, loopLengthFor, minLoopOffset, maxLoopOffset } from '../patch/loop-rules';
@@ -207,8 +207,8 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
   //     it lands BEFORE the loop_gen row, never after it.
   //   * a second loop_gen on the same instrument is silently rejected
   //     (the engine only triggers one anyway).
-  const loopGenIdx = ins.slots.findIndex((s) => s.fn === 22);
-  if (code === 22) {
+  const loopGenIdx = ins.slots.findIndex((s) => isPostRenderOp(s.fn));
+  if (isPostRenderOp(code)) {
     if (loopGenIdx >= 0) return;          // already has one
     atIdx = ins.slots.length;
   } else if (loopGenIdx >= 0 && atIdx > loopGenIdx) {
@@ -871,11 +871,11 @@ function renderRow(
       knobsHost.appendChild(renderParam(model, instrIdx, slotIdx, slot, p));
     }
   }
-  // loop_gen (op 22) has no slot params, but it owns the instrument's
-  // loop region. Surface a single "offset" knob that drives
-  // ins.loopOffset, snapping to the loop-rules valid set. loopLength is
-  // derived (sampleLength − loopOffset).
-  if (slot.fn === 22) {
+  // loop_gen has no slot params, but it owns the instrument's loop
+  // region. Surface a single "offset" knob that drives ins.loopOffset,
+  // snapping to the loop-rules valid set. loopLength is derived
+  // (sampleLength − loopOffset).
+  if (isPostRenderOp(slot.fn)) {
     const ins = model.patch.instruments[instrIdx];
     if (ins) {
       const minOff = minLoopOffset(ins.sampleLength);
@@ -981,7 +981,7 @@ function renderRow(
       row.appendChild(makeCornerInsertBtn(model, instrIdx, slotIdx, 'before', insertCorners.full));
     }
     const afterDisabled: boolean | string =
-      slot.fn === 22 ? 'loop_gen must stay in the last slot — insert above it'
+      isPostRenderOp(slot.fn) ? 'loop_gen must stay in the last slot — insert above it'
       : insertCorners.full ? true
       : false;
     row.appendChild(makeCornerInsertBtn(model, instrIdx, slotIdx + 1, 'after', afterDisabled));

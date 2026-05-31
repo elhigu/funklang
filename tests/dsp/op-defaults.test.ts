@@ -1,6 +1,33 @@
 import { describe, it, expect } from 'vitest';
 import { emptySlot } from '../../src/patch/types';
-import { applyInsertDefaults, opByCode } from '../../src/dsp/op-metadata';
+import {
+  applyInsertDefaults, opByCode, isCrossInstrumentOp, isPostRenderOp,
+} from '../../src/dsp/op-metadata';
+
+describe('op trait predicates', () => {
+  it('isCrossInstrumentOp is true only for clone (17) and chordgen (18)', () => {
+    expect(isCrossInstrumentOp(17)).toBe(true);   // clone
+    expect(isCrossInstrumentOp(18)).toBe(true);   // chordgen
+    for (const fn of [1, 2, 6, 8, 14, 16, 19, 22, 24]) {
+      expect(isCrossInstrumentOp(fn), `fn ${fn}`).toBe(false);
+    }
+    expect(isCrossInstrumentOp(999)).toBe(false); // unknown op
+  });
+
+  it('isPostRenderOp is true only for loop_gen (22)', () => {
+    expect(isPostRenderOp(22)).toBe(true);
+    for (const fn of [1, 2, 17, 18, 19, 24]) {
+      expect(isPostRenderOp(fn), `fn ${fn}`).toBe(false);
+    }
+    expect(isPostRenderOp(999)).toBe(false);
+  });
+
+  it('the flags live on the op defs, so the predicates stay in sync with OP_DEFS', () => {
+    expect(opByCode(17)!.crossInstrument).toBe(true);
+    expect(opByCode(18)!.crossInstrument).toBe(true);
+    expect(opByCode(22)!.postRender).toBe(true);
+  });
+});
 
 describe('applyInsertDefaults', () => {
   it('preserves fn and outVar — defaults merge ON TOP of the base, not replace it', () => {
