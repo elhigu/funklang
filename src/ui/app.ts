@@ -1,4 +1,4 @@
-import { PatchModel } from '../patch/model';
+import { PatchModel, adjustIndexForMove } from '../patch/model';
 import { HistoryManager } from '../patch/history';
 import { emptyPatch, emptyInstrument, N_SLOTS_EDITABLE } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
@@ -634,12 +634,7 @@ export function bootApp(root: HTMLElement): void {
   // Used by both the sidebar drag handler and __funklangModel so the
   // E2E shim and real drag UX behave identically.
   const moveInstrumentWithRemap = (from: number, to: number): void => {
-    const adjust = (idx: number): number => {
-      if (idx === from) return to;
-      if (from < idx && idx <= to) return idx - 1;  // shifted left by the splice-out
-      if (to <= idx && idx < from) return idx + 1;  // shifted right by the splice-in
-      return idx;
-    };
+    const adjust = (idx: number): number => adjustIndexForMove(idx, from, to);
     activeIdx = adjust(activeIdx);
     selection = { instrIdx: adjust(selection.instrIdx), slotIdx: selection.slotIdx };
     outputTarget = { instrIdx: adjust(outputTarget.instrIdx), slotIdx: outputTarget.slotIdx };

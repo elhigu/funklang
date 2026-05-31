@@ -7,6 +7,22 @@ import { N_INSTRUMENTS, N_SLOTS_MAX } from './types';
 import type { Instrument, Patch, Slot } from './types';
 import { clampLoopOffset } from './loop-rules';
 
+/**
+ * Where does an index that pointed at OLD instrument position `idx` land
+ * after `moveInstrument(from, to)` permutes the array? Pure mirror of the
+ * splice `moveInstrument` performs — host-side view-state indices
+ * (activeIdx, selection, outputTarget) feed through this so they follow
+ * the reorder. Kept beside `moveInstrument` so the two splice-mirror
+ * computations can't drift apart.
+ */
+export function adjustIndexForMove(idx: number, from: number, to: number): number {
+  if (from === to) return idx;
+  if (idx === from) return to;
+  if (from < idx && idx <= to) return idx - 1;  // splice-out shifts these left
+  if (to <= idx && idx < from) return idx + 1;  // splice-in shifts these right
+  return idx;
+}
+
 export class PatchModel {
   readonly events = new EventBus<PatchChange>();
 

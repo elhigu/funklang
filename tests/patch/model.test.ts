@@ -1,8 +1,53 @@
 import { describe, it, expect } from 'vitest';
-import { PatchModel } from '../../src/patch/model';
+import { PatchModel, adjustIndexForMove } from '../../src/patch/model';
 import type { PatchChange } from '../../src/patch/events';
 import { emptyPatch, emptySlot, N_SLOTS_MAX } from '../../src/patch/types';
 import type { Slot } from '../../src/patch/types';
+
+describe('adjustIndexForMove', () => {
+  // Mirrors PatchModel.moveInstrument's splice: where does an index that
+  // pointed at OLD position `idx` land after moving `from` → `to`?
+  it('the moved index itself maps to the destination', () => {
+    expect(adjustIndexForMove(2, 2, 5)).toBe(5);
+    expect(adjustIndexForMove(5, 5, 1)).toBe(1);
+  });
+
+  it('moving DOWN (from < to): indices in (from, to] shift left by one', () => {
+    // move 1 → 4: old 2,3,4 each shift to 1,2,3; 0 and 5 unchanged.
+    expect(adjustIndexForMove(0, 1, 4)).toBe(0);
+    expect(adjustIndexForMove(2, 1, 4)).toBe(1);
+    expect(adjustIndexForMove(3, 1, 4)).toBe(2);
+    expect(adjustIndexForMove(4, 1, 4)).toBe(3);
+    expect(adjustIndexForMove(5, 1, 4)).toBe(5);
+  });
+
+  it('moving UP (to < from): indices in [to, from) shift right by one', () => {
+    // move 4 → 1: old 1,2,3 each shift to 2,3,4; 0 and 5 unchanged.
+    expect(adjustIndexForMove(0, 4, 1)).toBe(0);
+    expect(adjustIndexForMove(1, 4, 1)).toBe(2);
+    expect(adjustIndexForMove(2, 4, 1)).toBe(3);
+    expect(adjustIndexForMove(3, 4, 1)).toBe(4);
+    expect(adjustIndexForMove(5, 4, 1)).toBe(5);
+  });
+
+  it('from === to is a no-op for every index', () => {
+    for (let i = 0; i < 6; i++) expect(adjustIndexForMove(i, 3, 3)).toBe(i);
+  });
+
+  it('agrees with the actual array splice for a sampling of moves', () => {
+    const moves: Array<[number, number]> = [[0, 3], [3, 0], [2, 4], [4, 2], [1, 5], [5, 1]];
+    for (const [from, to] of moves) {
+      const arr = [0, 1, 2, 3, 4, 5, 6];
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved!);
+      for (let oldIdx = 0; oldIdx < 7; oldIdx++) {
+        const predicted = adjustIndexForMove(oldIdx, from, to);
+        const actual = arr.indexOf(oldIdx);   // where old value oldIdx now sits
+        expect(predicted, `move ${from}->${to}, oldIdx ${oldIdx}`).toBe(actual);
+      }
+    }
+  });
+});
 
 function makeSlot(tag: number): Slot {
   return { ...emptySlot(), outVar: tag };
