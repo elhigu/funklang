@@ -18,7 +18,10 @@ import type { Slot } from '../patch/types';
 export type ParamKind =
   | { kind: 'const-int';    min: number; max: number; label: string; scale?: 'linear' | 'pow' }
   | { kind: 'var-source';   label: string; allowNone?: boolean }
-  | { kind: 'var-or-const'; min: number; max: number; label: string; scale?: 'linear' | 'pow' }
+  | { kind: 'var-or-const'; min: number; max: number; label: string; scale?: 'linear' | 'pow';
+      /** `'fractional'` adds a sidecar text input showing the literal as
+       *  value/32767 ∈ [-1.0, 1.0] (mul's coefficient view). */
+      display?: 'fractional' }
   | { kind: 'enum';         options: ReadonlyArray<{ value: number; label: string }>; label: string }
   | { kind: 'instr-ref';    label: string }
   | { kind: 'sample-ref';   label: string };
@@ -235,7 +238,7 @@ export const OP_DEFS: ReadonlyArray<OpDef> = [
     params: [
       { field: 'val1', type: { kind: 'var-source', label: 'in1', allowNone: true } },
       { field: 'val2Value', selector: 'val2',
-        type: { kind: 'var-or-const', min: -32768, max: 32830, label: 'in2' } },
+        type: { kind: 'var-or-const', min: -32768, max: 32830, label: 'in2', display: 'fractional' } },
     ],
   },
 

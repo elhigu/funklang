@@ -588,7 +588,7 @@ function renderParam(
       // applyMode() can disable it in lock-step with the knob when the
       // value is sourced from a variable rather than the literal.
       let mulFrac: HTMLInputElement | null = null;
-      if (slot.fn === 10 && param.field === 'val2Value') {
+      if (param.type.display === 'fractional') {
         const frac = document.createElement('input');
         frac.type = 'text';
         frac.className = 'param-mul-frac';

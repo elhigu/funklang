@@ -27,6 +27,15 @@ describe('op trait predicates', () => {
     expect(opByCode(18)!.crossInstrument).toBe(true);
     expect(opByCode(22)!.postRender).toBe(true);
   });
+
+  it("mul's val2Value param declares display:'fractional' (drives the sidecar)", () => {
+    const mulVal2 = opByCode(10)!.params.find((p) => p.field === 'val2Value')!;
+    expect(mulVal2.type.kind).toBe('var-or-const');
+    expect((mulVal2.type as { display?: string }).display).toBe('fractional');
+    // add (fn=9) has the same field but NO fractional sidecar.
+    const addVal2 = opByCode(9)!.params.find((p) => p.field === 'val2Value')!;
+    expect((addVal2.type as { display?: string }).display).toBeUndefined();
+  });
 });
 
 describe('applyInsertDefaults', () => {
