@@ -21,9 +21,8 @@ import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, openFileWithHandle, saveFileBytes, saveToHandle } from './file-dialog';
 import { attachWheelStep } from './wheel';
 import { getDisplayBase, setDisplayBase, onDisplayBaseChange } from './number-format';
-import {
-  startAutosaveLoop, latestAutosave, listAutosaves, restoreAutosave, saveAutosave,
-} from './autosave';
+import { startAutosaveLoop, latestAutosave, restoreAutosave } from './autosave';
+import { wireRevertPanel } from './revert-panel';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -1190,18 +1189,13 @@ export function bootApp(root: HTMLElement): void {
   startAutosaveLoop(() => model.patch);
 
   // ── REVERT AUTOSAVE side panel ──────────────────────────────────
-  const revertPanel = root.querySelector('#revert-panel') as HTMLElement;
-  const revertList  = root.querySelector('#revert-list')  as HTMLElement;
-  const revertClose = root.querySelector('#revert-close') as HTMLButtonElement;
-  const revertBtn   = root.querySelector('#btn-revert')   as HTMLButtonElement;
-
-  let revertEntries: ReturnType<typeof listAutosaves> = [];
-
-  const restoreEntry = (i: number): void => {
-    const entry = revertEntries[i];
-    if (!entry) return;
-    try {
-      model.patch = restoreAutosave(entry);
+  // The panel owns its own browsing UI; we hand it the "apply a restored
+  // patch" action since that mutates editor state (activeIdx / selection /
+  // output / render), which the panel must not know about.
+  wireRevertPanel(root, {
+    getPatch: () => model.patch,
+    onRestore: (patch) => {
+      model.patch = patch;
       normalizePatch(model.patch);
       if (activeIdx >= model.patch.instruments.length) activeIdx = 0;
       const ins = model.patch.instruments[activeIdx];
@@ -1220,87 +1214,7 @@ export function bootApp(root: HTMLElement): void {
       renderMain();
       repaint();
       playAudition();   // user wants to HEAR the loaded state
-    } catch (err) {
-      console.error('Failed to restore autosave', err);
-    }
-  };
-
-  const selectRevertRow = (i: number): void => {
-    const rows = Array.from(revertList.querySelectorAll('.revert-row')) as HTMLElement[];
-    if (i < 0 || i >= rows.length) return;
-    for (const r of rows) r.classList.remove('active');
-    rows[i]!.classList.add('active');
-    rows[i]!.scrollIntoView({ block: 'nearest' });
-    restoreEntry(i);
-  };
-
-  const openRevertPanel = (): void => {
-    // Snapshot CURRENT state to the top of the list before browsing —
-    // user-requested escape hatch so they can roll back any preview.
-    saveAutosave(model.patch);
-    revertEntries = listAutosaves();
-    revertList.innerHTML = '';
-    revertEntries.forEach((entry, i) => {
-      const li = document.createElement('li');
-      li.className = 'revert-row';
-      // Highlight the CURRENT row by default so the user has a visible
-      // "I'm here" anchor before any scrolling starts.
-      if (i === 0) li.classList.add('active');
-      const ts = new Date(entry.timestamp);
-      const labelLeft = i === 0 ? 'CURRENT' : `${i} ${i === 1 ? 'save' : 'saves'} ago`;
-      li.innerHTML = `<span class="revert-label">${labelLeft}</span><span class="revert-time">${ts.toLocaleString()}</span>`;
-      li.addEventListener('click', () => selectRevertRow(i));
-      revertList.appendChild(li);
-    });
-    revertPanel.classList.remove('hidden');
-    revertPanel.setAttribute('aria-hidden', 'false');
-  };
-  const closeRevertPanel = (): void => {
-    revertPanel.classList.add('hidden');
-    revertPanel.setAttribute('aria-hidden', 'true');
-  };
-  revertBtn.addEventListener('click', openRevertPanel);
-  revertClose.addEventListener('click', closeRevertPanel);
-
-  // Keyboard browse when the panel is open: Up/Down move highlight +
-  // load that snapshot (so the user actually HEARS each entry as they
-  // scroll). Escape closes.
-  document.addEventListener('keydown', (e) => {
-    if (revertPanel.classList.contains('hidden')) return;
-    if (e.key === 'Escape') { e.preventDefault(); closeRevertPanel(); return; }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    const rows = Array.from(revertList.querySelectorAll('.revert-row')) as HTMLElement[];
-    if (rows.length === 0) return;
-    const curIdx = Math.max(0, rows.findIndex((r) => r.classList.contains('active')));
-    const nextIdx = Math.max(0, Math.min(rows.length - 1, curIdx + (e.key === 'ArrowDown' ? 1 : -1)));
-    if (nextIdx === curIdx) return;
-    e.preventDefault();
-    selectRevertRow(nextIdx);
-  });
-
-  // Wheel inside the panel scrolls the SELECTION (not the DOM scroll
-  // position) — each notch moves to the next/previous autosave and
-  // loads it so the user can spin through history with one finger.
-  revertPanel.addEventListener('wheel', (e) => {
-    if (revertPanel.classList.contains('hidden')) return;
-    const rows = Array.from(revertList.querySelectorAll('.revert-row')) as HTMLElement[];
-    if (rows.length === 0) return;
-    e.preventDefault();
-    const curIdx = Math.max(0, rows.findIndex((r) => r.classList.contains('active')));
-    const nextIdx = Math.max(0, Math.min(rows.length - 1, curIdx + (e.deltaY > 0 ? 1 : -1)));
-    if (nextIdx === curIdx) return;
-    selectRevertRow(nextIdx);
-  }, { passive: false });
-
-  // Click outside the panel (and not on the REVERT button that opened
-  // it) closes the panel. mousedown rather than click so the panel
-  // disappears the moment a stray editor click lands.
-  document.addEventListener('mousedown', (e) => {
-    if (revertPanel.classList.contains('hidden')) return;
-    const t = e.target as Node;
-    if (revertPanel.contains(t)) return;
-    if (revertBtn.contains(t)) return;   // opening click would immediately close
-    closeRevertPanel();
+    },
   });
 
   // Global hex/dec display toggle. Flipping it just re-renders the
