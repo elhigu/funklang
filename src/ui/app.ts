@@ -15,7 +15,7 @@ import { renderSidebar } from './sidebar';
 import { helpOverlayHtml, wireHelp } from './help-modal';
 import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
-import { bytesToInt16, bytesToInt16WithLoop } from './waveform';
+import { bytesToInt16 } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
 import { openFileBytes, openFileWithHandle, saveFileBytes, saveToHandle } from './file-dialog';
@@ -23,6 +23,7 @@ import { attachWheelStep } from './wheel';
 import { getDisplayBase, setDisplayBase, onDisplayBaseChange } from './number-format';
 import { startAutosaveLoop, latestAutosave, restoreAutosave } from './autosave';
 import { wireRevertPanel } from './revert-panel';
+import { slotDisplayTap, audibleForTarget, instrumentHasPostRender } from './audio-tap';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -59,13 +60,6 @@ function loadStoredNote(): string {
 function saveStoredNote(note: string): void {
   try { localStorage.setItem(NOTE_LS_KEY, note); }
   catch { /* localStorage unavailable */ }
-}
-
-function instrHasOp(model: PatchModel, instrIdx: number, op: number): boolean {
-  const ins = model.patch.instruments[instrIdx];
-  if (!ins) return false;
-  for (const s of ins.slots) if (s.fn === op) return true;
-  return false;
 }
 
 function warnPatchOver16Slots(model: PatchModel): void {
@@ -554,25 +548,6 @@ export function bootApp(root: HTMLElement): void {
     stepInstrument(e.deltaY > 0 ? 1 : -1, { play: true });
   }, { passive: false });
 
-  /**
-   * loop_gen (op22) produces no per-tick output — its slotTap[i] is silent.
-   * To make the loop_gen slot's tap (and the dedicated wave-viewer when
-   * loop_gen is in play) actually show the crossfaded loop region, we use
-   * the engine's post-loopgen `bytes` buffer (upscaled to Int16) as that
-   * slot's display tap.
-   */
-  function slotDisplayTap(
-    ins: typeof model.patch.instruments[number],
-    render: NonNullable<typeof lastRender>,
-    slotIdx: number,
-  ): Int16Array {
-    const slot = ins.slots[slotIdx];
-    if (slot && isPostRenderOp(slot.fn) && render.bytes.length > 0) {
-      return bytesToInt16(render.bytes);
-    }
-    return render.slotTaps[slotIdx] ?? new Int16Array(0);
-  }
-
   function displayTapsFor(
     ins: typeof model.patch.instruments[number],
     render: NonNullable<typeof lastRender>,
@@ -641,9 +616,9 @@ export function bootApp(root: HTMLElement): void {
       const target = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null && lastRender)
         ? (slotDisplayTap(ins, lastRender, outputTarget.slotIdx))
         : finalAudible;
-      // Loop overlay only when the patch uses op22 (Loop Generator) somewhere
-      // in the active instrument. The user wants the band hidden otherwise.
-      const showLoop = instrHasOp(model, activeIdx, 22);
+      // Loop overlay only when the active instrument has a loop_gen op.
+      // The user wants the band hidden otherwise.
+      const showLoop = instrumentHasPostRender(ins);
       waveViewer.setSample(target, {
         loopOffset: ins.loopOffset,
         loopLength: ins.loopLength,
@@ -675,28 +650,6 @@ export function bootApp(root: HTMLElement): void {
     if (brandEl) brandEl.classList.toggle('audio-on', audioEnabled);
   };
 
-  /**
-   * Build the Int16 buffer that represents what we actually want to
-   * audition for the instrument's FINAL output. When the instrument has
-   * an op22 loop_gen slot AND the loop region is non-empty, we append a
-   * few iterations of the loop region after the original sample so the
-   * user audibly hears the loop behaviour the Amiga would produce, not
-   * just one-shot the whole buffer.
-   */
-  const FINAL_LOOP_REPEATS = 1 ;
-  const buildFinalAudible = (
-    ins: typeof model.patch.instruments[number],
-    render: NonNullable<typeof lastRender>,
-    instrIdx: number,
-  ): Int16Array => {
-    if (instrHasOp(model, instrIdx, 22) && ins.loopLength > 0) {
-      return bytesToInt16WithLoop(
-        render.bytes, ins.loopOffset, ins.loopLength, FINAL_LOOP_REPEATS,
-      );
-    }
-    return bytesToInt16(render.bytes);
-  };
-
   /** Internal core; callers can bypass the audioEnabled gate via `force`. */
   const playAuditionInternal = (opts: { force?: boolean } = {}): void => {
     if (!audioEnabled && !opts.force) return;
@@ -717,14 +670,9 @@ export function bootApp(root: HTMLElement): void {
     }
     if (!render || !renderIns) return;
 
-    // For final output (slotIdx == null) and for the loop_gen slot's tap
-    // we want the looped bytes; intermediate slot taps stay one-shot.
-    const loopGenSlot = outputTarget.slotIdx != null
-      ? renderIns.slots[outputTarget.slotIdx] : undefined;
-    const targetIsLoopGenSlot = !!loopGenSlot && isPostRenderOp(loopGenSlot.fn);
-    const sample = (outputTarget.slotIdx != null && !targetIsLoopGenSlot)
-      ? slotDisplayTap(renderIns, render, outputTarget.slotIdx)
-      : buildFinalAudible(renderIns, render, outputTarget.instrIdx);
+    // audibleForTarget picks the right buffer: final output for slotIdx
+    // null or a loop_gen slot, the slot's one-shot tap otherwise.
+    const sample = audibleForTarget(renderIns, render, outputTarget.slotIdx);
     if (!sample || sample.length === 0) return;
     player.play(sample, noteRateHz(previewNote));
   };
