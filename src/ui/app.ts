@@ -285,7 +285,7 @@ export function bootApp(root: HTMLElement): void {
         // knob picks up the new value. (The slot grid is the only
         // listener that has a stale view of `ins.loopOffset` after
         // the meta events above.)
-        model.events.emit({ instrIdx: state.activeIdx, kind: 'structure' });
+        applyEdit({ kind: 'structure', instrIdx: state.activeIdx });
       },
     });
 
@@ -407,9 +407,7 @@ export function bootApp(root: HTMLElement): void {
     state.activeIdx = want;
     state.selection = { instrIdx: want, slotIdx: null };
     state.outputTarget = { instrIdx: want, slotIdx: null };
-    renderMain();
-    repaint();
-    if (opts.play) playAudition();   // gated by state.audioEnabled
+    applyEdit({ kind: 'select' }, { audition: opts.play });   // audition gated by state.audioEnabled
   };
 
   /**
@@ -448,10 +446,7 @@ export function bootApp(root: HTMLElement): void {
       const stem = f.name.replace(/\.aki$/i, '');
       if (!ins.name) ins.name = stem;
       model.patch.instruments[state.activeIdx] = ins;
-      rebuildCloneGraph();
-      model.events.emit({ instrIdx: state.activeIdx, kind: 'structure' });
-      renderMain();
-      repaint();
+      applyEdit({ kind: 'structure', instrIdx: state.activeIdx });
     } finally {
       setTimeout(() => { importing = false; }, 300);
     }
@@ -495,10 +490,7 @@ export function bootApp(root: HTMLElement): void {
     const label = ins.name || `instrument ${String(i + 1).padStart(2, '0')}`;
     if (!confirm(`Remove "${label}" — clears the name, sample length and all slots. Cannot be undone with Ctrl+Z. Continue?`)) return;
     model.patch.instruments[i] = emptyInstrument();
-    rebuildCloneGraph();
-    model.events.emit({ instrIdx: i, kind: 'structure' });
-    if (i === state.activeIdx) renderMain();
-    repaint();
+    applyEdit({ kind: 'structure', instrIdx: i });
   };
 
   // Reorder an instrument AND remap the three host-side indices
@@ -666,6 +658,40 @@ export function bootApp(root: HTMLElement): void {
 
   /** Auto-replay-on-change path — gated by the audio toggle. */
   const playAudition = (): void => playAuditionInternal();
+
+  /**
+   * The single "I changed something — refresh accordingly" verb. Handlers
+   * describe WHAT changed; this owns HOW the refresh cascade runs, so the
+   * clone-graph / DOM / sidebar / audio steps live in one place instead of
+   * being hand-copied (and easy to get subtly wrong, or double-run) at every
+   * call site.
+   *
+   * For 'reset' and 'structure' the work is delegated to the model-event
+   * subscriber below: emitting the event IS the refresh — it rebuilds the
+   * clone graph, revalidates the output target, re-renders grid + sidebar,
+   * and (for a structure change touching the active instrument) re-auditions
+   * via the debounced path. 'select' is a pure view change (no model
+   * mutation, no event), so it re-renders directly.
+   */
+  type EditScope =
+    | { kind: 'reset' }                        // whole patch replaced (open / close / revert / restore)
+    | { kind: 'structure'; instrIdx: number }  // slot layout or clone wiring changed
+    | { kind: 'select' };                      // active instrument switched; no data change
+  const applyEdit = (scope: EditScope, opts: { audition?: boolean | undefined } = {}): void => {
+    switch (scope.kind) {
+      case 'reset':
+        model.events.emit({ instrIdx: -1, kind: 'reset' });
+        break;
+      case 'structure':
+        model.events.emit({ instrIdx: scope.instrIdx, kind: 'structure' });
+        break;
+      case 'select':
+        renderMain();
+        repaint();
+        break;
+    }
+    if (opts.audition) playAudition();
+  };
 
   /**
    * Replay whatever's already rendered (does not re-run DSP). Used by spacebar.
@@ -905,11 +931,8 @@ export function bootApp(root: HTMLElement): void {
     state.activeIdx = firstPopulatedInstrument(model.patch);
     state.selection = { instrIdx: state.activeIdx, slotIdx: null };
     state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
-    rebuildCloneGraph();
-    model.events.emit({ instrIdx: -1, kind: 'reset' });
     warnPatchOver16Slots(model);
-    renderMain();
-    repaint();
+    applyEdit({ kind: 'reset' });
   };
 
   hidden.addEventListener('change', async () => {
@@ -954,10 +977,7 @@ export function bootApp(root: HTMLElement): void {
     state.activeIdx = 0;
     state.selection = { instrIdx: 0, slotIdx: null };
     state.outputTarget = { instrIdx: 0, slotIdx: null };
-    rebuildCloneGraph();
-    model.events.emit({ instrIdx: -1, kind: 'reset' });
-    renderMain();
-    repaint();
+    applyEdit({ kind: 'reset' });
   });
   // Single audio toggle replaces PLAY/STOP/RETRIG. Green = on (changes
   // auto-replay, spacebar replays). Red = muted (re-renders still happen so
@@ -1104,8 +1124,7 @@ export function bootApp(root: HTMLElement): void {
       state.activeIdx = firstPopulatedInstrument(model.patch);
       state.selection = { instrIdx: state.activeIdx, slotIdx: null };
       state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
-      rebuildCloneGraph();
-      model.events.emit({ instrIdx: -1, kind: 'reset' });
+      applyEdit({ kind: 'reset' });
     } catch { /* corrupt entry — ignore, user can browse REVERT panel */ }
   }
   // Kick off the recurring loop. (Stop function discarded — the app's
@@ -1129,11 +1148,7 @@ export function bootApp(root: HTMLElement): void {
       }
       state.selection = { instrIdx: state.activeIdx, slotIdx: null };
       state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
-      rebuildCloneGraph();
-      model.events.emit({ instrIdx: -1, kind: 'reset' });
-      renderMain();
-      repaint();
-      playAudition();   // user wants to HEAR the loaded state
+      applyEdit({ kind: 'reset' }, { audition: true });   // user wants to HEAR the loaded state
     },
   });
 
@@ -1149,12 +1164,10 @@ export function bootApp(root: HTMLElement): void {
   onDisplayBaseChange(() => {
     // Every knob / number field reads its display string from
     // `formatInt` — re-render the whole editor so they update.
-    renderMain();
-    repaint();
+    applyEdit({ kind: 'select' });
   });
 
-  renderMain();
-  repaint();
+  applyEdit({ kind: 'select' });   // initial paint of the blank editor
   updateUndoRedoButtons();
 
   // Expose the model on window so E2E tests can drive moves and edits
