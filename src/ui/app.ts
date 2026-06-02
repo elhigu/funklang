@@ -24,6 +24,7 @@ import { getDisplayBase, setDisplayBase, onDisplayBaseChange } from './number-fo
 import { startAutosaveLoop, latestAutosave, restoreAutosave } from './autosave';
 import { wireRevertPanel } from './revert-panel';
 import { slotDisplayTap, audibleForTarget, instrumentHasPostRender } from './audio-tap';
+import { firstPopulatedInstrument, isPatchBlank, instrumentIsEmpty } from '../patch/queries';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -915,10 +916,7 @@ export function bootApp(root: HTMLElement): void {
     patchFileName = name;
     patchFileHandle = handle;
     nameEl.textContent = patchFileName;
-    activeIdx = model.patch.instruments.findIndex(
-      (ins) => ins.slots.some((s) => s.fn !== 0),
-    );
-    if (activeIdx < 0) activeIdx = 0;
+    activeIdx = firstPopulatedInstrument(model.patch);
     selection = { instrIdx: activeIdx, slotIdx: null };
     outputTarget = { instrIdx: activeIdx, slotIdx: null };
     rebuildCloneGraph();
@@ -1113,24 +1111,16 @@ export function bootApp(root: HTMLElement): void {
   // the most recent autosave silently — saves the user a click after a
   // page reload.
   const bootAutosave = latestAutosave();
-  if (bootAutosave) {
-    const patchIsBlank = !model.patch.instruments.some(
-      (ins) => ins.slots.some((s) => s.fn !== 0),
-    );
-    if (patchIsBlank) {
-      try {
-        model.patch = restoreAutosave(bootAutosave);
-        normalizePatch(model.patch);
-        activeIdx = model.patch.instruments.findIndex(
-          (ins) => ins.slots.some((s) => s.fn !== 0),
-        );
-        if (activeIdx < 0) activeIdx = 0;
-        selection = { instrIdx: activeIdx, slotIdx: null };
-        outputTarget = { instrIdx: activeIdx, slotIdx: null };
-        rebuildCloneGraph();
-        model.events.emit({ instrIdx: -1, kind: 'reset' });
-      } catch { /* corrupt entry — ignore, user can browse REVERT panel */ }
-    }
+  if (bootAutosave && isPatchBlank(model.patch)) {
+    try {
+      model.patch = restoreAutosave(bootAutosave);
+      normalizePatch(model.patch);
+      activeIdx = firstPopulatedInstrument(model.patch);
+      selection = { instrIdx: activeIdx, slotIdx: null };
+      outputTarget = { instrIdx: activeIdx, slotIdx: null };
+      rebuildCloneGraph();
+      model.events.emit({ instrIdx: -1, kind: 'reset' });
+    } catch { /* corrupt entry — ignore, user can browse REVERT panel */ }
   }
   // Kick off the recurring loop. (Stop function discarded — the app's
   // lifetime is the page lifetime; no clean shutdown needed.)
@@ -1145,15 +1135,11 @@ export function bootApp(root: HTMLElement): void {
     onRestore: (patch) => {
       model.patch = patch;
       normalizePatch(model.patch);
-      if (activeIdx >= model.patch.instruments.length) activeIdx = 0;
-      const ins = model.patch.instruments[activeIdx];
-      if (!ins || ins.slots.every((s) => s.fn === 0)) {
-        // Active instrument is empty in the restored patch — fall back
-        // to the first populated one so the user actually sees something.
-        const firstFilled = model.patch.instruments.findIndex(
-          (i2) => i2.slots.some((s) => s.fn !== 0),
-        );
-        if (firstFilled >= 0) activeIdx = firstFilled;
+      // Keep the user on the same instrument while browsing snapshots —
+      // unless it's empty in the restored patch, in which case fall back
+      // to the first populated one so they actually see something.
+      if (instrumentIsEmpty(model.patch, activeIdx)) {
+        activeIdx = firstPopulatedInstrument(model.patch);
       }
       selection = { instrIdx: activeIdx, slotIdx: null };
       outputTarget = { instrIdx: activeIdx, slotIdx: null };
