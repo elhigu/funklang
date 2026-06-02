@@ -25,6 +25,7 @@ import { startAutosaveLoop, latestAutosave, restoreAutosave } from './autosave';
 import { wireRevertPanel } from './revert-panel';
 import { slotDisplayTap, audibleForTarget, instrumentHasPostRender } from './audio-tap';
 import { firstPopulatedInstrument, isPatchBlank, instrumentIsEmpty } from '../patch/queries';
+import { createEditorState } from './editor-state';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -32,24 +33,14 @@ const NOTE_LS_KEY = 'funklang.previewNote';
 
 /**
  * Two separate concepts:
- *  - `selection`:    which slot the user is "looking at" (edit focus).
+ *  - `state.selection`:    which slot the user is "looking at" (edit focus).
  *                    Set by clicking a slot row. Mutating knob values does
  *                    NOT change this.
- *  - `outputTarget`: which signal feeds the audio player. `slotIdx === null`
+ *  - `state.outputTarget`: which signal feeds the audio player. `slotIdx === null`
  *                    means "play the instrument's final v1 output". Only the
  *                    user explicitly retargets this (header dropdown or the
  *                    per-row 🔊 button).
  */
-interface SelectionState {
-  instrIdx: number;
-  slotIdx: number | null;
-}
-
-interface OutputTarget {
-  instrIdx: number;
-  slotIdx: number | null; // null = final output (v1)
-}
-
 function loadStoredNote(): string {
   try {
     const v = localStorage.getItem(NOTE_LS_KEY);
@@ -82,18 +73,14 @@ export function bootApp(root: HTMLElement): void {
   const model = new PatchModel(emptyPatch());
   const history = new HistoryManager(model);
   const player = new Player();
-  let activeIdx = 0;
-  let patchFileName = '';
-  // File System Access handle if open via FSA; undefined otherwise.
-  let patchFileHandle: FileSystemFileHandle | undefined = undefined;
-  let selection: SelectionState = { instrIdx: 0, slotIdx: null };
-  let outputTarget: OutputTarget = { instrIdx: 0, slotIdx: null };
-  let previewNote: string = loadStoredNote();
+  // All editor view-state (focus / selection / output tap / file / audio)
+  // lives in one cohesive object so it can be passed to controllers.
+  const state = createEditorState(loadStoredNote());
   // Reverse clone-dependency index. Rebuilt on structure changes.
   let cloneGraph: CloneGraph = buildCloneGraph(model.patch);
 
   const noteOptions = NOTE_LIST
-    .map((n) => `<option value="${n}"${n === previewNote ? ' selected' : ''}>${n}</option>`)
+    .map((n) => `<option value="${n}"${n === state.previewNote ? ' selected' : ''}>${n}</option>`)
     .join('');
 
   root.innerHTML = `
@@ -190,20 +177,20 @@ export function bootApp(root: HTMLElement): void {
   };
 
   /**
-   * If `outputTarget.slotIdx` no longer references a valid slot (e.g. the
+   * If `state.outputTarget.slotIdx` no longer references a valid slot (e.g. the
    * row was deleted by undo / removeSlot), fall back to the instrument's
    * final output.
    */
   const validateOutputTarget = (): void => {
-    const ins = model.patch.instruments[outputTarget.instrIdx];
+    const ins = model.patch.instruments[state.outputTarget.instrIdx];
     if (!ins) {
-      outputTarget = { instrIdx: activeIdx, slotIdx: null };
+      state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
       return;
     }
-    if (outputTarget.slotIdx != null) {
-      const slot = ins.slots[outputTarget.slotIdx];
+    if (state.outputTarget.slotIdx != null) {
+      const slot = ins.slots[state.outputTarget.slotIdx];
       if (!slot || slot.fn === 0) {
-        outputTarget = { instrIdx: outputTarget.instrIdx, slotIdx: null };
+        state.outputTarget = { instrIdx: state.outputTarget.instrIdx, slotIdx: null };
       }
     }
   };
@@ -249,11 +236,11 @@ export function bootApp(root: HTMLElement): void {
     // when they're working at the bottom of a long instrument. Only
     // honoured when the rebuild targets the SAME instrument — switching
     // instruments should start at the top, not inherit the old scroll.
-    const sameInstrument = gridHostInstrIdx === activeIdx;
+    const sameInstrument = gridHostInstrIdx === state.activeIdx;
     const prevScrollTop = sameInstrument ? (gridHostEl?.scrollTop ?? 0) : 0;
 
     mainEl.innerHTML = '';
-    const ins = model.patch.instruments[activeIdx];
+    const ins = model.patch.instruments[state.activeIdx];
     if (!ins) {
       gridHostEl = null;
       gridHostInstrIdx = null;
@@ -262,10 +249,10 @@ export function bootApp(root: HTMLElement): void {
     }
     const headerHost = document.createElement('div');
     mainEl.appendChild(headerHost);
-    renderInstrHeader(headerHost, model, activeIdx, {
+    renderInstrHeader(headerHost, model, state.activeIdx, {
       onImportAki: () => { void importAkiForActive(); },
       onExportAki: () => { void exportAkiForActive(); },
-      onRemove:    () => removeInstrumentWithConfirm(activeIdx),
+      onRemove:    () => removeInstrumentWithConfirm(state.activeIdx),
     });
 
     const viewerHost = document.createElement('div');
@@ -281,15 +268,15 @@ export function bootApp(root: HTMLElement): void {
         // here — emitting `structure` mid-drag would destroy the
         // wave-viewer canvas (renderMain rebuild) and the document-
         // level mousemove handler would then divide by a zero rect.
-        const ins = model.patch.instruments[activeIdx];
+        const ins = model.patch.instruments[state.activeIdx];
         if (!ins) return;
         const snapped = clampLoopOffset(ins.sampleLength, rawOffset);
         const newLen = loopLengthFor(ins.sampleLength, snapped);
         if (snapped !== ins.loopOffset) {
-          model.setInstrumentField(activeIdx, 'loopOffset', snapped);
+          model.setInstrumentField(state.activeIdx, 'loopOffset', snapped);
         }
         if (newLen !== ins.loopLength) {
-          model.setInstrumentField(activeIdx, 'loopLength', newLen);
+          model.setInstrumentField(state.activeIdx, 'loopLength', newLen);
         }
       },
       onLoopCommit: () => {
@@ -298,7 +285,7 @@ export function bootApp(root: HTMLElement): void {
         // knob picks up the new value. (The slot grid is the only
         // listener that has a stale view of `ins.loopOffset` after
         // the meta events above.)
-        model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
+        model.events.emit({ instrIdx: state.activeIdx, kind: 'structure' });
       },
     });
 
@@ -306,24 +293,24 @@ export function bootApp(root: HTMLElement): void {
     gridHost.className = 'slot-grid-host';
     mainEl.appendChild(gridHost);
     gridHostEl = gridHost;
-    gridHostInstrIdx = activeIdx;
-    renderSlotGrid(gridHost, model, activeIdx, {
-      selectedSlot: selection.instrIdx === activeIdx ? selection.slotIdx : null,
-      outputSlot: outputTarget.slotIdx,
-      outputInstr: outputTarget.instrIdx,
+    gridHostInstrIdx = state.activeIdx;
+    renderSlotGrid(gridHost, model, state.activeIdx, {
+      selectedSlot: state.selection.instrIdx === state.activeIdx ? state.selection.slotIdx : null,
+      outputSlot: state.outputTarget.slotIdx,
+      outputInstr: state.outputTarget.instrIdx,
       onSelect: (slotIdx) => {
-        selection = { instrIdx: activeIdx, slotIdx };
+        state.selection = { instrIdx: state.activeIdx, slotIdx };
         // Refresh only the row highlights + footer label — don't replay audio
         // and don't change the output target.
         refreshSelectionHighlight();
         updateLabels();
       },
       onSetOutput: (srcInstrIdx, slotIdx) => {
-        // srcInstrIdx may not be activeIdx if 🔊 was clicked inside an
+        // srcInstrIdx may not be state.activeIdx if 🔊 was clicked inside an
         // expanded clone block — the inner grid belongs to the source
         // instrument. Honour the actual instr the slot belongs to so the
         // user hears that slot's tap, not the active instrument's.
-        outputTarget = { instrIdx: srcInstrIdx, slotIdx };
+        state.outputTarget = { instrIdx: srcInstrIdx, slotIdx };
         refreshOutputHighlight();
         refreshOutputMasterBtn();
         updateLabels();
@@ -359,7 +346,7 @@ export function bootApp(root: HTMLElement): void {
     for (const r of Array.from(rows)) {
       const el = r as HTMLElement;
       const idx = parseInt(el.dataset['slot'] ?? '-1', 10);
-      const isSel = selection.instrIdx === activeIdx && idx === selection.slotIdx;
+      const isSel = state.selection.instrIdx === state.activeIdx && idx === state.selection.slotIdx;
       el.classList.toggle('selected', isSel);
       el.classList.toggle('active', isSel);
     }
@@ -372,7 +359,7 @@ export function bootApp(root: HTMLElement): void {
     for (const r of Array.from(rows)) {
       const el = r as HTMLElement;
       const idx = parseInt(el.dataset['slot'] ?? '-1', 10);
-      const isOut = outputTarget.instrIdx === activeIdx && idx === outputTarget.slotIdx;
+      const isOut = state.outputTarget.instrIdx === state.activeIdx && idx === state.outputTarget.slotIdx;
       el.classList.toggle('output-target', isOut);
       const numCol = el.querySelector('.col-num');
       if (numCol) {
@@ -403,7 +390,7 @@ export function bootApp(root: HTMLElement): void {
    * Clicking it always returns the output to MASTER V1 of the active instr.
    */
   const refreshOutputMasterBtn = (): void => {
-    const isMaster = outputTarget.instrIdx === activeIdx && outputTarget.slotIdx == null;
+    const isMaster = state.outputTarget.instrIdx === state.activeIdx && state.outputTarget.slotIdx == null;
     outputMasterBtn.classList.toggle('active', isMaster);
     outputMasterBtn.classList.toggle('dimmed', !isMaster);
   };
@@ -416,17 +403,17 @@ export function bootApp(root: HTMLElement): void {
   const selectInstrument = (i: number, opts: { play?: boolean } = {}): void => {
     const n = model.patch.instruments.length;
     let want = Math.max(0, Math.min(n - 1, i));
-    if (want === activeIdx) return;
-    activeIdx = want;
-    selection = { instrIdx: want, slotIdx: null };
-    outputTarget = { instrIdx: want, slotIdx: null };
+    if (want === state.activeIdx) return;
+    state.activeIdx = want;
+    state.selection = { instrIdx: want, slotIdx: null };
+    state.outputTarget = { instrIdx: want, slotIdx: null };
     renderMain();
     repaint();
-    if (opts.play) playAudition();   // gated by audioEnabled
+    if (opts.play) playAudition();   // gated by state.audioEnabled
   };
 
   /**
-   * Step the sidebar selection by `delta`, skipping over empty instruments
+   * Step the sidebar state.selection by `delta`, skipping over empty instruments
    * so wheel/arrow nav lands only on something audible. Wraps around past
    * the ends so you can scroll continuously.
    */
@@ -435,7 +422,7 @@ export function bootApp(root: HTMLElement): void {
     const n = list.length;
     if (n === 0) return;
     const dir = delta > 0 ? 1 : -1;
-    let next = activeIdx;
+    let next = state.activeIdx;
     for (let tries = 0; tries < n; tries++) {
       next = (next + dir + n) % n;
       const ins = list[next];
@@ -444,7 +431,7 @@ export function bootApp(root: HTMLElement): void {
         return;
       }
     }
-    // No non-empty instrument anywhere — leave activeIdx alone.
+    // No non-empty instrument anywhere — leave state.activeIdx alone.
   };
 
   // .AKI import/export hoisted out of the top menu and into the per-
@@ -460,9 +447,9 @@ export function bootApp(root: HTMLElement): void {
       const ins = parseAki(f.bytes);
       const stem = f.name.replace(/\.aki$/i, '');
       if (!ins.name) ins.name = stem;
-      model.patch.instruments[activeIdx] = ins;
+      model.patch.instruments[state.activeIdx] = ins;
       rebuildCloneGraph();
-      model.events.emit({ instrIdx: activeIdx, kind: 'structure' });
+      model.events.emit({ instrIdx: state.activeIdx, kind: 'structure' });
       renderMain();
       repaint();
     } finally {
@@ -474,10 +461,10 @@ export function bootApp(root: HTMLElement): void {
     if (exporting) return;
     exporting = true;
     try {
-      const ins = model.patch.instruments[activeIdx];
+      const ins = model.patch.instruments[state.activeIdx];
       if (!ins) return;
       const bytes = serializeAki(ins);
-      const stem = (ins.name || `instr_${activeIdx + 1}`).replace(/[^\w.-]+/g, '_');
+      const stem = (ins.name || `instr_${state.activeIdx + 1}`).replace(/[^\w.-]+/g, '_');
       await saveFileBytes(bytes, `${stem}.aki`, '.aki');
     } finally {
       setTimeout(() => { exporting = false; }, 300);
@@ -488,7 +475,7 @@ export function bootApp(root: HTMLElement): void {
   // file is associated. CLOSE button greys out in that state because
   // clicking it would be a no-op.
   const patchHasContent = (): boolean => {
-    if (patchFileName) return true;
+    if (state.patchFileName) return true;
     for (const ins of model.patch.instruments) {
       if (ins.slots.some((s) => s.fn !== 0)) return true;
     }
@@ -510,12 +497,12 @@ export function bootApp(root: HTMLElement): void {
     model.patch.instruments[i] = emptyInstrument();
     rebuildCloneGraph();
     model.events.emit({ instrIdx: i, kind: 'structure' });
-    if (i === activeIdx) renderMain();
+    if (i === state.activeIdx) renderMain();
     repaint();
   };
 
   // Reorder an instrument AND remap the three host-side indices
-  // (activeIdx / selection / outputTarget) that currently point at
+  // (state.activeIdx / state.selection / state.outputTarget) that currently point at
   // OLD positions in the array. Mirrors the splice the model does:
   //   - from itself maps to to
   //   - indices the splice walks over shift by ±1
@@ -523,14 +510,14 @@ export function bootApp(root: HTMLElement): void {
   // E2E shim and real drag UX behave identically.
   const moveInstrumentWithRemap = (from: number, to: number): void => {
     const adjust = (idx: number): number => adjustIndexForMove(idx, from, to);
-    activeIdx = adjust(activeIdx);
-    selection = { instrIdx: adjust(selection.instrIdx), slotIdx: selection.slotIdx };
-    outputTarget = { instrIdx: adjust(outputTarget.instrIdx), slotIdx: outputTarget.slotIdx };
+    state.activeIdx = adjust(state.activeIdx);
+    state.selection = { instrIdx: adjust(state.selection.instrIdx), slotIdx: state.selection.slotIdx };
+    state.outputTarget = { instrIdx: adjust(state.outputTarget.instrIdx), slotIdx: state.outputTarget.slotIdx };
     model.moveInstrument(from, to);
   };
 
   const repaint = (): void => {
-    renderSidebar(listEl, model.patch, activeIdx, {
+    renderSidebar(listEl, model.patch, state.activeIdx, {
       // Sidebar click also auto-plays (subject to the audio toggle), same
       // as wheel/arrow nav. Empty rows are clickable now too — the slot
       // grid renders an empty-state placeholder with a [+] button there.
@@ -572,10 +559,10 @@ export function bootApp(root: HTMLElement): void {
   };
 
   const runRender = (): void => {
-    const ins = model.patch.instruments[activeIdx];
+    const ins = model.patch.instruments[state.activeIdx];
     if (!ins) return;
     try {
-      lastRender = renderInstrument(model.patch, activeIdx);
+      lastRender = renderInstrument(model.patch, state.activeIdx);
       cycleError = null;
     } catch (err) {
       if (err instanceof CyclicCloneError) {
@@ -614,8 +601,8 @@ export function bootApp(root: HTMLElement): void {
     }
     if (waveViewer) {
       const finalAudible = lastRender ? bytesToInt16(lastRender.bytes) : null;
-      const target = (outputTarget.instrIdx === activeIdx && outputTarget.slotIdx != null && lastRender)
-        ? (slotDisplayTap(ins, lastRender, outputTarget.slotIdx))
+      const target = (state.outputTarget.instrIdx === state.activeIdx && state.outputTarget.slotIdx != null && lastRender)
+        ? (slotDisplayTap(ins, lastRender, state.outputTarget.slotIdx))
         : finalAudible;
       // Loop overlay only when the active instrument has a loop_gen op.
       // The user wants the band hidden otherwise.
@@ -642,28 +629,27 @@ export function bootApp(root: HTMLElement): void {
     gridHostEl.prepend(banner);
   };
 
-  let audioEnabled = true;
   // Cache the brand-dot element so we can drive its "autoplayback active"
-  // pulse animation off audioEnabled. The CSS pulse runs only while the
+  // pulse animation off state.audioEnabled. The CSS pulse runs only while the
   // `.audio-on` class is present on the brand container.
   const brandEl = root.querySelector('.brand') as HTMLElement | null;
   const reflectAudioOnDot = (): void => {
-    if (brandEl) brandEl.classList.toggle('audio-on', audioEnabled);
+    if (brandEl) brandEl.classList.toggle('audio-on', state.audioEnabled);
   };
 
-  /** Internal core; callers can bypass the audioEnabled gate via `force`. */
+  /** Internal core; callers can bypass the state.audioEnabled gate via `force`. */
   const playAuditionInternal = (opts: { force?: boolean } = {}): void => {
-    if (!audioEnabled && !opts.force) return;
+    if (!state.audioEnabled && !opts.force) return;
 
-    // When outputTarget.instrIdx differs from activeIdx (e.g. user clicked
+    // When state.outputTarget.instrIdx differs from state.activeIdx (e.g. user clicked
     // 🔊 inside an expanded clone block), render THAT instrument so we
     // can pull its sample / slotTap rather than the active one's.
     let render: typeof lastRender = lastRender;
-    let renderIns = model.patch.instruments[activeIdx];
-    if (outputTarget.instrIdx !== activeIdx) {
+    let renderIns = model.patch.instruments[state.activeIdx];
+    if (state.outputTarget.instrIdx !== state.activeIdx) {
       try {
-        render = renderInstrument(model.patch, outputTarget.instrIdx);
-        renderIns = model.patch.instruments[outputTarget.instrIdx];
+        render = renderInstrument(model.patch, state.outputTarget.instrIdx);
+        renderIns = model.patch.instruments[state.outputTarget.instrIdx];
       } catch {
         // Cyclic clone, etc. — just bail; nothing to play.
         return;
@@ -673,9 +659,9 @@ export function bootApp(root: HTMLElement): void {
 
     // audibleForTarget picks the right buffer: final output for slotIdx
     // null or a loop_gen slot, the slot's one-shot tap otherwise.
-    const sample = audibleForTarget(renderIns, render, outputTarget.slotIdx);
+    const sample = audibleForTarget(renderIns, render, state.outputTarget.slotIdx);
     if (!sample || sample.length === 0) return;
-    player.play(sample, noteRateHz(previewNote));
+    player.play(sample, noteRateHz(state.previewNote));
   };
 
   /** Auto-replay-on-change path — gated by the audio toggle. */
@@ -683,11 +669,11 @@ export function bootApp(root: HTMLElement): void {
 
   /**
    * Replay whatever's already rendered (does not re-run DSP). Used by spacebar.
-   * `force` bypasses the audioEnabled gate — spacebar is an explicit user
+   * `force` bypasses the state.audioEnabled gate — spacebar is an explicit user
    * action, so it always plays even when "autoplayback on changes" is muted.
    */
   const retriggerAudio = (opts: { force?: boolean } = {}): void => {
-    if (!audioEnabled && !opts.force) return;
+    if (!state.audioEnabled && !opts.force) return;
     if (!lastRender) {
       runRender();
     }
@@ -695,25 +681,25 @@ export function bootApp(root: HTMLElement): void {
   };
 
   const updateLabels = (): void => {
-    const sNum = String(selection.instrIdx + 1).padStart(2, '0');
-    if (selection.slotIdx == null) {
+    const sNum = String(state.selection.instrIdx + 1).padStart(2, '0');
+    if (state.selection.slotIdx == null) {
       selectionLabel.textContent = `instr ${sNum} / —`;
     } else {
-      const ins = model.patch.instruments[selection.instrIdx];
-      const slot = ins?.slots[selection.slotIdx];
+      const ins = model.patch.instruments[state.selection.instrIdx];
+      const slot = ins?.slots[state.selection.slotIdx];
       const vlabel = slot && slot.outVar > 0 ? ` · v${slot.outVar}` : '';
       selectionLabel.textContent =
-        `instr ${sNum} / slot ${String(selection.slotIdx + 1).padStart(2, '0')}${vlabel}`;
+        `instr ${sNum} / slot ${String(state.selection.slotIdx + 1).padStart(2, '0')}${vlabel}`;
     }
-    const oNum = String(outputTarget.instrIdx + 1).padStart(2, '0');
-    if (outputTarget.slotIdx == null) {
+    const oNum = String(state.outputTarget.instrIdx + 1).padStart(2, '0');
+    if (state.outputTarget.slotIdx == null) {
       outputLabel.textContent = `instr ${oNum} / final`;
     } else {
-      const ins = model.patch.instruments[outputTarget.instrIdx];
-      const slot = ins?.slots[outputTarget.slotIdx];
+      const ins = model.patch.instruments[state.outputTarget.instrIdx];
+      const slot = ins?.slots[state.outputTarget.slotIdx];
       const vlabel = slot && slot.outVar > 0 ? ` · v${slot.outVar}` : '';
       outputLabel.textContent =
-        `instr ${oNum} / slot ${String(outputTarget.slotIdx + 1).padStart(2, '0')}${vlabel}`;
+        `instr ${oNum} / slot ${String(state.outputTarget.slotIdx + 1).padStart(2, '0')}${vlabel}`;
     }
     updateUndoRedoButtons();
   };
@@ -722,7 +708,7 @@ export function bootApp(root: HTMLElement): void {
   // Always force-plays so the user hears the change immediately, even when
   // the audio toggle is muted (consistent with clicking a slot's 🔊).
   outputMasterBtn.addEventListener('click', () => {
-    outputTarget = { instrIdx: activeIdx, slotIdx: null };
+    state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
     refreshOutputHighlight();
     refreshOutputMasterBtn();
     updateLabels();
@@ -758,11 +744,11 @@ export function bootApp(root: HTMLElement): void {
     // The active instrument re-renders whenever IT changes OR when any
     // instrument it (transitively) clones changes. Output target also
     // matters because the user may be playing a different instrument
-    // than activeIdx — although currently the UI keeps them aligned.
+    // than state.activeIdx — although currently the UI keeps them aligned.
     const affectsActive =
-      e.instrIdx === activeIdx ||
-      outputTarget.instrIdx === e.instrIdx ||
-      allDependentsOf(cloneGraph, e.instrIdx).has(activeIdx);
+      e.instrIdx === state.activeIdx ||
+      state.outputTarget.instrIdx === e.instrIdx ||
+      allDependentsOf(cloneGraph, e.instrIdx).has(state.activeIdx);
     updateUndoRedoButtons();
     if (!affectsActive) return;
     if (e.kind === 'structure') {
@@ -837,7 +823,7 @@ export function bootApp(root: HTMLElement): void {
       return;
     }
 
-    // Plain ArrowUp/ArrowDown steps the sidebar instrument selection
+    // Plain ArrowUp/ArrowDown steps the sidebar instrument state.selection
     // (auto-plays subject to the audio toggle, like the mouse wheel).
     // Must run BEFORE the `if (!mod) return;` modifier gate below —
     // otherwise no-modifier arrows never reach the rest of the chain.
@@ -884,7 +870,7 @@ export function bootApp(root: HTMLElement): void {
 
   // Warn before refresh/close when there's a patch in play.
   const beforeUnloadHandler = (ev: BeforeUnloadEvent): void => {
-    const hasWork = patchFileName !== '' || model.patch.instruments.some(
+    const hasWork = state.patchFileName !== '' || model.patch.instruments.some(
       (ins) => ins.slots.length > 0,
     );
     if (hasWork) {
@@ -913,12 +899,12 @@ export function bootApp(root: HTMLElement): void {
     // wave-viewer "len" meta, the loop_gen knob, …) assumes the rules
     // hold.
     normalizePatch(model.patch);
-    patchFileName = name;
-    patchFileHandle = handle;
-    nameEl.textContent = patchFileName;
-    activeIdx = firstPopulatedInstrument(model.patch);
-    selection = { instrIdx: activeIdx, slotIdx: null };
-    outputTarget = { instrIdx: activeIdx, slotIdx: null };
+    state.patchFileName = name;
+    state.patchFileHandle = handle;
+    nameEl.textContent = state.patchFileName;
+    state.activeIdx = firstPopulatedInstrument(model.patch);
+    state.selection = { instrIdx: state.activeIdx, slotIdx: null };
+    state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
     rebuildCloneGraph();
     model.events.emit({ instrIdx: -1, kind: 'reset' });
     warnPatchOver16Slots(model);
@@ -959,15 +945,15 @@ export function bootApp(root: HTMLElement): void {
     // CLOSE wipes the in-memory patch — autosaves are preserved so the
     // user can still REVERT, but the live edit state is gone. Confirm
     // first so a stray click can't nuke unsaved work.
-    const label = patchFileName || 'this patch';
+    const label = state.patchFileName || 'this patch';
     if (!confirm(`Close ${label}? Unsaved changes will be lost. (Autosaves stay available under REVERT AUTOSAVE.)`)) return;
     model.patch = emptyPatch();
-    patchFileName = '';
-    patchFileHandle = undefined;
+    state.patchFileName = '';
+    state.patchFileHandle = undefined;
     nameEl.textContent = '(no patch)';
-    activeIdx = 0;
-    selection = { instrIdx: 0, slotIdx: null };
-    outputTarget = { instrIdx: 0, slotIdx: null };
+    state.activeIdx = 0;
+    state.selection = { instrIdx: 0, slotIdx: null };
+    state.outputTarget = { instrIdx: 0, slotIdx: null };
     rebuildCloneGraph();
     model.events.emit({ instrIdx: -1, kind: 'reset' });
     renderMain();
@@ -978,9 +964,9 @@ export function bootApp(root: HTMLElement): void {
   // waveforms stay live, but nothing is sent to the speakers).
   const audioToggle = root.querySelector('#btn-audio-toggle') as HTMLButtonElement;
   const updateAudioToggle = (): void => {
-    audioToggle.classList.toggle('on',  audioEnabled);
-    audioToggle.classList.toggle('off', !audioEnabled);
-    audioToggle.title = audioEnabled
+    audioToggle.classList.toggle('on',  state.audioEnabled);
+    audioToggle.classList.toggle('off', !state.audioEnabled);
+    audioToggle.title = state.audioEnabled
       ? 'Audio on — click to mute (changes still re-render). Spacebar replays.'
       : 'Audio muted — click to unmute.';
     reflectAudioOnDot();
@@ -1006,8 +992,8 @@ export function bootApp(root: HTMLElement): void {
       player.play(sample, RATE);
       return;
     }
-    audioEnabled = !audioEnabled;
-    if (!audioEnabled) player.stop();
+    state.audioEnabled = !state.audioEnabled;
+    if (!state.audioEnabled) player.stop();
     updateAudioToggle();
   });
   updateAudioToggle();
@@ -1045,20 +1031,20 @@ export function bootApp(root: HTMLElement): void {
     saving = true;
     try {
       const bytes = serializeAkp(model.patch);
-      if (patchFileHandle) {
+      if (state.patchFileHandle) {
         try {
-          await saveToHandle(patchFileHandle, bytes);
+          await saveToHandle(state.patchFileHandle, bytes);
           return;
         } catch { /* fall through to picker fallback */ }
       }
-      const name = patchFileName || 'patch.akp';
+      const name = state.patchFileName || 'patch.akp';
       const newHandle = await saveFileBytes(bytes, name, '.akp');
       if (newHandle) {
-        patchFileHandle = newHandle;
+        state.patchFileHandle = newHandle;
         try {
           const f = await newHandle.getFile();
-          patchFileName = f.name;
-          nameEl.textContent = patchFileName;
+          state.patchFileName = f.name;
+          nameEl.textContent = state.patchFileName;
         } catch { /* ignore */ }
       }
     } finally {
@@ -1073,14 +1059,14 @@ export function bootApp(root: HTMLElement): void {
     saving = true;
     try {
       const bytes = serializeAkp(model.patch);
-      const name = patchFileName || 'patch.akp';
+      const name = state.patchFileName || 'patch.akp';
       const newHandle = await saveFileBytes(bytes, name, '.akp');
       if (newHandle) {
-        patchFileHandle = newHandle;
+        state.patchFileHandle = newHandle;
         try {
           const f = await newHandle.getFile();
-          patchFileName = f.name;
-          nameEl.textContent = patchFileName;
+          state.patchFileName = f.name;
+          nameEl.textContent = state.patchFileName;
         } catch { /* ignore */ }
       }
     } finally {
@@ -1095,8 +1081,8 @@ export function bootApp(root: HTMLElement): void {
 
   const noteSelect = root.querySelector('#note-select') as HTMLSelectElement;
   noteSelect.addEventListener('change', () => {
-    previewNote = noteSelect.value;
-    saveStoredNote(previewNote);
+    state.previewNote = noteSelect.value;
+    saveStoredNote(state.previewNote);
     // No re-render needed — the sample data is unchanged, only the
     // playback rate moves. Replay so the user hears the new note.
     playAudition();
@@ -1115,9 +1101,9 @@ export function bootApp(root: HTMLElement): void {
     try {
       model.patch = restoreAutosave(bootAutosave);
       normalizePatch(model.patch);
-      activeIdx = firstPopulatedInstrument(model.patch);
-      selection = { instrIdx: activeIdx, slotIdx: null };
-      outputTarget = { instrIdx: activeIdx, slotIdx: null };
+      state.activeIdx = firstPopulatedInstrument(model.patch);
+      state.selection = { instrIdx: state.activeIdx, slotIdx: null };
+      state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
       rebuildCloneGraph();
       model.events.emit({ instrIdx: -1, kind: 'reset' });
     } catch { /* corrupt entry — ignore, user can browse REVERT panel */ }
@@ -1128,7 +1114,7 @@ export function bootApp(root: HTMLElement): void {
 
   // ── REVERT AUTOSAVE side panel ──────────────────────────────────
   // The panel owns its own browsing UI; we hand it the "apply a restored
-  // patch" action since that mutates editor state (activeIdx / selection /
+  // patch" action since that mutates editor state (state.activeIdx / state.selection /
   // output / render), which the panel must not know about.
   wireRevertPanel(root, {
     getPatch: () => model.patch,
@@ -1138,11 +1124,11 @@ export function bootApp(root: HTMLElement): void {
       // Keep the user on the same instrument while browsing snapshots —
       // unless it's empty in the restored patch, in which case fall back
       // to the first populated one so they actually see something.
-      if (instrumentIsEmpty(model.patch, activeIdx)) {
-        activeIdx = firstPopulatedInstrument(model.patch);
+      if (instrumentIsEmpty(model.patch, state.activeIdx)) {
+        state.activeIdx = firstPopulatedInstrument(model.patch);
       }
-      selection = { instrIdx: activeIdx, slotIdx: null };
-      outputTarget = { instrIdx: activeIdx, slotIdx: null };
+      state.selection = { instrIdx: state.activeIdx, slotIdx: null };
+      state.outputTarget = { instrIdx: state.activeIdx, slotIdx: null };
       rebuildCloneGraph();
       model.events.emit({ instrIdx: -1, kind: 'reset' });
       renderMain();
@@ -1173,8 +1159,8 @@ export function bootApp(root: HTMLElement): void {
 
   // Expose the model on window so E2E tests can drive moves and edits
   // without simulating DOM drag-and-drop (brittle in headless browsers).
-  // moveInstrument is wrapped so the host-side activeIdx / selection /
-  // outputTarget follow the reorder — same path the real drag uses.
+  // moveInstrument is wrapped so the host-side state.activeIdx / state.selection /
+  // state.outputTarget follow the reorder — same path the real drag uses.
   const shim = Object.create(model) as PatchModel & { moveInstrument: (from: number, to: number) => void };
   shim.moveInstrument = moveInstrumentWithRemap;
   (window as unknown as { __funklangModel?: PatchModel }).__funklangModel = shim;
