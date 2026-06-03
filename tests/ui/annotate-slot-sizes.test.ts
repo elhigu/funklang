@@ -32,7 +32,7 @@ describe('annotateSlotSizes', () => {
   it('writes the marginal byte cost into each slot row', () => {
     const p = emptyPatch();
     p.instruments[0]!.slots = [
-      { ...emptySlot(), fn: 2, outVar: 1 }, // saw, firstUse → 256+64 (seed)
+      { ...emptySlot(), fn: 2, outVar: 1 }, // saw, firstUse → 64+64 (seed)
       { ...emptySlot(), fn: 2, outVar: 1 }, // saw reuse → 64
     ];
     host = gridWithSlots([0, 1]);
@@ -42,8 +42,8 @@ describe('annotateSlotSizes', () => {
 
     const labels = host.querySelectorAll('[data-slot-size]');
     expect(labels.length).toBe(2);
-    // seed: opCost=256, slotStreamCost=64 → firstUse 320 B, reuse 64 B
-    expect(labels[0]!.textContent).toContain('320 B');
+    // seed: osc_saw opCost=64, slotStreamCost=64 → firstUse 128 B, reuse 64 B
+    expect(labels[0]!.textContent).toContain('128 B');
     expect(labels[1]!.textContent).toContain('64 B');
   });
 
