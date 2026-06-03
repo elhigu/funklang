@@ -1444,3 +1444,9 @@
   .size-breakdown-inner td, .size-breakdown-inner th { padding: 1px 6px; text-align: left; }
   .size-breakdown-inner .num { text-align: right; font-variant-numeric: tabular-nums; }
   .size-breakdown-note { opacity: 0.8; }
+
+  .size-status {
+    background: none; border: none; color: inherit; font: inherit; cursor: pointer;
+    padding: 0 0.5rem; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .size-status:hover { text-decoration: underline; }

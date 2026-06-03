@@ -124,7 +124,7 @@ export function bootApp(root: HTMLElement): void {
       </aside>
       <main id="main-area"></main>
       <footer>
-        <div></div>
+        <button id="size-status" class="size-status" title="Click for size breakdown">—</button>
         <div class="footer-status">
           <span class="k">selected →</span>
           <span class="selection" id="selection-label">—</span>
