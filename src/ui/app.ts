@@ -325,10 +325,9 @@ export function bootApp(root: HTMLElement): void {
         playAuditionInternal({ force: true });
       },
     });
-    runRender();
+    runRender();   // also paints slot byte-cost labels via annotateActiveSizes
     refreshOutputMasterBtn();
     updateLabels();
-    annotateActiveSizes();
 
     // Restore focus to whatever the user was on before this rebuild.
     // querySelector matches the first equivalent element under the new
@@ -605,8 +604,11 @@ export function bootApp(root: HTMLElement): void {
         }
         updateSlotWaves(host, taps);
       }
-      annotateActiveSizes();
     }
+    // Slot byte-cost labels are derived from the patch model, not the render
+    // output, so paint them even when lastRender is null (e.g. a cyclic-clone
+    // render leaves the canvases blank). annotateActiveSizes guards gridHostEl.
+    annotateActiveSizes();
     if (waveViewer) {
       const finalAudible = lastRender ? bytesToInt16(lastRender.bytes) : null;
       const target = (state.outputTarget.instrIdx === state.activeIdx && state.outputTarget.slotIdx != null && lastRender)
