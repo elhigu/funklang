@@ -1428,3 +1428,19 @@
   ::-webkit-scrollbar { width: 10px; height: 10px; background: var(--bg-1); }
   ::-webkit-scrollbar-thumb { background: var(--bg-3); border: 2px solid var(--bg-1); }
   ::-webkit-scrollbar-thumb:hover { background: var(--amber-dim); }
+
+  /* Size breakdown modal */
+  .size-breakdown-overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); z-index: 50;
+  }
+  .size-breakdown-overlay.hidden { display: none; }
+  .size-breakdown-inner {
+    background: #11141a; color: #cdd; border: 1px solid #2a3140; padding: 1rem 1.25rem;
+    max-height: 80vh; overflow: auto; min-width: 22rem; font: 12px/1.4 monospace;
+  }
+  .size-breakdown-inner header { display: flex; justify-content: space-between; align-items: center; }
+  .size-breakdown-inner table { width: 100%; border-collapse: collapse; margin: 0.25rem 0 0.75rem; }
+  .size-breakdown-inner td, .size-breakdown-inner th { padding: 1px 6px; text-align: left; }
+  .size-breakdown-inner .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .size-breakdown-note { opacity: 0.8; }
