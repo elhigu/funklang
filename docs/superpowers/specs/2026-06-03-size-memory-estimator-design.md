@@ -98,8 +98,15 @@ residentChip = mod_length_empty + Σ_i SmpLength[i] + imp_length
 ```
 
 All MEMF_CHIP. `SmpLength[i]` is the per-instrument generated-sample length our
-renderer already computes; `imp_length` is the sum of imported-sample bytes;
-`mod_length_empty` is a constant from the empty mod template. The transient
+renderer already computes — `RenderResult.bytes.length`, i.e. `sampleLength + 1`
+bytes per instrument (`src/dsp/engine.ts:84,182-185`; `sampleLength` is a field
+on `Instrument`, `src/patch/types.ts:46`). `imp_length` is the sum of
+`importedSamples[i].data.length` (`Int8Array`, `N_IMPORTS = 8`,
+`src/patch/types.ts`). `mod_length_empty` exists only in the build-generated
+`Iset.h` (consumed by `main-executable.c:479,484`), so it is **not** available in
+the funklang codebase; it is measured once offline and committed as a constant in
+`calibration-data.ts` (the empty ProTracker module template is fixed-size, so a
+single measurement suffices). The transient
 24*2048*2 = 98304-byte precalc work buffer is **not** surfaced as a headline (the
 user confirmed enough free chip is available during precalc); it may appear as a
 tooltip footnote only.
@@ -117,13 +124,25 @@ funklang/tools/
   calibrate-exe-size.ts  # node script: drives wine, fits constants, rewrites calibration-data.ts
 
 funklang/src/ui/
-  size-statusbar.ts        # the bottom bar
+  size-statusbar.ts        # populates the size cells of the EXISTING footer
   size-breakdown-modal.ts  # click-to-expand full breakdown
 ```
 
 `sizecalc/` is pure functions over `Patch` — no DOM, no audio — unit-testable in
-isolation. UI components subscribe to the same `PatchModel` change events the
-rest of the editor uses.
+isolation. UI components subscribe to the existing `PatchModel` event bus:
+`model.events.on((e: PatchChange) => ...)` (`src/patch/events.ts`,
+`src/patch/model.ts:28`), the same channel `app.ts` already uses to refresh.
+
+**Extend the existing footer, do not add a second bar.** A `<footer>` status bar
+already exists (`src/ui/app.ts:126-135`, updated by `updateLabels()`), with a
+3-column grid (`auto 1fr auto`) whose left and right cells are largely free.
+`size-statusbar.ts` populates size cells within that footer rather than
+introducing a competing bottom bar, and hooks the same refresh path.
+
+Op identity comes from `slot.fn` (numeric op code) resolved via
+`opByCode(slot.fn)` in `src/schema/op-metadata.ts` (24 op codes; note this module
+moved from `src/dsp/` to `src/schema/`). "Distinct op types used" = the set of
+`slot.fn` values across all populated slots.
 
 ## UI
 
@@ -145,9 +164,11 @@ rest of the editor uses.
 
 ## Calibration tool
 
-`funklang/tools/calibrate-exe-size.ts`, run on the user's machine via
-`npm run calibrate-exe-size`. Re-run whenever engine code or compiler flags
-change.
+`funklang/tools/calibrate-exe-size.ts`, run on the user's machine via a new
+`npm run calibrate-exe-size` script. It is a Node/`tsx` script (the repo already
+depends on the vite/vitest TS toolchain; `tsx` is the invocation pattern for
+`.ts` tools — `funklang/tools/` currently holds only `refrender/`, so this is the
+first tool of its kind). Re-run whenever engine code or compiler flags change.
 
 Strategy:
 
