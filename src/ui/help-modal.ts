@@ -113,6 +113,17 @@ export function helpOverlayHtml(): string {
               </tbody>
             </table>
 
+            <h3>Size &amp; memory readout</h3>
+            <p>The footer shows the estimated <em>shrinklered</em> exe size of the
+            sample-generation code, the figure for the selected instrument
+            (<code>sel</code>), and resident chip-RAM. Click it for a full
+            breakdown.</p>
+            <p>Op-routine code is counted <strong>once per distinct op type</strong>:
+            a slot's byte label shows full cost on the first use of an op
+            (highlighted) and only the small stream cost when the op is reused.
+            Generated samples cost no exe bytes; imported samples do. Figures are
+            estimates (marked <code>~</code> until calibration has been run).</p>
+
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>
         </div>
