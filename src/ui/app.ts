@@ -15,6 +15,10 @@ import { renderSidebar } from './sidebar';
 import { helpOverlayHtml, wireHelp } from './help-modal';
 import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
+import { wireSizeStatusbar, type SizeStatusbar } from './size-statusbar';
+import { annotateSlotSizes } from './annotate-slot-sizes';
+import { computeBreakdown } from '../sizecalc/breakdown';
+import { CALIBRATION } from '../sizecalc/calibration-data';
 import { bytesToInt16 } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
@@ -158,6 +162,7 @@ export function bootApp(root: HTMLElement): void {
   // Per-render caches of the slot-grid container and wave viewer so we can
   // call updateSlotWaves / viewer.setSample without rebuilding the DOM.
   let gridHostEl: HTMLElement | null = null;
+  let sizeBar: SizeStatusbar | null = null;
   let waveViewer: WaveViewer | null = null;
   // Which instrument the slot-grid host was last rendered for. Used to
   // decide whether a captured scrollTop should be restored: only when the
@@ -323,6 +328,7 @@ export function bootApp(root: HTMLElement): void {
     runRender();
     refreshOutputMasterBtn();
     updateLabels();
+    annotateActiveSizes();
 
     // Restore focus to whatever the user was on before this rebuild.
     // querySelector matches the first equivalent element under the new
@@ -337,6 +343,15 @@ export function bootApp(root: HTMLElement): void {
     // reassigned to the freshly-built host earlier in this rebuild,
     // so it points at the new node — no need to re-querySelector.
     if (prevScrollTop > 0 && gridHostEl) gridHostEl.scrollTop = prevScrollTop;
+  };
+
+  // Paint per-slot byte-cost labels onto the active instrument's grid. Uses
+  // the module-scoped gridHostEl (whose direct child is `.slots`). Safe to
+  // call repeatedly — annotateSlotSizes upserts its spans.
+  const annotateActiveSizes = (): void => {
+    if (!gridHostEl) return;
+    const instr = computeBreakdown(model.patch, CALIBRATION).perInstrument[state.activeIdx];
+    if (instr) annotateSlotSizes(gridHostEl, instr);
   };
 
   /** Re-tag .selected / .active on slot rows without rebuilding the grid. */
@@ -590,6 +605,7 @@ export function bootApp(root: HTMLElement): void {
         }
         updateSlotWaves(host, taps);
       }
+      annotateActiveSizes();
     }
     if (waveViewer) {
       const finalAudible = lastRender ? bytesToInt16(lastRender.bytes) : null;
@@ -728,6 +744,7 @@ export function bootApp(root: HTMLElement): void {
         `instr ${oNum} / slot ${String(state.outputTarget.slotIdx + 1).padStart(2, '0')}${vlabel}`;
     }
     updateUndoRedoButtons();
+    sizeBar?.refresh();
   };
 
   // MASTER V1 button → route playback to the active instrument's final v1.
@@ -741,6 +758,8 @@ export function bootApp(root: HTMLElement): void {
     runRender();
     playAuditionInternal({ force: true });
   });
+
+  sizeBar = wireSizeStatusbar(root, model, () => state.selection.instrIdx);
 
   model.events.on((e) => {
     // Undo/redo synthesises a 'reset' event — rebuild everything from scratch.
