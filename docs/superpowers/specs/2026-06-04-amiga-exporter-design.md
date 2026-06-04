@@ -16,6 +16,24 @@ asked for.
 The exporter mirrors the GUI's codegen **byte-for-byte** (verified against real
 GUI output), so the compiled size matches what demo coders actually ship.
 
+## Where this fits (the 4-step arc)
+
+The end goal is a live in-browser estimator whose numbers track real compiled
+sizes. That is reached in four sub-projects; **this spec is step 1 only.**
+
+1. **Exporter (this spec).** TS turns an `.akp` into the six build *source*
+   files. *You* run the GUI export once on the generated test patches and return
+   the six files as the byte-exact oracle. **No compiling in this step.**
+2. **Compile harness.** You install 64-bit wine; I wrap gnumake/gcc/elf2hunk/
+   Shrinkler to compile the exported files into a real shrinklered binary and
+   read its size — headlessly, no GUI.
+3. **Corpus.** I generate a large systematic `.akp` set and compile them all via
+   step 2 → a dataset of *(patch features → real size)*. Automated; no user step.
+4. **Fitter.** I fit per-feature costs from that dataset and rewrite
+   `calibration-data.ts` → the live estimator now matches compiled sizes.
+
+The only manual GUI step in the whole arc is step 1's reference capture.
+
 ## Scope
 
 **In:** emit the six artifacts from a `Patch`, in memory, byte-identical to the
@@ -180,11 +198,19 @@ Pure (no I/O); `write-artifacts.ts` does the disk write separately.
 
 ## Verification (byte-exact oracle)
 
-1. `gen-verification-patches.ts` writes a small `.akp` set (via `serializeAkp`)
-   designed to exercise the codegen: every op type once; each multi-mode param
-   in both literal and variable form; an instrument with `loop_gen`; imported
-   samples present; a clone + chordgen cross-instrument pair; an empty-ish patch.
-   The same synthesized `minimal.mod` ships alongside.
+1. `gen-verification-patches.ts` writes this explicit `.akp` set (via
+   `serializeAkp`), each targeting a distinct slice of the codegen. The same
+   synthesized `minimal.mod` ships alongside for the GUI export.
+
+   | id | patch | exercises |
+   |----|-------|-----------|
+   | P01 | one instrument, single `osc_saw`, all params literal, short length | baseline `inst.h`/`ilen.h`/`Iset.h` shape |
+   | P02 | instruments each using a distinct `fn` 1–24, params literal | every per-op `switch` case (cases 1–24) |
+   | P03 | `osc_saw`, `osc_pulse`, `sv_flt_n` with freq/gain/width/val params in **variable** mode (vN) and a sibling copy in **literal** mode | the literal-vs-`arrayvartext` branch on each param field |
+   | P04 | instrument with slot 15 `fn==22` (loop_gen), non-zero `loopOffset`/`loopLength` | `samplename_flag='l'`, `ilen.h` repeat fields, `empty.mod` loop-word patch |
+   | P05 | several non-zero `importedSamples`, an `imported` op (`fn 20`) reading them | `ImpLength`, `Isamp.raw` concat + delta-encode |
+   | P06 | a `clone` (`fn 17`) and `chordgen` (`fn 18`) referencing earlier instruments | the special-emit ops (blank in `arrayfunctiontext`) + source refs |
+   | P07 | several populated instruments with one `sampleLength <= 2` gap between them | instrument-skip + `numinstruments`/`getnumberofhighestinstrument` |
 2. **User step (manual, once):** load each `.akp` in the original GUI, run the
    Amiga exe-export feeding `minimal.mod`, and return the six produced files
    into `fixtures/reference/<patch>/`.
