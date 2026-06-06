@@ -11,5 +11,8 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['tests/**/*.test.ts', 'sizelab/**/*.test.ts'],
+    // Never descend into a scratch/wine build dir if one ever lands under the
+    // tree — its `dosdevices/z: -> /` symlink would crash globbing on EACCES.
+    exclude: ['**/node_modules/**', '**/.scratch/**', '**/sizelab-scratch/**'],
   },
 });

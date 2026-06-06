@@ -5,7 +5,11 @@ import { join, resolve } from 'node:path';
 
 export interface Sandbox { dir: string; winePrefix: string; }
 
-const SCRATCH = resolve(import.meta.dirname, '..', '.scratch');
+// Scratch lives OUTSIDE the project tree: the wine prefix contains a
+// `dosdevices/z: -> /` symlink, and any tool that globs the repo (vitest, vite)
+// would follow it into `/` and crash on EACCES. The repo-parent reference area
+// is out-of-git and outside every project scanner's root.
+const SCRATCH = resolve(import.meta.dirname, '..', '..', '..', '..', 'reference', 'sizelab-scratch');
 const DEFAULT_SANDBOX = join(SCRATCH, 'sandbox');
 const DEFAULT_PREFIX = join(SCRATCH, 'wineprefix');
 const EXE_CREATOR = resolve(import.meta.dirname, '..', '..', '..', 'exe_creator');

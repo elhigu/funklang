@@ -21,6 +21,7 @@
     "e2e:report": "playwright show-report",
     "calibrate-exe-size": "tsx tools/calibrate-exe-size.ts",
     "gen-verification-patches": "tsx sizelab/tools/gen-verification-patches.ts",
+    "compile:smoke": "nix-shell -p wineWowPackages.stable --run 'SIZELAB_COMPILE_SMOKE=1 vitest run sizelab/harness/compile.smoke.test.ts'",
     "gate": "npm run typecheck && npm test && npm run e2e"
   },
   "keywords": [],
