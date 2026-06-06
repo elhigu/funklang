@@ -1,4 +1,5 @@
 import type { Patch } from '../../src/patch/types';
+import { normalizeLoop } from './loop-norm';
 
 /** Patch instrument sample-length (and loop, when slot 15 is loop_gen) words
  *  into a copy of `mod`, big-endian u16, mirroring Form1.cs 5646-5666. */
@@ -15,8 +16,9 @@ export function patchMod(mod: Uint8Array, patch: Patch): Uint8Array {
     const base = 30 * n;
     beU16(42 + base, Math.max(0, ins.sampleLength | 0));
     if (ins.slots[15]?.fn === 22) {
-      beU16(46 + base, Math.max(0, ins.loopOffset | 0));
-      beU16(48 + base, Math.max(0, ins.loopLength | 0));
+      const { off, len } = normalizeLoop(ins.sampleLength, ins.loopOffset);
+      beU16(46 + base, off);
+      beU16(48 + base, len);
     }
   }
   return out;

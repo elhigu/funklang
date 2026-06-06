@@ -21,8 +21,8 @@ describe('emitIlen', () => {
     const out = emitIlen(p);
     expect(out).toContain('// lead\r\n');
     expect(out).toContain('SmpLength[0] = 0x3000;\r\n');
-    expect(out).toContain('repeat_offset[0] = 0x0;\r\n');
-    expect(out).toContain('repeat_length[0] = 0x0;\r\n');
+    expect(out).toContain('repeat_offset[0] = 0x17FF;\r\n');
+    expect(out).toContain('repeat_length[0] = 0x1801;\r\n');
     expect(out).toContain("samplename_flag[0] = ' ';\r\n");
     expect(out).toContain('ImpLength[0] = 0x10;\r\n');
     expect(out).toContain('ImpLength[7] = 0x0;\r\n');

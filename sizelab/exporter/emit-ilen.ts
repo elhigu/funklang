@@ -1,5 +1,6 @@
 import type { Patch } from '../../src/patch/types';
 import { csHex } from './hex';
+import { normalizeLoop } from './loop-norm';
 
 /** (max index with sampleLength>2) + 1. Form1.cs getnumberofhighestinstrument. */
 export function highestInstrument(patch: Patch): number {
@@ -16,10 +17,11 @@ export function emitIlen(patch: Patch): string {
   for (let i = 0; i < n; i++) {
     const ins = patch.instruments[i]!;
     const flag = ins.slots[15]?.fn === 22 ? 'l' : ' ';
+    const { off, len } = normalizeLoop(ins.sampleLength, ins.loopOffset);
     s += `// ${ins.name}\r\n`;
     s += `SmpLength[${i}] = 0x${csHex(ins.sampleLength)};\r\n`;
-    s += `repeat_offset[${i}] = 0x${csHex(ins.loopOffset)};\r\n`;
-    s += `repeat_length[${i}] = 0x${csHex(ins.loopLength)};\r\n`;
+    s += `repeat_offset[${i}] = 0x${csHex(off)};\r\n`;
+    s += `repeat_length[${i}] = 0x${csHex(len)};\r\n`;
     s += `samplename_flag[${i}] = '${flag}';\r\n`;
     s += `\r\n`;
   }

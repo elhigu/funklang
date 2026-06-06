@@ -22,8 +22,9 @@ describe('patchMod', () => {
     ins.slots[15] = { ...emptySlot(), fn: 22 };
     const out = patchMod(minimalMod(), p);
     const base = 30 * 1;
-    expect(out[46 + base]).toBe(0x00); expect(out[47 + base]).toBe(0x80); // 0x100>>1=0x80
-    expect(out[48 + base]).toBe(0x00); expect(out[49 + base]).toBe(0x40); // 0x80>>1=0x40
+    // checkloopparams normalizes off=4095,len=4097 (half=4096, offset<half)
+    expect(out[46 + base]).toBe(0x07); expect(out[47 + base]).toBe(0xFF); // 4095>>1=2047=0x07FF
+    expect(out[48 + base]).toBe(0x08); expect(out[49 + base]).toBe(0x00); // 4097>>1=2048=0x0800
   });
 
   it('does not write loop words when slot 15 is not loop_gen', () => {
