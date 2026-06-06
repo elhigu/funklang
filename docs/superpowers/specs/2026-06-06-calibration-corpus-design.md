@@ -2,133 +2,111 @@
 
 **Date:** 2026-06-06
 **Status:** Design for review (pre-implementation)
-**Sub-project 3 of 4** in the size-estimator effort (exporter → compile harness → **corpus** → fitter). Depends on sub-project 1 (exporter, in progress) to produce build inputs and sub-project 2 (wine64 compile harness) to measure sizes. Compilation is **fully automated** — this corpus adds **zero** manual GUI work.
+**Sub-project 3 of 4** (exporter → compile harness → **corpus** → fitter). Depends on sub-project 1 (exporter) for build inputs and sub-project 2 (wine64 harness) to measure sizes. Compilation is **fully automated** — zero manual GUI work.
 
 ## Goal
 
-Produce a corpus of synthetic patches whose compiled sizes let us resolve, **per operation and per parameter configuration**, how much each synthesis **phase** (one `vN = op(args);` slot) contributes to the Amiga executable. The output is a fitted cost table that makes the live estimator track real compiled sizes.
-
-The previous P01–P07 patches are insufficient for this — they cover *codegen variety* (for byte-exact exporter verification) but not the *controlled, repeated variation* needed to separate fixed from marginal costs. This corpus is built for measurement, not verification.
+Resolve, per operation and per parameter configuration, how much each synthesis **phase** (one `vN = op(args);` slot) adds to the Amiga executable — using the **fewest** compiles. The method is **subtraction against calibrated building blocks**, not statistical repetition.
 
 ## Terminology
 
-- **Phase / slot** — one op invocation in an instrument's synthesis graph: `vN = op(args);` in `inst.h`.
-- **Op type** — the operation (osc_saw, sv_flt_n, …); there are ~22 emittable ones (excludes loop_gen, and vocoder which the GUI never emits).
-- **Param mode** — for each var-or-const parameter, whether it is a **literal** (`#imm`) or a **variable** (`v1..v4`). This is the main per-phase code-shape variable.
+- **Phase / slot** — one op invocation: `vN = op(args);` in `inst.h`.
+- **Op type** — the operation (~22 emittable; excludes loop_gen and the never-emitted vocoder).
+- **Param mode** — per var-or-const parameter: **literal** (`#imm`) or **variable** (`v1..v4`). The main per-phase code-shape variable.
 
-## What we are resolving (the cost model)
+## Core method: subtractive calibration
 
-Compilation with `-Ofast -flto -fwhole-program` is **deterministic**, so each measurement is an exact integer; no repeated runs needed. We resolve an **uncompressed**-size model first because pre-Shrinkler code is genuinely (near-)additive:
+Compilation (`-Ofast -flto -fwhole-program`) is **deterministic**, so each compiled size is an exact integer — one compile per data point, no averaging.
+
+**The standard producer.** A canonical phase — `osc_sine` with fixed constant freq+gain — is the unit input source. Its per-phase cost `P_sin` is calibrated once. Whenever an op needs a *variable* input, that input is produced by a standard sine phase. The op's own cost in that mode is then recovered by subtracting the producers:
 
 ```
-size_uncompressed(patch) ≈
-    B                                            // fixed: player, ptplayer, framework, always-linked (loopgen, clr_buf…)
-  + Σ_{o ∈ opTypesPresent}  R[o]                 // op routine code, linked ONCE per distinct type (LTO dead-code elim)
-  + Σ_{phase p}             S[op(p), mode(p)]    // per-phase op-stream code, keyed by op + param-mode vector
-  + Iuse·[anyImports]      + iByte·importBytes    // imported-sample handling + baked-in delta bytes
-  + (generated sampleLength → ≈0 in exe; validated, not assumed)
+S[op, mode] = instrumentStream(op, mode) − k · P_sin      // k = number of variable inputs sourced
 ```
 
-`R[o]` includes the closure of helpers that op pulls in (`vol`/`clamp`/`mulsw`/`abs`); because helpers are shared, `R` values are not independent — the design handles this by **differencing against a baseline and measuring slopes**, and by reporting fit residuals rather than pretending perfect separability.
+E.g. for `osc_saw` with both freq and gain as variables:
+`S[saw, (V1,V2)] = instrumentStream − 2·P_sin`.
 
-**Shrinkler is modeled separately.** Compression is non-additive (repetition compresses), so the shrinkled size is fit as `g(uncompressed, composition)` — at minimum a ratio with reported variance, optionally split code-ratio vs import/sample-ratio. The live estimator = uncompressed model × compression model, with stated ± error. We record **both** sizes (`a.mingw.exe` uncompressed, `exemusic.exe` shrinkled) for every patch.
+**Getting `instrumentStream` (an instrument's marginal code).** Build a **routine-complete scaffold** `K`: one patch with one instrument per op type (each op once, const params) so **every op routine is linked**. Then for any test instrument `T`, compile `K` and `K+T` and difference:
 
-### Key risk made explicit
-`-Ofast` + whole-program inlining can **fold, hoist, or CSE** identical phases, so per-phase cost is not perfectly additive. The design **measures effective marginal cost** and **tests for nonlinearity** (vary repetition count and check the slope is constant). Where folding makes a slope non-constant, calibration reports it rather than forcing a line. This is the honest core of "figuring out how each phase behaves."
+```
+instrumentStream(T) = size(K+T) − size(K)
+```
 
-## Experimental design principle
+Because all routines already exist in `K`, the delta is purely `T`'s per-phase stream code (no `R[op]` routine cost re-added). This is what makes per-op measurement need only a few instruments instead of repetition series.
 
-We can't read `R[o]` and `S[o,mode]` off a single patch (base + routine + stream are entangled). We separate them with **repetition-slope** measurement:
+**Per-param effect (literal→variable).** Read directly as a difference of two modes of the same op, e.g. `ΔS_gain = S[saw,(c,V)] − S[saw,(c,c)]`. Routine, base, and producer costs cancel.
 
-> Build a series of patches that use op `o` (in a fixed config) **N times**, for `N ∈ {1,2,4,8,16,31}`, spread one-per-instrument. Fit `size = a + b·N`. Then **b = S[o, config]** (per-phase stream cost) and **a − B = R[o]** (routine + helper closure). `B` comes from the `N=0` baseline shared by all series.
+**Routine cost `R[op]` and base `B`.** Measured with one extra minimal diff per op: a patch using only that op once vs the scaffold logic, isolating `R[op]+S[op,cc]`; `B` is the consensus constant across these. (Routine cost is the big per-type chunk; per-phase `S` is the small marginal the modes vary.)
 
-"One op per instrument, many instruments" is exactly the "multiple instruments for each operation" the requirement calls for — and it's the cleanest repetition unit because each instrument is its own `if (instrument==k){…}` block in the generated function.
+### Honesty note (kept from the rigorous version)
+`-Ofast` + whole-program inlining can fold/CSE code, so stream costs aren't perfectly additive. Two cheap guards: (1) verify `P_sin` measured alone equals half of a two-sine instrument (additivity check); (2) the fitter re-predicts every corpus instrument and reports mean/max residual. Where subtraction yields inconsistent values, we report the spread rather than a false-precise number.
 
-## Corpus families
+## Per-op instrument sets
 
-All calibration instruments use a fixed `sampleLength = 4096` (>2 so they emit; constant so sample-length never confounds code size — Family I separately proves sample length is exe-neutral). Every measured phase has a real `outVar`. Ops that consume a variable input get a cheap **producer** phase (an `osc_saw` writing that var) placed first in the instrument; the producer's constant cost cancels in slopes and is itself calibrated (osc_saw is in Family R), so it's not a confound.
+All calibration instruments use `sampleLength = 4096` (>2 so they emit). Var inputs come from standard sine producers placed first in the instrument. Instrument count per op = enough to read each param's literal↔variable effect plus one all-variable interaction check:
 
-### Family O — baseline
-- **O0**: one instrument, one `osc_saw` all-literal (the universal anchor). Also the degenerate point for every series. Gives the data to pin `B` once `R[osc_saw]` is known.
-- A true empty build is not possible (an instrument must emit), so `B` is recovered algebraically from the O/R series intercepts, cross-checked across ops.
+| op kind | example | instruments |
+|---|---|---|
+| 0 var-or-const params (input is pure var-source only) — `ctrl` | ctrl(V1) | 1 (+producer) |
+| 1 var-or-const param — `vol`, `distortion`, `osc_noise`, `onepole_flt`(gain raw) | `vol(V1, gain c\|V)` | 2: gain const; gain var |
+| 2 params — `osc_saw/tri/sine`, `add`, `mul`, `reverb`, `sh`, `dly_cyc` | the saw example | 3–4: (c,c),(c,V),(V,c),(V,V) |
+| 3 params — `osc_pulse`, `enva`, `cmb_flt_n`, `sv_flt_n` | freq/val/gain ± width | ~5: all-const, each-one-var, all-var |
+| 4 params — `envd` | — | ~5: all-const, a few single-var, all-var |
 
-### Family R — routine + per-phase cost, per op type
-For each emittable op `o` (the ~22): a **6-patch series** repeating `o` across `N ∈ {1,2,4,8,16,31}` instruments, one canonical phase per instrument:
-- **Config:** all params **literal**, mid-range values (e.g. freq 1000, gain 64, width 64, val 8). Var-input ops get one producer phase per instrument writing `v1`; the measured op reads `v1`.
-- **Yields:** `S[o, all-literal]` (slope) and `R[o]+B` (intercept). ≈22 × 6 = **132 patches**.
-- Linearity check built in (6 points per op).
+≈ 22 ops × ~3.3 avg ≈ **~75 measurement instruments**.
 
-### Family P — parameter-mode sweep
-For each op `o` and each var-or-const param `p` it exposes (freq/gain/width/val1/val2 as applicable): a **3-patch series** `N ∈ {2,8,16}` with `p` in **variable** mode (reading a produced var), all other params literal. Compared against Family R's all-literal slope for `o`, the slope delta = **ΔS for making `p` a variable**.
-- Param counts per op vary (1–4 var-or-const params); ≈ aggregate **~45 (op,param) pairs × 3 = ~135 patches**.
-- Also one "**all params variable**" series per op (N ∈ {2,8,16}) to catch interaction (non-separable param effects): ~22 × 3 = **66 patches**.
+### Bespoke ops (expression length depends on params) — small targeted sets
+- **clone (17):** forward vs reverse (`gainVal` 0 vs ≠0) × transpose literal-vs-V1 × offset {0, large} ≈ **6 instruments** (each with a source at instrument 0).
+- **adsr (23):** emitted operands are precomputed from sampleLength + rates, so size tracks operand magnitude — sweep attack/decay/sustain/release/gain/width across {small, large} ≈ **6 instruments**, plus 2 sampleLengths.
+- **chordgen (18):** note selectors present/absent + shift literal/var ≈ **4 instruments** (with a source).
+- **imported (20):** 2 instruments (different import index), folded with imports below.
+- ≈ **~18 instruments**.
 
-### Family V — value-bucket sweep
-For a representative subset of ops (the oscillators, vol, add/mul, and adsr): repeat with literal values in buckets `{0, 1, 64, 127, 255, 1000, 32767, -1, -32768}` at `N ∈ {8}` to detect value-dependent codegen (e.g. `moveq` small-int vs `move.w`, immediate encoding). One series per (op, bucket).
-- Mostly expected to confirm value-independence; where a bucket shifts size, the model gains a per-value-class term. ≈ **~60 patches**. (If Family V shows flat size across buckets for an op, that op's `S` is value-independent and we stop sweeping it.)
-
-### Family B — bespoke ops (variable-length expressions)
-These emit inline expressions whose **length depends on parameters**, so they need dedicated sweeps (their `S` is not a single number):
-- **clone (17):** forward vs reverse (`gainVal` 0 vs ≠0) × transpose literal-vs-var × offset {0, small, large}; repeated `N ∈ {2,8,16}` with instrument 0 as the source and clones in later instruments. (~12 series.)
-- **adsr (23):** the emitted operands are **precomputed integers** derived from sampleLength + attack/decay/sustain/release/gain/width — so size depends on those operands' magnitudes. Sweep each rate param across buckets at `N ∈ {2,8}`, plus two sampleLengths. (~16 series.)
-- **chordgen (18):** vary the note selectors and shift; with a source instrument; `N ∈ {2,8}`. (~6 series.)
-- **imported (20):** vary import index; `N ∈ {2,8,16}`; folds into Family I. (~3 series.)
-- ≈ **~110 patches**.
-
-### Family C — connection / topology
-Validates the model's structural assumptions:
-- **Once-per-type:** two instruments using the **same** op vs two using **different** ops — confirms `R` is charged once per type (slope vs step).
-- **Dependency chains:** a single instrument with a chain `v1=osc; v2=f(v1); v3=f(v2); …` of depth `L ∈ {2,4,8,15}` — does chaining change per-phase cost vs independent phases?
-- **Variable fan:** phases writing 1 vs 2 vs 3 vs 4 distinct output vars — does the var index/count matter?
-- ≈ **~20 patches**.
-
-### Family I — imports & sample length (exe-vs-chip split)
-- **Imports:** vary count (0..8) and per-import byte size {0, 256, 4096, 32768}; measure `Isamp.raw` (delta-packed) contribution to the **uncompressed** exe (expected ~1:1) and to shrinkled (compresses). ~12 patches.
-- **Sample length:** hold ops fixed, vary `sampleLength ∈ {4, 4096, 32768, 131070}` across instruments; **confirm uncompressed exe size is ~constant** (generated samples are computed at runtime, not stored), proving the chip-vs-exe divergence the estimator relies on. ~6 patches.
-- ≈ **~18 patches**.
+### Structural / split checks — a handful
+- **Once-per-type:** scaffold already proves routines link once; one explicit two-same-op vs two-different-op pair confirms it. (~2)
+- **Imports:** vary import count {0,1,8} and per-import bytes {256, 32768} → import-handling fixed cost + per-byte exe contribution (delta-packed `Isamp.raw`, ~1:1 uncompressed). (~5)
+- **Sample length is exe-neutral:** same ops, `sampleLength ∈ {4, 4096, 131070}` → confirm uncompressed exe size constant (samples are runtime-generated, not stored). This *proves* the chip-vs-exe split the estimator relies on. (~3)
+- ≈ **~10 instruments**.
 
 ### Total
-≈ **520 patches** (132+135+66+60+110+20+18, minus overlap). At a few seconds per compile under the wine64 harness, the full corpus measures in well under an hour, unattended. No manual GUI step.
+≈ **~105 measurement instruments + scaffold + a couple of producer-calibration instruments**. Packed ~31 instruments/patch that's **~4 patches** for the bulk; with the `K`-vs-`K+T` diff method the compile count is ~1 + (instruments measured). Either way it is **~100 compiles, automated, minutes of wall-clock** — and far closer to your "3–4 instruments per op" than the earlier 520.
+
+> Optimization (optional): instead of one `K+T` diff per instrument, pack many distinct test instruments into a few patches and solve a small linear system for all `S[op,mode]` at once — fewer compiles, slightly more fitter logic. Default to the simpler per-instrument diff; switch if compile time ever matters.
+
+## Compression (Shrinkler)
+
+Record **both** sizes per compile (`a.mingw.exe` uncompressed, `exemusic.exe` shrinkled). All the subtraction above is on **uncompressed** size (near-additive, clean). Shrinkler is modeled on top as a ratio with reported variance (optionally split code vs import/sample), since repetition/compression isn't additive. The live estimator = uncompressed model × compression model, with stated ±.
 
 ## Generation & constraints
 
-A generator (`sizelab/corpus/`) emits the patches as in-memory `Patch` objects (reusing `emptyPatch`/`emptySlot` and the same builder helpers as the verification generator) and feeds each to the exporter + compile harness, recording one CSV row per patch: `{ patchId, family, op, paramModes, N, valueBucket, sampleLength, importBytes, uncompressedBytes, shrinkledBytes, opTypesPresent }`.
-
-Constraints the generator must honor (from the codegen):
-- Instrument emits only if `sampleLength > 2`; calibration uses 4096 (Family I varies it deliberately).
-- Phase emits only if `outVar != 0 && fn != 22`; every measured phase sets `outVar`.
-- Var-input ops (vol/add/mul/ctrl/distortion/reverb and the `errIfVal1Zero` ops 11/13/15/19) require their `val1` (and friends) to reference a variable **already written earlier in the same instrument** — the generator inserts a producer phase first.
-- clone/chordgen need a **source instrument at a lower index**; the generator places the source at instrument 0.
-- ≤16 editable slots per instrument: within-instrument repetition caps at 16−producers; higher `N` uses more instruments (up to 31).
-- `numinstruments`/`highestInstrument` is driven by the highest emitting instrument — series with `N` instruments occupy indices `0..N-1` (plus a source where needed).
+A generator (`sizelab/corpus/`) emits patches as in-memory `Patch` objects (reusing `emptyPatch`/`emptySlot` builders), feeds each through the exporter + compile harness, and records one CSV row per measurement: `{ id, op, paramModes, producersUsed, sampleLength, importBytes, uncompressedBytes, shrinkledBytes, opTypesPresent }`. Constraints from the codegen:
+- Instrument emits only if `sampleLength > 2`; var-input ops need their producer phase **earlier in the same instrument**; clone/chordgen need a **source instrument at a lower index** (placed at instrument 0); `outVar != 0` and `fn != 22` for every measured phase; ≤16 slots/instrument.
 
 ## How it feeds the fitter (sub-project 4)
 
-The fitter consumes the CSV:
-1. **Per-op slopes/intercepts** from Families R/P/V via least-squares per series; assemble `S[op, mode]` (and value-class terms where Family V demanded them) and `R[op]`.
-2. **`B`** from the consensus of `R`-series intercepts.
-3. **Bespoke ops** get parameterized size functions (clone/adsr/chordgen) fit from Family B rather than a single `S`.
-4. **Import/sample terms** from Family I.
-5. **Compression model** from the (uncompressed, shrinkled) pairs across the whole corpus.
-6. **Residual report:** mean/max error of the assembled model re-predicting every corpus patch's uncompressed and shrinkled size — written into `calibration-data.ts` (`fitted: true`, `fit{}` block) and surfaced in the UI as the estimate's ±.
+1. `P_sin` from the producer instrument; additivity checked.
+2. `S[op, mode]` for each op/mode by subtraction (`instrumentStream − k·P_sin`); per-param deltas from mode differences.
+3. `R[op]` and `B` from the minimal routine-isolation diffs.
+4. Bespoke ops → small parameterized size functions from their sets.
+5. Import/sample terms from the split checks.
+6. Compression model from the (uncompressed, shrinkled) pairs.
+7. Residual report (re-predict every corpus instrument) → `calibration-data.ts` `fit{}` + UI ±.
 
-The resulting `calibration-data.ts` schema extends the current one: `opCost` becomes per-op `{ routine, stream: Record<modeKey, number> }` plus bespoke size-fn coefficients; existing consumers (chip-ram, exe-size, breakdown) update to read the richer table. That schema change is part of sub-project 4, noted here so the corpus CSV carries every field the fitter needs.
+`calibration-data.ts` gains a per-op `{ routine, stream: Record<modeKey, number> }` shape plus bespoke coefficients; the chip-ram/exe-size/breakdown consumers update to read it (sub-project 4).
 
-## Relationship to P01–P07 and the live estimator
+## Relationship to P01–P07 and the estimator
 
-- **P01–P07** remain the exporter's byte-exact verification gate (sub-project 1). Untouched by this.
-- The **corpus** is calibration input only; it is never shipped and never imported by `src/` (lives in `sizelab/corpus/`, same isolation rule).
-- The **live estimator** keeps its current fast linear form; calibration just replaces seeded constants with fitted ones and upgrades `opCost` to the per-mode table.
+- **P01–P07** stay as the exporter byte-exact verification gate (sub-project 1); untouched.
+- The corpus is calibration-only, never shipped, never imported by `src/` (lives in `sizelab/corpus/`).
+- The live estimator keeps its fast linear form; calibration swaps seeded constants for fitted ones and upgrades `opCost` to the per-mode table.
 
 ## Out of scope
-
-- The wine64 compile harness itself (sub-project 2) — this design assumes it exists and returns `(uncompressed, shrinkled)` for a patch.
-- The fitter implementation (sub-project 4) — only its input contract (the CSV schema) is fixed here.
-- Atari `.prg` / raw `.bin` targets.
+- The wine64 harness (sub-project 2) and the fitter (sub-project 4) — only the CSV contract is fixed here.
+- Atari `.prg` / raw `.bin`.
+- Literal **value-bucket** effects (moveq vs move.w): dropped from the default corpus; add a tiny probe only if residuals later implicate value-dependence.
 
 ## Open questions for review
-
-1. **Corpus size** — ~520 patches as scoped, or trim (e.g. drop Family V if value-independence is confirmed on a small probe first) / expand (more repetition points per series for tighter slopes)?
-2. **Repetition ceiling** — `N=31` uses every instrument; is that the right max, or cap lower to keep compiles fast?
-3. **Per-mode granularity** — model each param independently (additive ΔS) plus one all-variable interaction series (current plan), or measure the full 2^k mode combinations for low-arity ops (more patches, captures all interactions)?
-4. **Compression model depth** — single global ratio, or split code/import/sample ratios (needs Family I to anchor the import ratio)? The latter is more accurate for import-heavy patches.
+1. **Producer choice** — standard `osc_sine` (your suggestion) as the single producer, or also calibrate a second producer type to check the subtraction is producer-independent? (One extra ~4 instruments.)
+2. **Interaction coverage** — per-param deltas + one all-variable instrument per op (current plan), or skip the all-variable check for 1–2 param ops to shave further?
+3. **Scaffold vs pack-and-solve** — simple `K`-vs-`K+T` per-instrument diffs (more compiles, trivial fitter) or packed linear system (fewer compiles, more fitter logic)?
