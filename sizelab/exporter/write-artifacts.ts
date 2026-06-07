@@ -1,8 +1,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { ExportedArtifacts } from './export-patch';
+import type { ExportedArtifacts, BinaryArtifacts } from './export-patch';
 
-export function writeArtifacts(artifacts: ExportedArtifacts, dir: string): void {
+/** Either exe (`ExportedArtifacts`) or bin (`BinaryArtifacts`) — both are
+ *  filename → text|bytes maps. */
+export type Artifacts = ExportedArtifacts | BinaryArtifacts;
+
+export function writeArtifacts(artifacts: Artifacts, dir: string): void {
   for (const [name, content] of Object.entries(artifacts)) {
     const target = join(dir, name);
     mkdirSync(dirname(target), { recursive: true });
