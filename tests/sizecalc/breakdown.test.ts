@@ -23,13 +23,13 @@ describe('computeBreakdown', () => {
     const i1 = b.perInstrument[1]!;
     expect(i0.slots[0]!.firstUse).toBe(true);
     expect(i0.slots[0]!.codeBytes).toBe(200);
-    expect(i0.slots[0]!.marginalUncompressed).toBe(200 + 10);
+    expect(i0.slots[0]!.marginalBytes).toBe(200 + 10);
     expect(i1.slots[0]!.firstUse).toBe(false);
     expect(i1.slots[0]!.codeBytes).toBe(0);
-    expect(i1.slots[0]!.marginalUncompressed).toBe(10);
+    expect(i1.slots[0]!.marginalBytes).toBe(10);
   });
 
-  it('reports op-types-used with names and per-instrument shrinkled', () => {
+  it('reports op-types-used with names and per-instrument code bytes', () => {
     const p = emptyPatch();
     p.instruments[0]!.slots = [
       { ...emptySlot(), fn: 2, outVar: 1 },
@@ -38,16 +38,15 @@ describe('computeBreakdown', () => {
     const b = computeBreakdown(p, CAL);
     expect(b.opTypesUsed.map((o) => o.fn)).toEqual([2, 4]);
     expect(b.opTypesUsed.find((o) => o.fn === 2)!.name).toBe('osc_saw');
-    // instr0 uncompressed = 200 + 300 + 2*10 = 520; shrinkled = 520*0.5
-    expect(b.perInstrument[0]!.uncompressed).toBe(520);
-    expect(b.perInstrument[0]!.shrinkled).toBe(260);
+    // instr0 code = Σ marginal = 200 + 300 + 2*10 = 520 (imports excluded)
+    expect(b.perInstrument[0]!.codeBytes).toBe(520);
   });
 
-  it('embeds the patch totals (exe + chip) it was built from', () => {
+  it('embeds the patch totals (code + chip) it was built from', () => {
     const p = emptyPatch();
     p.instruments[0]!.sampleLength = 2048;
     const b = computeBreakdown(p, CAL);
     expect(b.chip.residentTotal).toBe(1084 + 2048);
-    expect(b.exe.uncompressed).toBe(1000); // no op slots → just base
+    expect(b.code.codeBytes).toBe(1000); // no op slots → just base
   });
 });

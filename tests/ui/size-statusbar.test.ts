@@ -23,7 +23,7 @@ describe('size status bar', () => {
     const model = new PatchModel(p);
     let sel = 0;
     wireSizeStatusbar(root, model, () => sel);
-    expect(btn.textContent).toMatch(/exe/);
+    expect(btn.textContent).toMatch(/code/);
     expect(btn.textContent).toMatch(/chip/);
     expect(btn.textContent).toMatch(/sel/);
   });

@@ -27,12 +27,12 @@ export function wireSizeStatusbar(
     const selIdx = getSelectedInstr();
     const sel = b.perInstrument[selIdx];
     const rough = CALIBRATION.fitted ? '' : '~';
-    // `sel.shrinkled` is the instrument's MARGINAL contribution (its op code +
-    // stream, compressed) — deliberately not the absolute headline formula:
-    // base/shrink.base/imports are patch-global and would double-count here.
-    const selTxt = sel ? `${rough}${fmtBytes(sel.shrinkled)}` : '—';
+    // `sel.codeBytes` is the instrument's MARGINAL contribution (its op code +
+    // stream) — deliberately not the absolute headline formula: base is
+    // patch-global and would double-count here.
+    const selTxt = sel ? `${rough}${fmtBytes(sel.codeBytes)}` : '—';
     btn.textContent =
-      `exe ${rough}${fmtBytes(b.exe.shrinkled)} ` +
+      `code ${rough}${fmtBytes(b.code.codeBytes)} ` +
       `(sel ${selTxt}) · chip ${fmtBytes(b.chip.residentTotal)}`;
   };
 

@@ -34,6 +34,6 @@ export function annotateSlotSizes(host: HTMLElement, instr: InstrumentBreakdown)
     label.title = cost.firstUse
       ? `${fmtBytes(cost.codeBytes)} op code (first use) + ${fmtBytes(cost.streamBytes)} stream`
       : `${fmtBytes(cost.streamBytes)} stream (op code already counted)`;
-    label.textContent = fmtBytes(cost.marginalUncompressed);
+    label.textContent = fmtBytes(cost.marginalBytes);
   }
 }
