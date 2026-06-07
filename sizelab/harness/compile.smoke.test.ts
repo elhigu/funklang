@@ -19,9 +19,11 @@ describe('compilePatch (real toolchain)', () => {
     expect(r.shrinkled).toBe(4544);
   }, 600_000);
 
-  it.runIf(SMOKE)('compiles P01 to a 612-byte relocatable binary blob', async () => {
+  it.runIf(SMOKE)('compiles P01 to a 344-byte relocatable binary blob', async () => {
+    // bin path uses --gc-sections, so gcc8_a_support is dropped for this
+    // multiply-free patch (vs 612 when the support object was force-linked).
     const r = await compilePatchBinary(VERIFICATION_PATCHES['P01']!);
     expect(r.ok, r.error).toBe(true);
-    expect(r.bytes).toBe(612);
+    expect(r.bytes).toBe(344);
   }, 600_000);
 });

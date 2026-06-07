@@ -28,10 +28,24 @@ defines `__mulsi3`/`__udivsi3`/`__divsi3`/`__modsi3`.
 ## Effect
 
 - Real patches (exe **and** bin) link and build; the GUI's own "Export Amiga
-  Exe/Bin" works too.
-- Adds a fixed overhead to **every** build (the whole support object is linked,
-  not garbage-collected): P01 exe 13176 → **13596** uncompressed (4388 → **4544**
-  shrinklered), bin 344 → **612**. This is a constant base bump — per-op/per-mode
-  costs are unchanged.
-- The calibration corpus (`corpus/measurements.csv`) and the `compile.smoke`
-  anchors were re-measured **with** this fix in place; they assume it.
+  Exe/Bin" works (when run under a 64-bit-capable wine — see note below).
+
+### Binary target: `--gc-sections` (pay only for what you use)
+
+`Makefile-binary` *also* adds `-ffunction-sections -fdata-sections` +
+`-Wl,--gc-sections`, so `gcc8_a_support` is **dropped when unreferenced**. A
+patch with no 32-bit multiply (oscillators/filters/const params) carries none of
+it; an envelope/distortion/clone patch pulls it in. Measured:
+- empty patch bin: 496 → **236** bytes; P01 (osc_saw): 612 → **344**;
+  "amigaklang basics" (envelopes): **5256** (unchanged — it needs `__mulsi3`).
+
+The **exe** target (`Makefile-executable`) keeps the support force-linked (the
++420-byte bump is noise against the ~13.6 kB player, and the calibration corpus
+was measured that way). The `compile.smoke` anchors: exe 13596/4544, bin **344**.
+
+### GUI note
+
+The GUI must run under a **64-bit-capable wine** (wineWow, win64 prefix) for its
+spawned build to run the x86-64 toolchain. The stock `run.sh` uses 32-bit wine,
+so the GUI's own Export buttons fail with "Bad EXE format" before compiling —
+use the CLI (`npm run export:bin`) or relaunch the GUI under wineWow.
