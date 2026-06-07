@@ -14,13 +14,14 @@ describe('compilePatch (real toolchain)', () => {
   it.runIf(SMOKE)('compiles P01 to the spike anchor sizes', async () => {
     const r = await compilePatch(VERIFICATION_PATCHES['P01']!);
     expect(r.ok, r.error).toBe(true);
-    expect(r.uncompressed).toBe(13176);
-    expect(r.shrinkled).toBe(4388);
+    // Anchors include gcc8_a_support (__mulsi3 etc.) linked into both Makefiles.
+    expect(r.uncompressed).toBe(13596);
+    expect(r.shrinkled).toBe(4544);
   }, 600_000);
 
-  it.runIf(SMOKE)('compiles P01 to a 344-byte relocatable binary blob', async () => {
+  it.runIf(SMOKE)('compiles P01 to a 612-byte relocatable binary blob', async () => {
     const r = await compilePatchBinary(VERIFICATION_PATCHES['P01']!);
     expect(r.ok, r.error).toBe(true);
-    expect(r.bytes).toBe(344);
+    expect(r.bytes).toBe(612);
   }, 600_000);
 });
