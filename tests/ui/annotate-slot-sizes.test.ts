@@ -2,9 +2,17 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { emptyPatch, emptySlot } from '../../src/patch/types';
-import { CALIBRATION } from '../../src/sizecalc/calibration-data';
+import type { CalibrationData } from '../../src/sizecalc/calibration-data';
 import { computeBreakdown } from '../../src/sizecalc/breakdown';
 import { annotateSlotSizes } from '../../src/ui/annotate-slot-sizes';
+
+// Fixed test calibration (decoupled from the live fitted CALIBRATION so re-fits
+// don't churn these assertions): osc_saw opCost 64 + slotStreamCost 64.
+const CAL: CalibrationData = {
+  base: 1000, slotStreamCost: 64, opCost: { 2: 64 }, modLengthEmpty: 0,
+  shrink: { base: 0, codeRatio: 0.5, impRatio: 0.5 }, fitted: true,
+  fit: { meanErrUncompressed: 0, maxErrUncompressed: 0, meanErrShrinkled: 0, maxErrShrinkled: 0 },
+};
 
 function gridWithSlots(modelIdxs: number[]): HTMLElement {
   const host = document.createElement('div');
@@ -37,7 +45,7 @@ describe('annotateSlotSizes', () => {
     ];
     host = gridWithSlots([0, 1]);
     document.body.appendChild(host);
-    const b = computeBreakdown(p, CALIBRATION);
+    const b = computeBreakdown(p, CAL);
     annotateSlotSizes(host, b.perInstrument[0]!);
 
     const labels = host.querySelectorAll('[data-slot-size]');
@@ -55,7 +63,7 @@ describe('annotateSlotSizes', () => {
     ];
     host = gridWithSlots([0, 1]);
     document.body.appendChild(host);
-    const b = computeBreakdown(p, CALIBRATION);
+    const b = computeBreakdown(p, CAL);
     annotateSlotSizes(host, b.perInstrument[0]!);
     const labels = host.querySelectorAll('[data-slot-size]');
     expect((labels[0] as HTMLElement).dataset['firstUse']).toBe('1');
@@ -67,7 +75,7 @@ describe('annotateSlotSizes', () => {
     p.instruments[0]!.slots = [{ ...emptySlot(), fn: 2, outVar: 1 }];
     host = gridWithSlots([0]);
     document.body.appendChild(host);
-    const b = computeBreakdown(p, CALIBRATION);
+    const b = computeBreakdown(p, CAL);
     annotateSlotSizes(host, b.perInstrument[0]!);
     annotateSlotSizes(host, b.perInstrument[0]!);
     expect(host.querySelectorAll('[data-slot-size]').length).toBe(1);

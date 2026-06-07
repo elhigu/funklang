@@ -24,7 +24,8 @@
     "compile:smoke": "nix-shell -p wineWowPackages.stable --run 'SIZELAB_COMPILE_SMOKE=1 vitest run sizelab/harness/compile.smoke.test.ts'",
     "corpus:run": "nix-shell -p wineWowPackages.stable --run 'tsx sizelab/corpus/run-corpus.ts'",
     "export:bin": "tsx sizelab/harness/export-bin.ts",
-    "gate": "npm run typecheck && npm test && npm run e2e"
+    "gate": "npm run typecheck && npm test && npm run e2e",
+    "fit:calibration": "tsx sizelab/fit/fit-calibration.ts"
   },
   "keywords": [],
   "author": "",

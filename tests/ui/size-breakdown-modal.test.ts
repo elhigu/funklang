@@ -25,11 +25,12 @@ describe('breakdown modal', () => {
     expect(overlay.textContent).toContain('osc_saw');
   });
 
-  it('shows a rough-estimate notice while calibration is unfitted', () => {
+  it('shows the calibrated ± notice (CALIBRATION is fitted)', () => {
     const modal = mountBreakdownModal(root);
-    modal.open(computeBreakdown(emptyPatch(), CALIBRATION)); // CALIBRATION.fitted === false
+    modal.open(computeBreakdown(emptyPatch(), CALIBRATION)); // CALIBRATION.fitted === true
     const overlay = root.querySelector('#size-breakdown-overlay') as HTMLElement;
-    expect(overlay.textContent!.toLowerCase()).toContain('rough');
+    expect(overlay.textContent!.toLowerCase()).toContain('typical'); // "±N typical (max M)"
+    expect(overlay.textContent!.toLowerCase()).not.toContain('rough');
   });
 
   it('closes on outside click', () => {
