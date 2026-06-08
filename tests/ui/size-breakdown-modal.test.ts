@@ -32,7 +32,7 @@ describe('breakdown modal', () => {
     const txt = overlay.textContent!.toLowerCase();
     expect(txt).toContain('rough'); // clearly labelled approximate
     expect(txt).toContain('typical'); // "±~N% typical …"
-    expect(txt).toContain('export:bin'); // points to the exact-number path
+    expect(txt).toContain('amigaklang'); // points web users to the exact-size path
   });
 
   it('closes on outside click', () => {

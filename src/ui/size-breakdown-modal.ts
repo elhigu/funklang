@@ -48,19 +48,23 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
     const flooredRow = b.code.floored
       ? `<tr><td>· (min .bin floor)</td><td class="num">${fmtBytes(b.code.codeBytes)}</td></tr>`
       : '';
+    const importRow = b.code.importBytes > 0
+      ? `<tr><td>· imported samples</td><td class="num">${fmtBytes(b.code.importBytes)}</td></tr>`
+      : '';
 
     overlay.innerHTML = `
       <div class="size-breakdown-inner" role="document">
         <header><h2>SIZE BREAKDOWN</h2><button id="size-breakdown-close" aria-label="Close">✕</button></header>
-        <p class="size-breakdown-note">Rough estimates — enough to get a hunch of which operations add lots of code and which are cheap, not exact bytes (the .bin is sub-additive under whole-program LTO). ${accuracy}; run <code>export:bin</code> to compile the exact size. Imported samples aren't generation code, so they're not in this figure — but their raw bytes still cost disk space (you supply them to the host) and chip-RAM at runtime.</p>
+        <p class="size-breakdown-note">Rough estimates — enough to get a hunch of which operations add lots of code and which are cheap, not exact bytes (the .bin is sub-additive under whole-program LTO). ${accuracy}. For the exact size, export the patch from the original AmigaKlang.</p>
         <section>
           <h3>Totals</h3>
           <table>
-            <tr><td>code (rough)</td><td class="num">~${fmtBytes(b.code.codeBytes)}</td></tr>
+            <tr><td>size (rough)</td><td class="num">~${fmtBytes(b.code.totalBytes)}</td></tr>
             <tr><td>· base</td><td class="num">${fmtBytes(b.code.base)}</td></tr>
             <tr><td>· ${b.code.distinctOps.length} op type(s)</td><td class="num">${fmtBytes(b.code.distinctOpBytes)}</td></tr>
             <tr><td>· ${b.code.nSlots} slot(s)</td><td class="num">${fmtBytes(b.code.slotBytes)}</td></tr>
             ${flooredRow}
+            ${importRow}
             <tr><td>chip-RAM (resident)</td><td class="num">${fmtBytes(b.chip.residentTotal)}</td></tr>
           </table>
         </section>

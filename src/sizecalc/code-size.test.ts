@@ -49,10 +49,18 @@ describe('estimateCodeSize (aggregate .bin model)', () => {
     expect(e.distinctOpBytes).toBe(50); // perDistinctOp applies regardless of opCost
   });
 
-  it('EXCLUDES imported samples from code (they are chip-RAM, not .bin code)', () => {
+  it('excludes imports from codeBytes but adds them exactly to totalBytes', () => {
     const p = withSlots([2, 4]); // raw 100+100+20=220 > floor
     p.importedSamples[0]!.data = new Int8Array(5000);
     const e = estimateCodeSize(p, CAL);
-    expect(e.codeBytes).toBe(220); // imports add nothing to code
+    expect(e.codeBytes).toBe(220); // .bin code unaffected by imports
+    expect(e.importBytes).toBe(5000); // exact raw sample bytes
+    expect(e.totalBytes).toBe(220 + 5000); // full on-disk footprint
+  });
+
+  it('totalBytes == codeBytes when there are no imported samples', () => {
+    const e = estimateCodeSize(withSlots([2, 4]), CAL);
+    expect(e.importBytes).toBe(0);
+    expect(e.totalBytes).toBe(e.codeBytes);
   });
 });

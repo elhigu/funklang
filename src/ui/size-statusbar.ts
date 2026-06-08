@@ -30,8 +30,8 @@ export function wireSizeStatusbar(
     // .bin, so it can't be an exact per-instrument byte total). Chip is exact.
     const selTxt = sel && sel.weight > 0 ? ` · sel ~${fmtBytes(sel.weight)}` : '';
     btn.textContent =
-      `~code ${fmtBytes(b.code.codeBytes)}${selTxt} · chip ${fmtBytes(b.chip.residentTotal)}`;
-    btn.title = `Rough .bin code estimate (±~${CALIBRATION.fit.meanPct}%). Click for breakdown.`;
+      `~size ${fmtBytes(b.code.totalBytes)}${selTxt} · chip ${fmtBytes(b.chip.residentTotal)}`;
+    btn.title = `Rough exported-size estimate (code ±~${CALIBRATION.fit.meanPct}%, + exact imported-sample bytes). Click for breakdown.`;
   };
 
   btn.addEventListener('click', () => {

@@ -10,14 +10,24 @@
 //
 // This is a ballpark (~±20%); per-op `opCost` is a separate RELATIVE weight used
 // only to rank which op is heavy in the breakdown (see breakdown.ts), never
-// summed here. Imported samples are NOT code (they live in chip-RAM at runtime).
+// summed here. Imported-sample bytes are added on top (exactly) as part of the
+// patch's total on-disk footprint — the .bin doesn't embed them, but they must
+// still be stored on disk and supplied to the host at runtime.
 import type { Patch } from '../patch/types';
 import type { CalibrationData } from './calibration-data';
 
 export interface CodeSizeEstimate {
-  /** Rough estimated uncompressed .bin code bytes (aggregate model, ~±20%). */
+  /** Rough estimated uncompressed .bin generation-code bytes (aggregate, ~±20%). */
   codeBytes: number;
-  // Components (for the breakdown view) — these SUM to codeBytes (pre-floor):
+  /**
+   * Exact raw imported-sample bytes. The relocatable .bin doesn't embed these
+   * (the host supplies them at ImpAdr), but they still have to be stored on
+   * disk in the demo, so they count toward the patch's total exported size.
+   */
+  importBytes: number;
+  /** codeBytes + importBytes — the patch's full on-disk footprint (headline). */
+  totalBytes: number;
+  // Code components (for the breakdown view) — these SUM to codeBytes (pre-floor):
   base: number;
   /** perDistinctOp · number of distinct op types. */
   distinctOpBytes: number;
@@ -47,8 +57,13 @@ export function estimateCodeSize(patch: Patch, cal: CalibrationData): CodeSizeEs
   const raw = cal.base + distinctOpBytes + slotBytes;
   const codeBytes = Math.max(cal.floor, raw);
 
+  let importBytes = 0;
+  for (const s of patch.importedSamples) importBytes += s.data.length;
+
   return {
     codeBytes,
+    importBytes,
+    totalBytes: codeBytes + importBytes,
     base: cal.base,
     distinctOpBytes,
     slotBytes,

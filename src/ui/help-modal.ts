@@ -114,22 +114,20 @@ export function helpOverlayHtml(): string {
             </table>
 
             <h3>Size &amp; memory readout</h3>
-            <p>The footer shows a <strong>rough</strong> estimate of the
-            <em>.bin code</em> size of the sample-generation code — the
-            relocatable blob you embed in a demo — a relative weight for the
-            selected instrument (<code>sel</code>), and resident chip-RAM.
+            <p>The footer shows a <strong>rough</strong> estimate of the patch's
+            exported <em>size</em> — the relocatable sample-generation <code>.bin</code>
+            you embed in a demo, plus any imported-sample bytes — a relative weight
+            for the selected instrument (<code>sel</code>), and resident chip-RAM.
             Click it for a full breakdown.</p>
-            <p>The code figure is a calibrated <strong>ballpark (±~20%)</strong>,
+            <p>The code part is a calibrated <strong>ballpark (±~20%)</strong>,
             always marked <code>~</code>: the real .bin is sub-additive (whole-program
             LTO and <code>--gc-sections</code> share helper code between ops), so
-            no live formula can be exact. For the precise number, compile with
-            <code>npm run export:bin</code>. Per-op / per-instrument / per-slot
-            figures are <strong>relative weights</strong> ("which op is heavy") and
-            deliberately do <em>not</em> sum to the headline. Imported samples
-            aren't generation code (and the relocatable .bin doesn't embed them —
-            the host supplies them at <code>ImpAdr</code>), so they're outside this
-            estimate; their raw bytes still cost disk space in your demo and
-            chip-RAM at runtime.</p>
+            no live formula can be exact. For the precise number, export the patch
+            from the original AmigaKlang. Per-op / per-instrument / per-slot figures
+            are <strong>relative weights</strong> ("which op is heavy") and
+            deliberately do <em>not</em> sum to the headline. Imported-sample bytes
+            are added exactly (they cost disk space even though the .bin doesn't
+            embed them — the host supplies them at <code>ImpAdr</code>).</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>
