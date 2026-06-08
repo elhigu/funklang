@@ -52,7 +52,7 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
     overlay.innerHTML = `
       <div class="size-breakdown-inner" role="document">
         <header><h2>SIZE BREAKDOWN</h2><button id="size-breakdown-close" aria-label="Close">✕</button></header>
-        <p class="size-breakdown-note">Rough estimate (${accuracy}). The .bin (relocatable sample-generation code you embed) is sub-additive under whole-program LTO, so this can only be a ballpark — run <code>export:bin</code> to compile the exact size. Imported samples aren't in the code (they're chip-RAM).</p>
+        <p class="size-breakdown-note">Rough estimates — enough to get a hunch of which operations add lots of code and which are cheap, not exact bytes (the .bin is sub-additive under whole-program LTO). ${accuracy}; run <code>export:bin</code> to compile the exact size. Imported samples aren't in the code (they're chip-RAM).</p>
         <section>
           <h3>Totals</h3>
           <table>
