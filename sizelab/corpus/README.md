@@ -12,19 +12,30 @@ Regenerate with `npm run corpus:run` (needs wineWow; writes `measurements.csv`).
   so the fit is anchored on real multi-instrument structure, not just single-op synthetics.
 - `measurements.csv` — committed dataset (deterministic; lets the fitter run without wine).
 
-## Why the headline is an aggregate model (not a per-op sum)
+## Model: additive per-op (fit UNWEIGHTED)
 
-The .bin is built with whole-program LTO + `--gc-sections`, which **shares helper
-code between ops and collapses similar slots** — so real patches are strongly
-*sub-additive*. A non-negative per-op sum over-predicts real patches by 60%+
-(the fit literally wants negative op costs to compensate). So the fitter
-(`../fit/fit-calibration.ts`) produces two things:
+`../fit/fit-calibration.ts` fits, on synthetic + real `.bin` sizes:
 
-1. **Headline (aggregate):** `binBytes ≈ base + perDistinctOp·distinctOpTypes +
-   perSlot·nSlots`, fit on the **real** patches (weighted ×8). ≈ **±20%** mean on
-   real patches — a deliberate ballpark; compile (`npm run export:bin`) for exact.
-2. **Relative per-op weights:** a per-op ridge on the **synthetic single-op** rows,
-   used only to rank "which op is heavy" in the breakdown — never summed.
+```
+binBytes ≈ base + Σ_distinct opRoutine[op] + perSlot·nSlots + perVarOperand·nVarOperands
+```
+
+≈ **10% mean** on real patches (max ~4 kB), and *coherent* — the breakdown's
+per-op / per-slot figures are real bytes that sum to the headline. For the exact
+number, export the patch from the original AmigaKlang.
+
+**Fit unweighted — this is the whole trick.** An earlier version weighted the
+real patches ×8, which drove the base negative and inflated per-op costs, making
+the additive model look hopeless (≈60% over) and forcing a fallback aggregate
+model (`base + perDistinctOp·distinctOps + perSlot·slots`, ≈18%). Fit *unweighted*,
+the per-op routine costs settle to "effective" values that absorb the `.bin`'s
+mild sub-additivity (whole-program LTO + `--gc-sections` share helper code), and
+the additive model both wins on accuracy and stays coherent.
+
+Operand mode matters a lot per op (bin over each op's all-const baseline): a
+variable `enva` attack adds ~676 B, a variable `osc_saw` freq ~164 B — captured
+by `perVarOperand` and visible per-slot in the breakdown. Real-patch operand
+modes are recomputed from the `.akp` files at fit time.
 
 ## Dataset notes (run 2026-06-07)
 

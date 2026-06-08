@@ -1,9 +1,10 @@
 // src/ui/annotate-slot-sizes.ts
 //
-// Injects a per-slot RELATIVE op weight into slot-grid rows. Same DOM
-// traversal as updateSlotWaves (slot-grid.ts): `.slots > .slot-wrap > .slot`
-// keyed by data-model-slot. The .bin is sub-additive (ops share code), so this
-// is a relative "how heavy is this op" hint, not an exact byte contribution.
+// Injects each slot's MARGINAL .bin code contribution into slot-grid rows. Same
+// DOM traversal as updateSlotWaves (slot-grid.ts): `.slots > .slot-wrap > .slot`
+// keyed by data-model-slot. Op-routine cost is shown only on the first patch-wide
+// use of an op (firstUse), so reused ops read cheap; slots with variable operands
+// read costlier. These marginals sum to the headline estimate.
 import type { InstrumentBreakdown } from '../sizecalc/breakdown';
 import { fmtBytes } from '../sizecalc/format';
 
@@ -31,7 +32,11 @@ export function annotateSlotSizes(host: HTMLElement, instr: InstrumentBreakdown)
       slotEl.appendChild(label);
     }
     label.dataset['firstUse'] = cost.firstUse ? '1' : '0';
-    label.title = `~${fmtBytes(cost.weight)} relative op weight (ops share code in the .bin; the headline total is patch-wide and approximate)`;
-    label.textContent = `~${fmtBytes(cost.weight)}`;
+    const parts = [
+      cost.firstUse ? `${fmtBytes(cost.routineBytes)} op routine (first use)` : 'op routine already counted',
+      cost.varOperands > 0 ? `${cost.varOperands} variable operand(s)` : 'all-const',
+    ];
+    label.title = `~${fmtBytes(cost.marginalBytes)} marginal — ${parts.join(', ')}`;
+    label.textContent = `~${fmtBytes(cost.marginalBytes)}`;
   }
 }

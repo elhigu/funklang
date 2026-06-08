@@ -17,13 +17,13 @@ describe('size status bar', () => {
     document.body.appendChild(root);
   });
 
-  it('renders exe + chip totals and the selected instrument figure', () => {
+  it('renders the rough size + chip totals and the selected instrument figure', () => {
     const p = emptyPatch();
     p.instruments[0]!.slots = [{ ...emptySlot(), fn: 2, outVar: 1 }];
     const model = new PatchModel(p);
     let sel = 0;
     wireSizeStatusbar(root, model, () => sel);
-    expect(btn.textContent).toMatch(/code/);
+    expect(btn.textContent).toMatch(/~size/);
     expect(btn.textContent).toMatch(/chip/);
     expect(btn.textContent).toMatch(/sel/);
   });

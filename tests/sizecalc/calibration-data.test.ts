@@ -2,30 +2,29 @@ import { describe, it, expect } from 'vitest';
 import { CALIBRATION } from '../../src/sizecalc/calibration-data';
 import { OP_DEFS } from '../../src/schema/op-metadata';
 
-describe('CALIBRATION seed table (aggregate .bin model)', () => {
+describe('CALIBRATION seed table (additive per-op model)', () => {
   it('has the required top-level fields', () => {
     expect(typeof CALIBRATION.base).toBe('number');
-    expect(typeof CALIBRATION.perDistinctOp).toBe('number');
     expect(typeof CALIBRATION.perSlot).toBe('number');
+    expect(typeof CALIBRATION.perVarOperand).toBe('number');
     expect(typeof CALIBRATION.floor).toBe('number');
     expect(typeof CALIBRATION.modLengthEmpty).toBe('number');
     expect(typeof CALIBRATION.fitted).toBe('boolean');
   });
 
-  it('seeds an opCost (relative weight) entry for every known op code', () => {
+  it('has an opRoutine entry for every known op code', () => {
     for (const def of OP_DEFS) {
-      expect(CALIBRATION.opCost[def.code], `op ${def.code} (${def.name})`).toBeTypeOf('number');
+      expect(CALIBRATION.opRoutine[def.code], `op ${def.code} (${def.name})`).toBeTypeOf('number');
     }
   });
 
-  it('is calibrated from the corpus with sane aggregate coefficients', () => {
+  it('is calibrated from the corpus with sane coefficients', () => {
     expect(CALIBRATION.fitted).toBe(true);
-    // Aggregate model: each distinct op type and each slot pulls positive code,
-    // and there is a positive .bin floor (empty-patch size).
-    expect(CALIBRATION.perDistinctOp).toBeGreaterThan(0);
-    expect(CALIBRATION.perSlot).toBeGreaterThan(0);
+    expect(CALIBRATION.base).toBeGreaterThanOrEqual(0);
+    expect(CALIBRATION.perSlot).toBeGreaterThanOrEqual(0);
+    expect(CALIBRATION.perVarOperand).toBeGreaterThan(0); // variable operands cost code
     expect(CALIBRATION.floor).toBeGreaterThan(0);
-    for (const def of OP_DEFS) expect(CALIBRATION.opCost[def.code]).toBeGreaterThanOrEqual(0);
+    for (const def of OP_DEFS) expect(CALIBRATION.opRoutine[def.code]).toBeGreaterThanOrEqual(0);
   });
 
   it('records real-patch fit residuals', () => {

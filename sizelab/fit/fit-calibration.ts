@@ -1,34 +1,34 @@
 // Offline fitter: read corpus measurements.csv and regenerate
-// src/sizecalc/calibration-data.ts. TARGET = the relocatable .bin code blob
-// (what you embed in a demo), NOT the standalone exe.
+// src/sizecalc/calibration-data.ts. TARGET = the relocatable .bin code blob.
 //
-// The .bin is strongly SUB-ADDITIVE: whole-program LTO + --gc-sections share
-// helpers and collapse similar slots, so a non-negative per-op sum over-predicts
-// real patches by 60%+. So we fit TWO things:
+// Model (additive per-op, fit UNWEIGHTED on synthetic + real rows):
+//   binBytes ≈ base + Σ_distinct opRoutine[op] + perSlot·nSlots
+//                   + perVarOperand·nVarOperands
 //
-//   1. HEADLINE (aggregate): binBytes ≈ base + perDistinctOp·distinctOpTypes
-//      + perSlot·nSlots, fit on REAL multi-instrument patches (weighted heavily).
-//      This is the number shown to the user (~±20%).
-//   2. RELATIVE per-op weights: a per-op ridge on the SYNTHETIC single-op corpus,
-//      clamped ≥0. Only used to rank "which op is heavy" in the breakdown — it is
-//      NOT summed into the headline.
+// Unweighted is the key: an earlier version weighted the real patches ×8, which
+// drove the base negative and inflated per-op costs (making the additive model
+// look hopeless). Fit unweighted, the per-op routine costs settle to "effective"
+// values that absorb the .bin's mild sub-additivity, and the model lands ~10%
+// mean on real patches — better than the old aggregate, and coherent (per-op
+// figures sum to the headline).
 //
-// Pure CSV math — no wine. Run: npm run fit:calibration
+// Pure CSV math — except real-patch operand modes, which we recompute from the
+// .akp files. Run: npm run fit:calibration
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OP_DEFS } from '../../src/schema/op-metadata';
+import { OP_DEFS, opByCode } from '../../src/schema/op-metadata';
+import { parseAkp } from '../../src/fileio/akp';
+import type { Slot } from '../../src/patch/types';
 import { parseCsv, type MeasurementRow } from '../corpus/measurements-csv';
 import { ridgeFit, residuals } from './lstsq';
 
 const SINE = 4;
 const MOD_LENGTH_EMPTY = 2108; // chip term (resident mod template); not part of code
-const REAL_WEIGHT = 8; // real patches drive the aggregate; synthetic shapes per-op
+const PATCHES = join(import.meta.dirname, '..', '..', '..', 'patches');
 
-// Fallback per-op RELATIVE weights for ops the corpus doesn't exercise.
+// Fallback routine cost for ops the corpus doesn't exercise (clone/loop_gen/etc.).
 const SEED: Record<number, number> = {
-  1: 48, 2: 64, 3: 80, 4: 128, 5: 80, 6: 80, 7: 112, 8: 120, 9: 32, 10: 32,
-  11: 112, 12: 160, 13: 320, 14: 32, 15: 320, 16: 128, 17: 48, 18: 560, 19: 96,
-  20: 64, 21: 140, 22: 0, 23: 200, 24: 128,
+  17: 120, 18: 560, 20: 64, 22: 0, 23: 200, 24: 128,
 };
 
 function opsPresent(r: MeasurementRow): Set<number> {
@@ -37,65 +37,81 @@ function opsPresent(r: MeasurementRow): Set<number> {
   return s;
 }
 const nSlots = (r: MeasurementRow): number => r.producerCount + r.measured.length;
-const nDistinct = (r: MeasurementRow): number => opsPresent(r).size;
+
+/** Variable (non-const) var-or-const operands set on an op slot. */
+export function slotVarOperands(s: Slot): number {
+  const def = opByCode(s.fn);
+  if (!def) return 0;
+  let n = 0;
+  for (const p of def.params) {
+    if (p.type.kind === 'var-or-const' && p.selector && (s[p.selector] as number) !== 0) n++;
+  }
+  return n;
+}
+
+/** # variable operands across a row: from mode strings (synth) or .akp (real). */
+function nVarOperands(r: MeasurementRow): number {
+  if (r.id.startsWith('real:')) {
+    const patch = parseAkp(new Uint8Array(readFileSync(join(PATCHES, r.id.slice(5) + '.akp'))));
+    let nv = 0;
+    for (const ins of patch.instruments) for (const s of ins.slots) if (s.fn !== 0) nv += slotVarOperands(s);
+    return nv;
+  }
+  return r.measured.reduce((n, m) => n + (m.mode.match(/V/g)?.length ?? 0), 0);
+}
+
 const c0 = (v: number): number => Math.max(0, Math.round(v));
 
 function main(): void {
   const csv = readFileSync(join(import.meta.dirname, '..', 'corpus', 'measurements.csv'), 'utf8');
-  const rows = parseCsv(csv);
+  const rows = parseCsv(csv).filter((r) => r.binBytes > 0); // drop unmeasured rows
   const reals = rows.filter((r) => r.id.startsWith('real:'));
-  const synth = rows.filter((r) => !r.id.startsWith('real:'));
 
-  // ── 1. Aggregate headline model: [1, distinctOpTypes, nSlots], reals weighted.
-  const aggX: number[][] = [];
-  const aggY: number[] = [];
-  for (const r of rows) {
-    const reps = r.id.startsWith('real:') ? REAL_WEIGHT : 1;
-    for (let k = 0; k < reps; k++) { aggX.push([1, nDistinct(r), nSlots(r)]); aggY.push(r.binBytes); }
-  }
-  const ab = ridgeFit(aggX, aggY, 0.5);
-  const base = ab[0]!;
-  const perDistinctOp = ab[1]!;
-  const perSlot = ab[2]!;
-  const aggPred = (r: MeasurementRow): number => base + perDistinctOp * nDistinct(r) + perSlot * nSlots(r);
+  // Features: [1, op-indicators…, nSlots, nVarOperands]. Fit UNWEIGHTED.
+  const ops = [...new Set(rows.flatMap((r) => [...opsPresent(r)]))].sort((a, b) => a - b);
+  const feat = (r: MeasurementRow): number[] => {
+    const pres = opsPresent(r);
+    return [1, ...ops.map((o) => (pres.has(o) ? 1 : 0)), nSlots(r), nVarOperands(r)];
+  };
+  const X = rows.map(feat);
+  const y = rows.map((r) => r.binBytes);
+  const beta = ridgeFit(X, y, 0.5);
+  const base = beta[0]!;
+  const perSlot = beta[beta.length - 2]!;
+  const perVarOperand = beta[beta.length - 1]!;
+  const routine = new Map<number, number>();
+  ops.forEach((o, i) => routine.set(o, beta[i + 1]!));
 
-  // Residual over REAL patches only — that's the accuracy users actually see.
-  const res = residuals(reals.map((r) => r.binBytes), (i) => aggPred(reals[i]!));
+  const pred = (r: MeasurementRow): number => {
+    let v = base + perSlot * nSlots(r) + perVarOperand * nVarOperands(r);
+    for (const o of opsPresent(r)) v += routine.get(o) ?? 0;
+    return v;
+  };
+  const res = residuals(reals.map((r) => r.binBytes), (i) => pred(reals[i]!));
   const avgReal = reals.reduce((s, r) => s + r.binBytes, 0) / Math.max(1, reals.length);
-  const floor = Math.min(...synth.map((r) => r.binBytes)); // empty/smallest .bin
+  const floor = Math.min(...rows.map((r) => r.binBytes));
 
-  // ── 2. Per-op RELATIVE weights: per-op ridge on synthetic single-op rows only.
-  const ops = [...new Set(synth.flatMap((r) => [...opsPresent(r)]))].sort((a, b) => a - b);
-  const opX = synth.map((r) => {
-    const present = opsPresent(r);
-    return [1, ...ops.map((op) => (present.has(op) ? 1 : 0))];
-  });
-  const ob = ridgeFit(opX, synth.map((r) => r.binBytes), 0.5);
-  const opFit = new Map<number, number>();
-  ops.forEach((op, i) => opFit.set(op, ob[i + 1]!));
-
-  const opCostEntries = OP_DEFS.map((d) => d.code).sort((a, b) => a - b)
-    .map((code) => `    ${code}: ${opFit.has(code) ? c0(opFit.get(code)!) : (SEED[code] ?? 128)},`)
+  const routineEntries = OP_DEFS.map((d) => d.code).sort((a, b) => a - b)
+    .map((code) => `    ${code}: ${routine.has(code) ? c0(routine.get(code)!) : (SEED[code] ?? 128)},`)
     .join('\n');
 
   const file = `// Calibration table for the size estimator (TARGET: .bin code size).
 //
 // REGENERATED by the offline fitter (npm run fit:calibration, sizelab/fit/).
-// The .bin is sub-additive (whole-program LTO + --gc-sections), so the HEADLINE
-// uses an aggregate model fit on REAL patches; per-op opCost is a RELATIVE
-// "which op is heavy" weight only and is NOT summed into codeBytes.
-// Types live in ./calibration-types.
+// Additive per-op model fit UNWEIGHTED on synthetic + real .bin sizes; per-op
+// opRoutine costs are "effective" (they absorb the .bin's mild sub-additivity)
+// and SUM, with perSlot/perVarOperand, to the headline. Types: ./calibration-types.
 import type { CalibrationData } from './calibration-types';
 
 export type { CalibrationData, FitQuality } from './calibration-types';
 
 export const CALIBRATION: CalibrationData = {
   base: ${c0(base)},
-  perDistinctOp: ${c0(perDistinctOp)},
   perSlot: ${c0(perSlot)},
+  perVarOperand: ${c0(perVarOperand)},
   floor: ${c0(floor)},
-  opCost: {
-${opCostEntries}
+  opRoutine: {
+${routineEntries}
   },
   modLengthEmpty: ${MOD_LENGTH_EMPTY},
   fitted: true,
@@ -108,11 +124,11 @@ ${opCostEntries}
 `;
   writeFileSync(join(import.meta.dirname, '..', '..', 'src', 'sizecalc', 'calibration-data.ts'), file);
 
-  console.log(`aggregate .bin headline (reals ×${REAL_WEIGHT}, ${reals.length} real / ${synth.length} synth):`);
-  console.log(`  base=${c0(base)}  perDistinctOp=${c0(perDistinctOp)}  perSlot=${c0(perSlot)}  floor=${c0(floor)}`);
-  console.log(`  REAL-patch residual: mean ${Math.round(res.mean)} (${Math.round((res.mean / avgReal) * 100)}% of avg ${Math.round(avgReal)}), max ${Math.round(res.max)} B`);
-  const show = [2, 4, 7, 8, 13, 15, 16].filter((o) => opFit.has(o));
-  console.log('  relative opCost: ' + show.map((o) => `${o}=${c0(opFit.get(o)!)}`).join(' '));
+  console.log(`additive per-op fit (${rows.length} rows, unweighted, ${reals.length} real):`);
+  console.log(`  base=${c0(base)} perSlot=${c0(perSlot)} perVarOperand=${c0(perVarOperand)} floor=${c0(floor)}`);
+  console.log(`  REAL residual: mean ${Math.round(res.mean)} (${Math.round((res.mean / avgReal) * 100)}%) max ${Math.round(res.max)} B`);
+  const show = [2, 4, 7, 13, 15, 16].filter((o) => routine.has(o));
+  console.log('  opRoutine: ' + show.map((o) => `${o}=${c0(routine.get(o)!)}`).join(' '));
 }
 
 main();

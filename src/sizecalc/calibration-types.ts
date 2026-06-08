@@ -2,14 +2,24 @@
 // Kept separate from the data so the offline fitter (sizelab/fit) can
 // regenerate calibration-data.ts without touching these definitions.
 //
-// The .bin (relocatable sample-generation blob) is strongly SUB-ADDITIVE under
-// whole-program LTO + --gc-sections, so a per-op additive sum over-predicts
-// real patches badly. The HEADLINE therefore uses an aggregate model fit on
-// real patches; per-op `opCost` is kept only as a RELATIVE "which op is heavy"
-// weight and is NOT summed into the headline.
+// Model: an ADDITIVE per-op estimate of the relocatable .bin generation code,
+// fit (unweighted) against synthetic single-op patches AND real multi-instrument
+// patches. The .bin is somewhat sub-additive (whole-program LTO shares code), so
+// the fitted per-op routine costs are "effective" values that already absorb
+// typical sharing — they are NOT isolated-in-a-vacuum costs. ~10% mean error on
+// real patches.
+//
+//   codeBytes = max(floor,
+//                   base
+//                 + Σ_distinct opRoutine[op]        // routine, paid once per op type
+//                 + perSlot · nSlots                 // every op slot
+//                 + perVarOperand · nVarOperands)    // each variable (non-const) operand
+//
+// Per-op / per-slot figures in the breakdown are real bytes from this same model
+// and SUM to the headline (coherent).
 
 export interface FitQuality {
-  /** Mean absolute residual (bytes) of the aggregate model over real patches. */
+  /** Mean absolute residual (bytes) over real patches. */
   meanErr: number;
   /** Max absolute residual (bytes) over real patches. */
   maxErr: number;
@@ -18,16 +28,16 @@ export interface FitQuality {
 }
 
 export interface CalibrationData {
-  // ── Aggregate headline model (approximate, ~±20%):
-  //    codeBytes = max(floor, base + perDistinctOp·distinctOpTypes + perSlot·nSlots)
+  /** Framework floor present in every .bin. */
   base: number;
-  perDistinctOp: number;
+  /** Effective code per op slot (fn !== 0). */
   perSlot: number;
-  /** Lower bound (empty-patch .bin floor). */
+  /** Effective code per variable (non-const) operand — the mode sensitivity. */
+  perVarOperand: number;
+  /** Lower bound (empty/smallest .bin). */
   floor: number;
-
-  /** RELATIVE per-op weight (which op pulls more code). NOT summed into codeBytes. */
-  opCost: Record<number, number>;
+  /** Effective per-op-type routine cost (paid once per distinct op present). */
+  opRoutine: Record<number, number>;
 
   /** Chip bytes of the resident mod template (chip-RAM term, not code). */
   modLengthEmpty: number;

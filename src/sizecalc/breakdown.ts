@@ -1,14 +1,14 @@
 // src/sizecalc/breakdown.ts
 //
-// Attribution for the size readout. The HEADLINE code figure is the aggregate
-// estimate from estimateCodeSize (~±20%, see code-size.ts). Because the .bin is
-// sub-additive, per-instrument / per-slot / per-op figures here are RELATIVE
-// WEIGHTS (from cal.opCost) that rank "which op pulls more code" — they do NOT
-// sum to the headline and are labelled as relative in the UI.
+// Full attribution for the size readout. With the additive per-op model these
+// figures are real bytes that SUM to the headline (code-size.ts): each slot's
+// MARGINAL cost = its op routine (only on the op's first patch-wide use) +
+// per-slot + per-variable-operand. So reused ops read cheap, and slots with
+// variable operands read costlier — the mode sensitivity the user asked for.
 import type { Patch } from '../patch/types';
 import type { CalibrationData } from './calibration-data';
 import { chipUsage, type ChipUsage } from './chip-ram';
-import { estimateCodeSize, type CodeSizeEstimate } from './code-size';
+import { estimateCodeSize, slotVarOperands, type CodeSizeEstimate } from './code-size';
 import { opByCode } from '../schema/op-metadata';
 
 export interface SlotCost {
@@ -17,26 +17,29 @@ export interface SlotCost {
   opName: string;
   /** True iff this is the first patch-wide slot using `fn`. */
   firstUse: boolean;
-  /** Relative code weight of this op (cal.opCost) — NOT a byte contribution. */
-  weight: number;
+  /** Variable (non-const) operands on this slot. */
+  varOperands: number;
+  /** Op-routine bytes (only on firstUse, else 0). */
+  routineBytes: number;
+  /** This slot's marginal .bin contribution (routine + perSlot + var operands). */
+  marginalBytes: number;
 }
 
 export interface InstrumentBreakdown {
   instrIdx: number;
   /** Generated-sample chip bytes for this instrument (sampleLength). */
   sampleBytes: number;
-  /** Σ of its slots' relative op weights — ranks instruments, not a byte total. */
-  weight: number;
+  /** Σ marginalBytes of its op slots — this instrument's .bin code contribution. */
+  codeBytes: number;
   slots: SlotCost[];
 }
 
 export interface PatchBreakdown {
-  /** Aggregate headline code estimate (~±20%). */
   code: CodeSizeEstimate;
   chip: ChipUsage;
   perInstrument: InstrumentBreakdown[];
-  /** Distinct ops present, with their relative weight (heaviest first). */
-  opTypesUsed: Array<{ fn: number; name: string; weight: number }>;
+  /** Distinct ops present, with their routine cost (heaviest first). */
+  opTypesUsed: Array<{ fn: number; name: string; routineBytes: number }>;
 }
 
 export function computeBreakdown(patch: Patch, cal: CalibrationData): PatchBreakdown {
@@ -46,34 +49,38 @@ export function computeBreakdown(patch: Patch, cal: CalibrationData): PatchBreak
   for (let instrIdx = 0; instrIdx < patch.instruments.length; instrIdx++) {
     const ins = patch.instruments[instrIdx]!;
     const slots: SlotCost[] = [];
-    let weight = 0;
+    let codeBytes = 0;
     for (let slotIdx = 0; slotIdx < ins.slots.length; slotIdx++) {
       const s = ins.slots[slotIdx]!;
       if (s.fn === 0) continue;
       const firstUse = !seen.has(s.fn);
       if (firstUse) seen.add(s.fn);
-      const w = cal.opCost[s.fn] ?? 0;
-      weight += w;
+      const varOperands = slotVarOperands(s);
+      const routineBytes = firstUse ? (cal.opRoutine[s.fn] ?? 0) : 0;
+      const marginalBytes = routineBytes + cal.perSlot + cal.perVarOperand * varOperands;
+      codeBytes += marginalBytes;
       slots.push({
         slotIdx,
         fn: s.fn,
         opName: opByCode(s.fn)?.name ?? `op${s.fn}`,
         firstUse,
-        weight: w,
+        varOperands,
+        routineBytes,
+        marginalBytes,
       });
     }
     perInstrument.push({
       instrIdx,
       sampleBytes: Math.max(0, ins.sampleLength | 0),
-      weight,
+      codeBytes,
       slots,
     });
   }
 
   const code = estimateCodeSize(patch, cal);
   const opTypesUsed = code.distinctOps
-    .map((fn) => ({ fn, name: opByCode(fn)?.name ?? `op${fn}`, weight: cal.opCost[fn] ?? 0 }))
-    .sort((a, b) => b.weight - a.weight);
+    .map((fn) => ({ fn, name: opByCode(fn)?.name ?? `op${fn}`, routineBytes: cal.opRoutine[fn] ?? 0 }))
+    .sort((a, b) => b.routineBytes - a.routineBytes);
 
   return { code, chip: chipUsage(patch, cal.modLengthEmpty), perInstrument, opTypesUsed };
 }

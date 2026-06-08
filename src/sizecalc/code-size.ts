@@ -1,60 +1,70 @@
-// Rough estimate of a patch's sample-generation CODE size — i.e. the relocatable
-// Amiga .bin blob you embed in a demo (NOT the standalone exe).
+// Estimate of a patch's sample-generation CODE size — the relocatable Amiga .bin
+// blob you embed in a demo (NOT the standalone exe).
 //
-// The .bin is strongly SUB-ADDITIVE: whole-program LTO + --gc-sections share
-// helpers and collapse similar slots, so summing per-op costs over-predicts real
-// patches by 60%+. The headline therefore uses an AGGREGATE model calibrated on
-// real multi-instrument patches:
+// ADDITIVE per-op model (see calibration-types.ts), fit on synthetic + real
+// patches, ~10% mean error and coherent (the breakdown's per-op / per-slot
+// figures sum to this headline):
 //
-//   codeBytes = max(floor, base + perDistinctOp·distinctOpTypes + perSlot·nSlots)
+//   codeBytes = max(floor, base + Σ_distinct opRoutine[op]
+//                              + perSlot·nSlots + perVarOperand·nVarOperands)
 //
-// This is a ballpark (~±20%); per-op `opCost` is a separate RELATIVE weight used
-// only to rank which op is heavy in the breakdown (see breakdown.ts), never
-// summed here. Imported-sample bytes are added on top (exactly) as part of the
-// patch's total on-disk footprint — the .bin doesn't embed them, but they must
-// still be stored on disk and supplied to the host at runtime.
-import type { Patch } from '../patch/types';
+// Imported-sample bytes are added on top exactly (totalBytes) — the .bin doesn't
+// embed them, but they must still be stored on disk and supplied to the host.
+import type { Patch, Slot } from '../patch/types';
+import { opByCode } from '../schema/op-metadata';
 import type { CalibrationData } from './calibration-data';
 
+/** Number of variable (non-const) var-or-const operands set on an op slot. */
+export function slotVarOperands(s: Slot): number {
+  const def = opByCode(s.fn);
+  if (!def) return 0;
+  let n = 0;
+  for (const p of def.params) {
+    if (p.type.kind === 'var-or-const' && p.selector && (s[p.selector] as number) !== 0) n++;
+  }
+  return n;
+}
+
 export interface CodeSizeEstimate {
-  /** Rough estimated uncompressed .bin generation-code bytes (aggregate, ~±20%). */
+  /** Estimated uncompressed .bin generation-code bytes (~±10–15%). */
   codeBytes: number;
-  /**
-   * Exact raw imported-sample bytes. The relocatable .bin doesn't embed these
-   * (the host supplies them at ImpAdr), but they still have to be stored on
-   * disk in the demo, so they count toward the patch's total exported size.
-   */
+  /** Exact raw imported-sample bytes (stored on disk, supplied to host at ImpAdr). */
   importBytes: number;
   /** codeBytes + importBytes — the patch's full on-disk footprint (headline). */
   totalBytes: number;
-  // Code components (for the breakdown view) — these SUM to codeBytes (pre-floor):
+  // Code components (sum to codeBytes, pre-floor):
   base: number;
-  /** perDistinctOp · number of distinct op types. */
-  distinctOpBytes: number;
-  /** perSlot · number of op slots. */
+  /** Σ opRoutine[op] over distinct op types. */
+  routineBytes: number;
+  /** perSlot · nSlots. */
   slotBytes: number;
-  /** True if the floor clamp raised codeBytes above base+distinctOp+slot. */
+  /** perVarOperand · nVarOperands. */
+  varOperandBytes: number;
   floored: boolean;
   /** Sorted distinct op codes present. */
   distinctOps: number[];
-  /** Total op slots (fn !== 0) across the patch. */
   nSlots: number;
+  nVarOperands: number;
 }
 
 export function estimateCodeSize(patch: Patch, cal: CalibrationData): CodeSizeEstimate {
   const distinct = new Set<number>();
   let nSlots = 0;
+  let nVarOperands = 0;
   for (const ins of patch.instruments) {
     for (const s of ins.slots) {
       if (s.fn === 0) continue;
       distinct.add(s.fn);
       nSlots++;
+      nVarOperands += slotVarOperands(s);
     }
   }
 
-  const distinctOpBytes = cal.perDistinctOp * distinct.size;
+  let routineBytes = 0;
+  for (const fn of distinct) routineBytes += cal.opRoutine[fn] ?? 0;
   const slotBytes = cal.perSlot * nSlots;
-  const raw = cal.base + distinctOpBytes + slotBytes;
+  const varOperandBytes = cal.perVarOperand * nVarOperands;
+  const raw = cal.base + routineBytes + slotBytes + varOperandBytes;
   const codeBytes = Math.max(cal.floor, raw);
 
   let importBytes = 0;
@@ -65,10 +75,12 @@ export function estimateCodeSize(patch: Patch, cal: CalibrationData): CodeSizeEs
     importBytes,
     totalBytes: codeBytes + importBytes,
     base: cal.base,
-    distinctOpBytes,
+    routineBytes,
     slotBytes,
+    varOperandBytes,
     floored: codeBytes > raw,
     distinctOps: [...distinct].sort((a, b) => a - b),
     nSlots,
+    nVarOperands,
   };
 }
