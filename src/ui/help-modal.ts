@@ -126,7 +126,10 @@ export function helpOverlayHtml(): string {
             <code>npm run export:bin</code>. Per-op / per-instrument / per-slot
             figures are <strong>relative weights</strong> ("which op is heavy") and
             deliberately do <em>not</em> sum to the headline. Imported samples
-            aren't part of the code (they live in chip-RAM, not the .bin).</p>
+            aren't generation code (and the relocatable .bin doesn't embed them —
+            the host supplies them at <code>ImpAdr</code>), so they're outside this
+            estimate; their raw bytes still cost disk space in your demo and
+            chip-RAM at runtime.</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>
