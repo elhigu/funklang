@@ -1437,13 +1437,18 @@
   .size-breakdown-overlay.hidden { display: none; }
   .size-breakdown-inner {
     background: #11141a; color: #cdd; border: 1px solid #2a3140; padding: 1rem 1.25rem;
-    max-height: 80vh; overflow: auto; min-width: 22rem; font: 12px/1.4 monospace;
+    max-height: 80vh; overflow: auto; width: 27rem; max-width: 92vw; font: 12px/1.4 monospace;
   }
   .size-breakdown-inner header { display: flex; justify-content: space-between; align-items: center; }
-  .size-breakdown-inner table { width: 100%; border-collapse: collapse; margin: 0.25rem 0 0.75rem; }
-  .size-breakdown-inner td, .size-breakdown-inner th { padding: 1px 6px; text-align: left; }
+  .size-breakdown-inner h3 { font-size: 11px; opacity: 0.6; font-weight: normal; margin: 0.5rem 0 0.1rem; }
+  .size-breakdown-inner table { width: 100%; border-collapse: collapse; margin: 0.1rem 0 0.5rem; }
+  .size-breakdown-inner td, .size-breakdown-inner th { padding: 2px 8px; text-align: left; }
+  .size-breakdown-inner th { border-bottom: 1px solid #2a3140; opacity: 0.55; font-weight: normal; }
   .size-breakdown-inner .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .size-breakdown-note { opacity: 0.8; }
+  /* Zebra + full-row hover so each name visually ties to its value. */
+  .size-breakdown-inner tr:nth-child(even) td { background: rgba(255,255,255,0.035); }
+  .size-breakdown-inner tr:hover td { background: rgba(120,170,255,0.16); }
+  .size-breakdown-note { opacity: 0.8; margin: 0 0 0.5rem; }
 
   .size-status {
     background: none; border: none; color: inherit; font: inherit; cursor: pointer;
