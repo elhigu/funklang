@@ -7,11 +7,11 @@ import { computeBreakdown } from '../../src/sizecalc/breakdown';
 import { annotateSlotSizes } from '../../src/ui/annotate-slot-sizes';
 
 // Fixed test calibration (decoupled from the live fitted CALIBRATION so re-fits
-// don't churn these assertions): osc_saw opCost 64 + slotStreamCost 64.
+// don't churn these assertions): osc_saw relative weight 64.
 const CAL: CalibrationData = {
-  base: 1000, slotStreamCost: 64, opCost: { 2: 64 }, modLengthEmpty: 0,
-  shrink: { base: 0, codeRatio: 0.5, impRatio: 0.5 }, fitted: true,
-  fit: { meanErrUncompressed: 0, maxErrUncompressed: 0, meanErrShrinkled: 0, maxErrShrinkled: 0 },
+  base: 1000, perDistinctOp: 100, perSlot: 10, floor: 200,
+  opCost: { 2: 64 }, modLengthEmpty: 0, fitted: true,
+  fit: { meanErr: 0, maxErr: 0, meanPct: 0 },
 };
 
 function gridWithSlots(modelIdxs: number[]): HTMLElement {
@@ -37,11 +37,11 @@ describe('annotateSlotSizes', () => {
     document.body.innerHTML = '';
   });
 
-  it('writes the marginal byte cost into each slot row', () => {
+  it('writes the relative op weight into each slot row', () => {
     const p = emptyPatch();
     p.instruments[0]!.slots = [
-      { ...emptySlot(), fn: 2, outVar: 1 }, // saw, firstUse → 64+64 (seed)
-      { ...emptySlot(), fn: 2, outVar: 1 }, // saw reuse → 64
+      { ...emptySlot(), fn: 2, outVar: 1 }, // saw
+      { ...emptySlot(), fn: 2, outVar: 1 }, // saw reuse — same op, same weight
     ];
     host = gridWithSlots([0, 1]);
     document.body.appendChild(host);
@@ -50,9 +50,9 @@ describe('annotateSlotSizes', () => {
 
     const labels = host.querySelectorAll('[data-slot-size]');
     expect(labels.length).toBe(2);
-    // seed: osc_saw opCost=64, slotStreamCost=64 → firstUse 128 B, reuse 64 B
-    expect(labels[0]!.textContent).toContain('128 B');
-    expect(labels[1]!.textContent).toContain('64 B');
+    // relative weight = osc_saw opCost 64, shown for every slot of that op
+    expect(labels[0]!.textContent).toContain('~64 B');
+    expect(labels[1]!.textContent).toContain('~64 B');
   });
 
   it('marks reused ops so the first-use cost is visually distinct', () => {

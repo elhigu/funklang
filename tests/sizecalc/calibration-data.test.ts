@@ -2,33 +2,35 @@ import { describe, it, expect } from 'vitest';
 import { CALIBRATION } from '../../src/sizecalc/calibration-data';
 import { OP_DEFS } from '../../src/schema/op-metadata';
 
-describe('CALIBRATION seed table', () => {
+describe('CALIBRATION seed table (aggregate .bin model)', () => {
   it('has the required top-level fields', () => {
     expect(typeof CALIBRATION.base).toBe('number');
-    expect(typeof CALIBRATION.slotStreamCost).toBe('number');
+    expect(typeof CALIBRATION.perDistinctOp).toBe('number');
+    expect(typeof CALIBRATION.perSlot).toBe('number');
+    expect(typeof CALIBRATION.floor).toBe('number');
     expect(typeof CALIBRATION.modLengthEmpty).toBe('number');
-    expect(CALIBRATION.shrink).toBeTypeOf('object');
-    expect(typeof CALIBRATION.shrink.base).toBe('number');
-    expect(typeof CALIBRATION.shrink.codeRatio).toBe('number');
-    expect(typeof CALIBRATION.shrink.impRatio).toBe('number');
     expect(typeof CALIBRATION.fitted).toBe('boolean');
   });
 
-  it('seeds an opCost entry for every known op code', () => {
+  it('seeds an opCost (relative weight) entry for every known op code', () => {
     for (const def of OP_DEFS) {
       expect(CALIBRATION.opCost[def.code], `op ${def.code} (${def.name})`).toBeTypeOf('number');
     }
   });
 
-  it('is calibrated (fitted from the corpus) with a measured base + opCost for every op', () => {
+  it('is calibrated from the corpus with sane aggregate coefficients', () => {
     expect(CALIBRATION.fitted).toBe(true);
-    // measured base is the real ~13.5k floor, not the old 3000 seed
-    expect(CALIBRATION.base).toBeGreaterThan(8000);
+    // Aggregate model: each distinct op type and each slot pulls positive code,
+    // and there is a positive .bin floor (empty-patch size).
+    expect(CALIBRATION.perDistinctOp).toBeGreaterThan(0);
+    expect(CALIBRATION.perSlot).toBeGreaterThan(0);
+    expect(CALIBRATION.floor).toBeGreaterThan(0);
     for (const def of OP_DEFS) expect(CALIBRATION.opCost[def.code]).toBeGreaterThanOrEqual(0);
   });
 
-  it('records fit residuals', () => {
-    expect(CALIBRATION.fit.meanErrShrinkled).toBeGreaterThanOrEqual(0);
-    expect(CALIBRATION.fit.maxErrUncompressed).toBeGreaterThanOrEqual(0);
+  it('records real-patch fit residuals', () => {
+    expect(CALIBRATION.fit.meanErr).toBeGreaterThanOrEqual(0);
+    expect(CALIBRATION.fit.maxErr).toBeGreaterThanOrEqual(CALIBRATION.fit.meanErr);
+    expect(CALIBRATION.fit.meanPct).toBeGreaterThanOrEqual(0);
   });
 });

@@ -1,9 +1,9 @@
 // src/ui/annotate-slot-sizes.ts
 //
-// Injects the per-slot marginal byte cost into slot-grid rows. Same DOM
+// Injects a per-slot RELATIVE op weight into slot-grid rows. Same DOM
 // traversal as updateSlotWaves (slot-grid.ts): `.slots > .slot-wrap > .slot`
-// keyed by data-model-slot. The op-code cost is shown only on the first
-// patch-wide use of each op (firstUse), so reused ops read near-free.
+// keyed by data-model-slot. The .bin is sub-additive (ops share code), so this
+// is a relative "how heavy is this op" hint, not an exact byte contribution.
 import type { InstrumentBreakdown } from '../sizecalc/breakdown';
 import { fmtBytes } from '../sizecalc/format';
 
@@ -31,9 +31,7 @@ export function annotateSlotSizes(host: HTMLElement, instr: InstrumentBreakdown)
       slotEl.appendChild(label);
     }
     label.dataset['firstUse'] = cost.firstUse ? '1' : '0';
-    label.title = cost.firstUse
-      ? `${fmtBytes(cost.codeBytes)} op code (first use) + ${fmtBytes(cost.streamBytes)} stream`
-      : `${fmtBytes(cost.streamBytes)} stream (op code already counted)`;
-    label.textContent = fmtBytes(cost.marginalBytes);
+    label.title = `~${fmtBytes(cost.weight)} relative op weight (ops share code in the .bin; the headline total is patch-wide and approximate)`;
+    label.textContent = `~${fmtBytes(cost.weight)}`;
   }
 }

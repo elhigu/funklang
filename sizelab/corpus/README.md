@@ -1,13 +1,30 @@
 # Calibration corpus
 
-Generated patches compiled through the real toolchain (`compilePatch`) to
-measure per-op / per-mode exe-size contributions. Regenerate with
-`npm run corpus:run` (needs wineWow; writes `measurements.csv`).
+Generated patches compiled through the real toolchain (`compilePatch` /
+`compilePatchBinary`) to calibrate the size estimator. **Target = the .bin code
+blob** you embed in a demo (the exe columns are kept for reference only).
+Regenerate with `npm run corpus:run` (needs wineWow; writes `measurements.csv`).
 
 - `producer.ts`, `modes.ts`, `op-instruments.ts`, `corpus-spec.ts` — pure patch generators.
-- `measurements-csv.ts` — CSV (de)serialization.
-- `run-corpus.ts` — compiles every corpus item, writes `measurements.csv`.
+- `measurements-csv.ts` — CSV (de)serialization (`binBytes` is the .bin size column).
+- `run-corpus.ts` — compiles every synthetic corpus item (exe + .bin), writes `measurements.csv`.
+- `measure-real.ts` — appends `real:*` rows: real `../../../patches/*.akp` compiled to .bin,
+  so the fit is anchored on real multi-instrument structure, not just single-op synthetics.
 - `measurements.csv` — committed dataset (deterministic; lets the fitter run without wine).
+
+## Why the headline is an aggregate model (not a per-op sum)
+
+The .bin is built with whole-program LTO + `--gc-sections`, which **shares helper
+code between ops and collapses similar slots** — so real patches are strongly
+*sub-additive*. A non-negative per-op sum over-predicts real patches by 60%+
+(the fit literally wants negative op costs to compensate). So the fitter
+(`../fit/fit-calibration.ts`) produces two things:
+
+1. **Headline (aggregate):** `binBytes ≈ base + perDistinctOp·distinctOpTypes +
+   perSlot·nSlots`, fit on the **real** patches (weighted ×8). ≈ **±20%** mean on
+   real patches — a deliberate ballpark; compile (`npm run export:bin`) for exact.
+2. **Relative per-op weights:** a per-op ridge on the **synthetic single-op** rows,
+   used only to rank "which op is heavy" in the breakdown — never summed.
 
 ## Dataset notes (run 2026-06-07)
 

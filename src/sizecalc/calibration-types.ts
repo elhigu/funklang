@@ -1,35 +1,38 @@
-// Types for the size-estimator calibration table. Kept separate from the data
-// so the offline fitter (sizelab/fit) can regenerate calibration-data.ts
-// without touching these definitions.
-
-export interface ShrinkModel {
-  /** Fixed shrinklered overhead present in every build. */
-  base: number;
-  /** Compressed-bytes-per-uncompressed-byte for code+stream. */
-  codeRatio: number;
-  /** Compressed-bytes-per-uncompressed-byte for baked-in imported samples. */
-  impRatio: number;
-}
+// Types for the size-estimator calibration table (TARGET: .bin code size).
+// Kept separate from the data so the offline fitter (sizelab/fit) can
+// regenerate calibration-data.ts without touching these definitions.
+//
+// The .bin (relocatable sample-generation blob) is strongly SUB-ADDITIVE under
+// whole-program LTO + --gc-sections, so a per-op additive sum over-predicts
+// real patches badly. The HEADLINE therefore uses an aggregate model fit on
+// real patches; per-op `opCost` is kept only as a RELATIVE "which op is heavy"
+// weight and is NOT summed into the headline.
 
 export interface FitQuality {
-  meanErrUncompressed: number;
-  maxErrUncompressed: number;
-  meanErrShrinkled: number;
-  maxErrShrinkled: number;
+  /** Mean absolute residual (bytes) of the aggregate model over real patches. */
+  meanErr: number;
+  /** Max absolute residual (bytes) over real patches. */
+  maxErr: number;
+  /** Mean residual as a percent of average real-patch size. */
+  meanPct: number;
 }
 
 export interface CalibrationData {
-  /** Uncompressed intercept: player code, framework, always-linked routines. */
+  // ── Aggregate headline model (approximate, ~±20%):
+  //    codeBytes = max(floor, base + perDistinctOp·distinctOpTypes + perSlot·nSlots)
   base: number;
-  /** Uncompressed op-stream bytes added per slot that has an op. */
-  slotStreamCost: number;
-  /** Uncompressed code bytes pulled in by the FIRST use of each op code. */
+  perDistinctOp: number;
+  perSlot: number;
+  /** Lower bound (empty-patch .bin floor). */
+  floor: number;
+
+  /** RELATIVE per-op weight (which op pulls more code). NOT summed into codeBytes. */
   opCost: Record<number, number>;
-  /** Chip bytes of the empty ProTracker module template (memcpy'd at runtime). */
+
+  /** Chip bytes of the resident mod template (chip-RAM term, not code). */
   modLengthEmpty: number;
-  shrink: ShrinkModel;
-  /** False while seeded; the calibration tool sets it true and fills `fit`. */
+
+  /** False while seeded; the fitter sets it true and fills `fit`. */
   fitted: boolean;
-  /** Residual error of the model vs the corpus (zeros while unfitted). */
   fit: FitQuality;
 }

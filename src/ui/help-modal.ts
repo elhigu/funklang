@@ -114,16 +114,19 @@ export function helpOverlayHtml(): string {
             </table>
 
             <h3>Size &amp; memory readout</h3>
-            <p>The footer shows the estimated <em>.bin code</em> size of the
-            sample-generation code — the relocatable blob you embed in a demo —
-            the figure for the selected instrument (<code>sel</code>), and
-            resident chip-RAM. Click it for a full breakdown.</p>
-            <p>Op-routine code is counted <strong>once per distinct op type</strong>:
-            a slot's byte label shows full cost on the first use of an op
-            (highlighted) and only the small stream cost when the op is reused.
-            Imported samples aren't part of the code (they live in chip-RAM, not
-            the .bin). Figures are estimates (marked <code>~</code> until
-            calibration has been run).</p>
+            <p>The footer shows a <strong>rough</strong> estimate of the
+            <em>.bin code</em> size of the sample-generation code — the
+            relocatable blob you embed in a demo — a relative weight for the
+            selected instrument (<code>sel</code>), and resident chip-RAM.
+            Click it for a full breakdown.</p>
+            <p>The code figure is a calibrated <strong>ballpark (±~20%)</strong>,
+            always marked <code>~</code>: the real .bin is sub-additive (whole-program
+            LTO and <code>--gc-sections</code> share helper code between ops), so
+            no live formula can be exact. For the precise number, compile with
+            <code>npm run export:bin</code>. Per-op / per-instrument / per-slot
+            figures are <strong>relative weights</strong> ("which op is heavy") and
+            deliberately do <em>not</em> sum to the headline. Imported samples
+            aren't part of the code (they live in chip-RAM, not the .bin).</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>

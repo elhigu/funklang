@@ -24,16 +24,14 @@ export function wireSizeStatusbar(
 
   const refresh = (): void => {
     const b = computeBreakdown(model.patch, CALIBRATION);
-    const selIdx = getSelectedInstr();
-    const sel = b.perInstrument[selIdx];
-    const rough = CALIBRATION.fitted ? '' : '~';
-    // `sel.codeBytes` is the instrument's MARGINAL contribution (its op code +
-    // stream) — deliberately not the absolute headline formula: base is
-    // patch-global and would double-count here.
-    const selTxt = sel ? `${rough}${fmtBytes(sel.codeBytes)}` : '—';
+    const sel = b.perInstrument[getSelectedInstr()];
+    // Code is a ROUGH aggregate estimate (~±20%) → always prefix `~`. The
+    // selected-instrument figure is a RELATIVE op weight (ops share code in the
+    // .bin, so it can't be an exact per-instrument byte total). Chip is exact.
+    const selTxt = sel && sel.weight > 0 ? ` · sel ~${fmtBytes(sel.weight)}` : '';
     btn.textContent =
-      `code ${rough}${fmtBytes(b.code.codeBytes)} ` +
-      `(sel ${selTxt}) · chip ${fmtBytes(b.chip.residentTotal)}`;
+      `~code ${fmtBytes(b.code.codeBytes)}${selTxt} · chip ${fmtBytes(b.chip.residentTotal)}`;
+    btn.title = `Rough .bin code estimate (±~${CALIBRATION.fit.meanPct}%). Click for breakdown.`;
   };
 
   btn.addEventListener('click', () => {

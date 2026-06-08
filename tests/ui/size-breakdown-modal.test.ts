@@ -25,12 +25,14 @@ describe('breakdown modal', () => {
     expect(overlay.textContent).toContain('osc_saw');
   });
 
-  it('shows the calibrated ± notice (CALIBRATION is fitted)', () => {
+  it('labels the estimate as rough/approximate with the real-patch ± notice', () => {
     const modal = mountBreakdownModal(root);
-    modal.open(computeBreakdown(emptyPatch(), CALIBRATION)); // CALIBRATION.fitted === true
+    modal.open(computeBreakdown(emptyPatch(), CALIBRATION));
     const overlay = root.querySelector('#size-breakdown-overlay') as HTMLElement;
-    expect(overlay.textContent!.toLowerCase()).toContain('typical'); // "±N typical (max M)"
-    expect(overlay.textContent!.toLowerCase()).not.toContain('rough');
+    const txt = overlay.textContent!.toLowerCase();
+    expect(txt).toContain('rough'); // clearly labelled approximate
+    expect(txt).toContain('typical'); // "±~N% typical …"
+    expect(txt).toContain('export:bin'); // points to the exact-number path
   });
 
   it('closes on outside click', () => {

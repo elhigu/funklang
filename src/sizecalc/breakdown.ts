@@ -1,12 +1,14 @@
 // src/sizecalc/breakdown.ts
 //
-// Full attribution for the size readout: patch totals, per-instrument
-// figures, per-slot MARGINAL cost (op code counted once at its first
-// patch-wide use), and the op-types-used list.
+// Attribution for the size readout. The HEADLINE code figure is the aggregate
+// estimate from estimateCodeSize (~±20%, see code-size.ts). Because the .bin is
+// sub-additive, per-instrument / per-slot / per-op figures here are RELATIVE
+// WEIGHTS (from cal.opCost) that rank "which op pulls more code" — they do NOT
+// sum to the headline and are labelled as relative in the UI.
 import type { Patch } from '../patch/types';
 import type { CalibrationData } from './calibration-data';
 import { chipUsage, type ChipUsage } from './chip-ram';
-import { estimateExeSize, type ExeSizeEstimate } from './exe-size';
+import { estimateCodeSize, type CodeSizeEstimate } from './code-size';
 import { opByCode } from '../schema/op-metadata';
 
 export interface SlotCost {
@@ -15,30 +17,26 @@ export interface SlotCost {
   opName: string;
   /** True iff this is the first patch-wide slot using `fn`. */
   firstUse: boolean;
-  /** Op-routine code bytes (only on firstUse, else 0). */
-  codeBytes: number;
-  /** Op-stream bytes for this slot. */
-  streamBytes: number;
-  /** codeBytes + streamBytes. */
-  marginalUncompressed: number;
+  /** Relative code weight of this op (cal.opCost) — NOT a byte contribution. */
+  weight: number;
 }
 
 export interface InstrumentBreakdown {
   instrIdx: number;
   /** Generated-sample chip bytes for this instrument (sampleLength). */
   sampleBytes: number;
-  /** Σ marginalUncompressed of its op slots. */
-  uncompressed: number;
-  /** uncompressed * codeRatio. */
-  shrinkled: number;
+  /** Σ of its slots' relative op weights — ranks instruments, not a byte total. */
+  weight: number;
   slots: SlotCost[];
 }
 
 export interface PatchBreakdown {
-  exe: ExeSizeEstimate;
+  /** Aggregate headline code estimate (~±20%). */
+  code: CodeSizeEstimate;
   chip: ChipUsage;
   perInstrument: InstrumentBreakdown[];
-  opTypesUsed: Array<{ fn: number; name: string; codeBytes: number }>;
+  /** Distinct ops present, with their relative weight (heaviest first). */
+  opTypesUsed: Array<{ fn: number; name: string; weight: number }>;
 }
 
 export function computeBreakdown(patch: Patch, cal: CalibrationData): PatchBreakdown {
@@ -48,41 +46,34 @@ export function computeBreakdown(patch: Patch, cal: CalibrationData): PatchBreak
   for (let instrIdx = 0; instrIdx < patch.instruments.length; instrIdx++) {
     const ins = patch.instruments[instrIdx]!;
     const slots: SlotCost[] = [];
-    let uncompressed = 0;
+    let weight = 0;
     for (let slotIdx = 0; slotIdx < ins.slots.length; slotIdx++) {
       const s = ins.slots[slotIdx]!;
       if (s.fn === 0) continue;
       const firstUse = !seen.has(s.fn);
       if (firstUse) seen.add(s.fn);
-      const codeBytes = firstUse ? (cal.opCost[s.fn] ?? 0) : 0;
-      const streamBytes = cal.slotStreamCost;
-      const marginalUncompressed = codeBytes + streamBytes;
-      uncompressed += marginalUncompressed;
+      const w = cal.opCost[s.fn] ?? 0;
+      weight += w;
       slots.push({
         slotIdx,
         fn: s.fn,
         opName: opByCode(s.fn)?.name ?? `op${s.fn}`,
         firstUse,
-        codeBytes,
-        streamBytes,
-        marginalUncompressed,
+        weight: w,
       });
     }
     perInstrument.push({
       instrIdx,
       sampleBytes: Math.max(0, ins.sampleLength | 0),
-      uncompressed,
-      shrinkled: uncompressed * cal.shrink.codeRatio,
+      weight,
       slots,
     });
   }
 
-  const exe = estimateExeSize(patch, cal);
-  const opTypesUsed = exe.distinctOps.map((fn) => ({
-    fn,
-    name: opByCode(fn)?.name ?? `op${fn}`,
-    codeBytes: cal.opCost[fn] ?? 0,
-  }));
+  const code = estimateCodeSize(patch, cal);
+  const opTypesUsed = code.distinctOps
+    .map((fn) => ({ fn, name: opByCode(fn)?.name ?? `op${fn}`, weight: cal.opCost[fn] ?? 0 }))
+    .sort((a, b) => b.weight - a.weight);
 
-  return { exe, chip: chipUsage(patch, cal.modLengthEmpty), perInstrument, opTypesUsed };
+  return { code, chip: chipUsage(patch, cal.modLengthEmpty), perInstrument, opTypesUsed };
 }
