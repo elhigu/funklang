@@ -963,6 +963,72 @@ export function distortion(st: AkGenState, output: string, inputs: string[]): st
   return empty.replaceAll('@OR', newValue);
 }
 
+/** Program.cs ADSR 1482-1507. dan-script: adsr(l, AA, DA, SLEV, SLEN, RA, PV).
+ *  inputs[0] = instance `l` (unused here); inputs[1..6] = AA,DA,SLEV,SLEN,RA,PV.
+ *  Uses three word slots @IN1=cwi*2, @IN2=cwi*2+4, @IN3=cwi*2+6 and bumps
+ *  currentWordInstance += 5. */
+export function adsr(st: AkGenState, output: string, inputs: string[]): string {
+  const num = st.currentWordInstance * 2;
+  const newValue = String(num);
+  const newValue2 = String(num + 4);
+  const newValue3 = String(num + 6);
+  const newValue4 = remapVarToRegisterOrImmediate(output);
+  const newValue5 = remapVarToRegisterOrImmediate(inputs[1]!);
+  const newValue6 = remapVarToRegisterOrImmediate(inputs[2]!);
+  const newValue7 = remapVarToRegisterOrImmediate(inputs[3]!);
+  const newValue8 = remapVarToRegisterOrImmediate(inputs[4]!);
+  const newValue9 = remapVarToRegisterOrImmediate(inputs[5]!);
+  const newValue10 = remapVarToRegisterOrImmediate(inputs[6]!);
+  const ll = st.localLabel;
+  let result = '';
+  result += '\t\t\t\tmove.l\tAK_OpInstance+@IN1(a5),@OR\n';
+  result += '\t\t\t\tmove.w\tAK_OpInstance+@IN2(a5),d4\n';
+  result += '\t\t\t\tbeq.s\t.ADSR_A_' + ll + '\n';
+  result += '\t\t\t\tsubq.w\t#1,d4\n';
+  result += '\t\t\t\tbeq.s\t.ADSR_D_' + ll + '\n';
+  result += '\t\t\t\tsubq.w\t#1,d4\n';
+  result += '\t\t\t\tbeq.s\t.ADSR_S_' + ll + '\n';
+  result += '.ADSR_R_' + ll + '\n';
+  result += '\t\t\t\tsub.l\t@RA,@OR\n';
+  result += '\t\t\t\tbge.s\t.ADSR_End_' + ll + '\n';
+  result += '\t\t\t\tmoveq\t#0,@OR\n';
+  result += '\t\t\t\tbra.s\t.ADSR_End_' + ll + '\n';
+  result += '.ADSR_A_' + ll + '\n';
+  result += '\t\t\t\tadd.l\t@AA,@OR\n';
+  result += '\t\t\t\tcmp.l\t@PV,@OR\n';
+  result += '\t\t\t\tblt.s\t.ADSR_End_' + ll + '\n';
+  result += '\t\t\t\tmove.l\t@PV,@OR\n';
+  result += '\t\t\t\tmove.w\t#1,AK_OpInstance+@IN2(a5)\n';
+  result += '\t\t\t\tbra.s\t.ADSR_End_' + ll + '\n';
+  result += '.ADSR_D_' + ll + '\n';
+  result += '\t\t\t\tsub.l\t@DA,@OR\n';
+  result += '\t\t\t\tcmp.l\t@SLEV,@OR\n';
+  result += '\t\t\t\tbgt.s\t.ADSR_End_' + ll + '\n';
+  result += '\t\t\t\tmove.l\t@SLEV,@OR\n';
+  result += '\t\t\t\tmove.l\t@SLEN,AK_OpInstance+@IN3(a5)\n';
+  result += '\t\t\t\tmove.w\t#2,AK_OpInstance+@IN2(a5)\n';
+  result += '\t\t\t\tbra.s\t.ADSR_End_' + ll + '\n';
+  result += '.ADSR_S_' + ll + '\n';
+  result += '\t\t\t\tsubq.l\t#1,AK_OpInstance+@IN3(a5)\n';
+  result += '\t\t\t\tbge.s\t.ADSR_End_' + ll + '\n';
+  result += '\t\t\t\tmove.w\t#3,AK_OpInstance+@IN2(a5)\n';
+  result += '.ADSR_End_' + ll + '\n';
+  result += '\t\t\t\tmove.l\t@OR,AK_OpInstance+@IN1(a5)\n';
+  result += '\t\t\t\tasr.l\t#8,@OR\n';
+  result = result.replaceAll('@IN1', newValue);
+  result = result.replaceAll('@IN2', newValue2);
+  result = result.replaceAll('@IN3', newValue3);
+  result = result.replaceAll('@AA', newValue5);
+  result = result.replaceAll('@DA', newValue6);
+  result = result.replaceAll('@SLEV', newValue7);
+  result = result.replaceAll('@SLEN', newValue8);
+  result = result.replaceAll('@RA', newValue9);
+  result = result.replaceAll('@PV', newValue10);
+  result = result.replaceAll('@OR', newValue4);
+  st.currentWordInstance += 5;
+  return result;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -997,7 +1063,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'clone_reverse(', gen: stub('clone_reverse') },
   { match: 'imported_sample(', gen: stub('imported_sample') },
   { match: 'distortion(', gen: distortion },
-  { match: 'adsr(', gen: stub('adsr') },
+  { match: 'adsr(', gen: adsr },
 ];
 
 export function dispatchOp(st: AkGenState, stmt: string, output: string, inputs: string[]): string {

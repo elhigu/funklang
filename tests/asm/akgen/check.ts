@@ -349,6 +349,24 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 16, outVar: 4, val1: 4, gain: 1 },
       ];
       break;
+    case 'adsr':
+      // ADSR 1482-1507. dan-script: adsr(l, AA, DA, SLEV, SLEN, RA, PV) — all
+      // args are compile-time constants computed by emitAdsr (no '#'/variable
+      // branching exists in the op; every operand is a literal immediate).
+      // The emitted text is fixed; only the substituted immediates + label vary.
+      // Each slot bumps currentWordInstance += 5 (@IN1/@IN2/@IN3 word triple),
+      // so multiple slots exercise the offset bookkeeping. Vary the param values
+      // (sustain level, attack/decay/release rates, peak) across value classes:
+      //  - power-of-2 gain (64) and non-power-of-2 gain (50)
+      //  - widthVal producing negative num5/num7 (signed (short)(widthVal<<8))
+      //  - a small sample so SLEN (num4) goes negative — exercises sign of @SLEN.
+      ins.slots = [
+        { ...emptySlot(), fn: 23, outVar: 1, val1Value: 10, val2Value: 5, freqVal: 8, gainVal: 64, widthVal: 30 },
+        { ...emptySlot(), fn: 23, outVar: 2, val1Value: 20, val2Value: 7, freqVal: 12, gainVal: 50, widthVal: 200 },
+        { ...emptySlot(), fn: 23, outVar: 3, val1Value: 3, val2Value: 1, freqVal: 2, gainVal: 128, widthVal: 100 },
+        { ...emptySlot(), fn: 23, outVar: 4, val1Value: 40, val2Value: 30, freqVal: 50, gainVal: 64, widthVal: 0 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
