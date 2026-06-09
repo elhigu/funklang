@@ -41,14 +41,15 @@ Each change → `model.setSlotParam` → re-render the active instrument
 (`slotDisplayTap` / `audibleForTarget`). Reuse existing render path.
 
 ## Build increments (gate + commit each)
-1. `param-list.ts` + `roller.ts` + `history.sealCoalesce()` + unit tests.
-2. knob.ts pointer-event migration + `onTouchTune` hook (+ test desktop drag
-   unchanged; touch fires the hook).
-3. `touch-tuner.ts` scaffold: overlay + active slider + rollers (rotary) +
-   value + close + undo-per-drag. Wire from app.ts. E2E (touch-emulated).
-4. Live waveform preview in the modal.
-5. Swipe up/down navigation + neighbour hints + scroll animation.
-6. Help-modal row; polish; final gate.
+1. ✅ `param-list.ts` + `roller.ts` + `history.sealCoalesce()` + unit tests.
+2. ✅ knob.ts pointer-event migration + `onTouchTune` hook.
+3. ✅ `touch-tuner.ts` scaffold + rollers + undo-per-drag. Wired from app.ts. E2E.
+4. ✅ Live waveform preview in the modal.
+5. ✅ Swipe up/down navigation + dimmed neighbour hints.
+6. ✅ Help-modal row.
+
+DONE. Remaining polish needs real-device tuning (see below) — notably the
+animated carousel scroll between params (currently a discrete swipe switch).
 
 ## Tests
 - Unit: param-list ordering, roller step math, navigation wrap, sealCoalesce.

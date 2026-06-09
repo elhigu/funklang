@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { openTouchTuner, PX_PER_NOTCH } from '../../src/ui/touch-tuner';
+import { openTouchTuner, PX_PER_NOTCH, SWIPE_PX_PER_PARAM } from '../../src/ui/touch-tuner';
 import type { TunableParam } from '../../src/ui/param-list';
 
 function param(over: Partial<TunableParam> = {}): TunableParam {
@@ -53,6 +53,22 @@ describe('touch value tuner', () => {
     roller.dispatchEvent(pe('pointerdown', 200));
     roller.dispatchEvent(pe('pointermove', 200 - PX_PER_NOTCH * 5));   // +50 → clamps to 255
     expect(t.value()).toBe(255);
+  });
+
+  it('swiping the nav up moves to the next param; neighbours are shown', () => {
+    const freq = param({ slotIdx: 0, field: 'freqVal', label: 'freq', value: 1000, max: 10000 });
+    const gain = param({ slotIdx: 0, field: 'gainVal', label: 'gain', value: 80, max: 128 });
+    const t = openTouchTuner(root, { title: 'T', params: [freq, gain], activeIndex: 0, apply: () => {}, sealUndo: () => {} });
+
+    expect((root.querySelector('[data-tt-pname]') as HTMLElement).textContent).toBe('freq');
+    expect((root.querySelector('[data-tt-next]') as HTMLElement).textContent).toBe('gain');
+
+    const nav = root.querySelector('[data-tt-nav]') as HTMLElement;
+    nav.dispatchEvent(pe('pointerdown', 200));
+    nav.dispatchEvent(pe('pointerup', 200 - (SWIPE_PX_PER_PARAM + 6)));   // swipe up one param
+    expect(t.index()).toBe(1);
+    expect((root.querySelector('[data-tt-pname]') as HTMLElement).textContent).toBe('gain');
+    expect(t.value()).toBe(80);
   });
 
   it('Done button and Escape both close the overlay', () => {

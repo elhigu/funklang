@@ -1,30 +1,34 @@
 // The touch value tuner — a thumb-friendly modal for editing a slider's value
 // when a finger (not a mouse) presses it. A 22px bar is hopeless under a
-// fingertip, so this overlay gives: a big draggable slider for coarse moves,
-// and four "roller" strips (±1 / ±10 / ±100 / ±1000) that step the value with
-// rotary drags. (Swipe-to-next-param and the live waveform land in later
-// increments; the API already carries the full param list + active index.)
+// fingertip, so this overlay gives:
+//   - a big draggable slider for coarse moves;
+//   - four "roller" strips (±1 / ±10 / ±100 / ±1000) that step the value with
+//     rotary drags;
+//   - swipe up/down to walk to the next/previous tunable param of the
+//     instrument (the neighbour labels are shown dimmed above/below);
+//   - a live waveform of the "tuned phase" that follows the value.
 //
-// Decoupled from the model: the caller supplies `apply` (write a value) and
-// `sealUndo` (called on each drag end, so one drag = one undo point).
+// Decoupled from the model: the caller supplies `apply` (write a value),
+// `sealUndo` (one drag = one undo point), and `wave` (the tuned-phase tap).
 
 import { makeKnob } from './knob';
 import type { Knob } from './knob';
 import { formatInt } from './number-format';
 import { drawWaveform } from './waveform';
-import { rollerNotches, applyRoller } from './roller';
+import { rollerNotches, applyRoller, swipeRows } from './roller';
 import type { TunableParam } from './param-list';
 
 /** Drag distance (px) per rotary notch. Touch-feel constant — tune on device. */
 export const PX_PER_NOTCH = 22;
-
-/** The four roller magnitudes, biggest first (reads top-to-bottom / left-right). */
+/** Vertical drag (px) per param when swiping to the next/previous slider. */
+export const SWIPE_PX_PER_PARAM = 48;
+/** The four roller magnitudes, biggest first (reads top-to-bottom). */
 export const ROLLER_STEPS = [1000, 100, 10, 1] as const;
 
 export interface TouchTunerOpts {
-  /** Header context, e.g. "INSTR 01 · slot 04 · sv_flt_n". */
+  /** Header context, e.g. "INSTR 01 · sv_flt_n". */
   title: string;
-  /** Every tunable param of the instrument (spine for swipe nav, later). */
+  /** Every tunable param of the instrument, in order (spine for swipe nav). */
   params: TunableParam[];
   /** Index into `params` to open on. */
   activeIndex: number;
@@ -32,11 +36,7 @@ export interface TouchTunerOpts {
   apply: (p: TunableParam, value: number) => void;
   /** Called on each drag end (finger lift) so one gesture = one undo point. */
   sealUndo: () => void;
-  /**
-   * Current display tap for a param's slot — the "tuned phase". Called on
-   * open and after every value change so the modal shows the waveform moving
-   * live. Omit to leave the wave panel blank.
-   */
+  /** Current display tap for a param's slot — the "tuned phase". */
   wave?: ((p: TunableParam) => Int16Array) | undefined;
   /** Called after the overlay is torn down. */
   onClose?: (() => void) | undefined;
@@ -46,13 +46,18 @@ export interface TouchTuner {
   close: () => void;
   /** The active param value (for tests / external reads). */
   value: () => number;
+  /** The active param index (for tests). */
+  index: () => number;
 }
 
 export function openTouchTuner(root: HTMLElement, opts: TouchTunerOpts): TouchTuner {
-  const param = opts.params[opts.activeIndex];
-  if (!param) return { close: () => {}, value: () => 0 };
+  const { params } = opts;
+  if (!params[opts.activeIndex]) return { close: () => {}, value: () => 0, index: () => -1 };
 
+  let activeIndex = opts.activeIndex;
+  let param: TunableParam = params[activeIndex]!;
   let current = param.value;
+  let slider: Knob | null = null;
 
   const overlay = document.createElement('div');
   overlay.id = 'touch-tuner-overlay';
@@ -66,24 +71,95 @@ export function openTouchTuner(root: HTMLElement, opts: TouchTunerOpts): TouchTu
         <button class="tt-close" id="touch-tuner-close" aria-label="Done">Done</button>
       </div>
       <div class="tt-wave" data-tt-wave><canvas data-tt-wave-cv width="420" height="84"></canvas></div>
-      <div class="tt-active">
-        <span class="tt-pname">${param.label}</span>
-        <span class="tt-value" data-tt-value>${formatInt(current)}</span>
+      <div class="tt-nav" data-tt-nav>
+        <div class="tt-neighbour" data-tt-prev></div>
+        <div class="tt-active">
+          <span class="tt-pname" data-tt-pname></span>
+          <span class="tt-value" data-tt-value></span>
+        </div>
+        <div class="tt-neighbour" data-tt-next></div>
       </div>
       <div class="tt-slider" data-tt-slider></div>
       <div class="tt-rollers" data-tt-rollers></div>
     </div>`;
   root.appendChild(overlay);
 
-  const valueEl = overlay.querySelector('[data-tt-value]') as HTMLElement;
-  const waveCv = overlay.querySelector('[data-tt-wave-cv]') as HTMLCanvasElement;
+  const $ = <T extends HTMLElement>(sel: string): T => overlay.querySelector(sel) as T;
+  const valueEl = $('[data-tt-value]');
+  const pnameEl = $('[data-tt-pname]');
+  const prevEl = $('[data-tt-prev]');
+  const nextEl = $('[data-tt-next]');
+  const sliderHost = $('[data-tt-slider]');
+  const rollersHost = $('[data-tt-rollers]');
+  const waveCv = $<HTMLCanvasElement>('[data-tt-wave-cv]');
 
-  // The "tuned phase": redraw the active slot's tap after every change so the
-  // user sees the waveform respond as they tune.
   const redrawWave = (): void => {
     if (!opts.wave) return;
     drawWaveform(waveCv, opts.wave(param), { width: waveCv.width, height: waveCv.height });
   };
+
+  // Write a new value to the active param + reflect it everywhere. `fromSlider`
+  // avoids echoing the value back into the slider that just produced it.
+  const setCurrent = (v: number, fromSlider: boolean): void => {
+    const clamped = Math.max(param.min, Math.min(param.max, v));
+    if (clamped === current) return;
+    current = clamped;
+    valueEl.textContent = formatInt(current);
+    opts.apply(param, current);
+    if (!fromSlider && slider) slider.setValue(current);
+    redrawWave();
+  };
+
+  // (Re)build everything tied to the ACTIVE param — used on open and on swipe.
+  const mountActive = (index: number): void => {
+    const len = params.length;
+    activeIndex = ((index % len) + len) % len;
+    param = params[activeIndex]!;
+    current = param.value;
+
+    pnameEl.textContent = param.label;
+    valueEl.textContent = formatInt(current);
+    // Dimmed neighbour labels (blank when there's only one param).
+    prevEl.textContent = len > 1 ? params[((activeIndex - 1) % len + len) % len]!.label : '';
+    nextEl.textContent = len > 1 ? params[(activeIndex + 1) % len]!.label : '';
+
+    // Fresh slider for the new range/scale (finger-draggable; no onTouchTune).
+    sliderHost.innerHTML = '';
+    slider = makeKnob({
+      label: '', value: current, min: param.min, max: param.max,
+      step: param.step, scale: param.scale, onChange: (v) => setCurrent(v, true),
+    });
+    slider.el.classList.add('tt-knob');
+    slider.el.addEventListener('pointerup', () => opts.sealUndo());
+    slider.el.addEventListener('pointercancel', () => opts.sealUndo());
+    sliderHost.appendChild(slider.el);
+
+    // Fresh rollers bound to the new range.
+    rollersHost.innerHTML = '';
+    for (const step of ROLLER_STEPS) {
+      rollersHost.appendChild(makeRoller(step, () => current,
+        (v) => setCurrent(v, false), { min: param.min, max: param.max }, opts.sealUndo));
+    }
+    redrawWave();
+  };
+
+  // ── swipe up/down → next/previous param ─────────────────────────────────
+  // The nav strip (label + neighbours) is the swipe zone; the slider drags
+  // horizontally and the rollers vertically, so neither conflicts.
+  const nav = $('[data-tt-nav]');
+  let swActive = false, swPid = -1, swStartY = 0;
+  nav.addEventListener('pointerdown', (e) => {
+    swActive = true; swPid = e.pointerId; swStartY = e.clientY;
+    try { nav.setPointerCapture(e.pointerId); } catch { /* jsdom */ }
+  });
+  const swipeEnd = (e: PointerEvent): void => {
+    if (!swActive || e.pointerId !== swPid) return;
+    swActive = false; swPid = -1;
+    const rows = swipeRows(swStartY - e.clientY, SWIPE_PX_PER_PARAM);  // up = next
+    if (rows !== 0) mountActive(activeIndex + rows);
+  };
+  nav.addEventListener('pointerup', swipeEnd);
+  nav.addEventListener('pointercancel', swipeEnd);
 
   // ── teardown ────────────────────────────────────────────────────────────
   let closed = false;
@@ -98,50 +174,11 @@ export function openTouchTuner(root: HTMLElement, opts: TouchTunerOpts): TouchTu
     if (e.key === 'Escape') { e.preventDefault(); close(); }
   };
   document.addEventListener('keydown', onKey, true);
-  // Tap the backdrop (outside the panel) to close.
   overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(); });
-  (overlay.querySelector('#touch-tuner-close') as HTMLButtonElement)
-    .addEventListener('click', close);
+  $('#touch-tuner-close').addEventListener('click', close);
 
-  // ── value plumbing ──────────────────────────────────────────────────────
-  // setCurrent updates the model + the readout; `fromSlider` avoids echoing
-  // the value back into the slider that just produced it.
-  let slider: Knob | null = null;
-  const setCurrent = (v: number, fromSlider: boolean): void => {
-    const clamped = Math.max(param.min, Math.min(param.max, v));
-    if (clamped === current) return;
-    current = clamped;
-    valueEl.textContent = formatInt(current);
-    opts.apply(param, current);
-    if (!fromSlider && slider) slider.setValue(current);
-    redrawWave();                        // tuned phase follows the value
-  };
-
-  // ── big slider (reuse makeKnob; no onTouchTune → finger drags it) ────────
-  slider = makeKnob({
-    label: '',
-    value: current,
-    min: param.min,
-    max: param.max,
-    step: param.step,
-    scale: param.scale,
-    onChange: (v) => setCurrent(v, true),
-  });
-  slider.el.classList.add('tt-knob');
-  (overlay.querySelector('[data-tt-slider]') as HTMLElement).appendChild(slider.el);
-  // The slider drag is itself a gesture → seal its own undo point on lift.
-  slider.el.addEventListener('pointerup', () => opts.sealUndo());
-  slider.el.addEventListener('pointercancel', () => opts.sealUndo());
-
-  // ── rollers (rotary stepping) ───────────────────────────────────────────
-  const rollersHost = overlay.querySelector('[data-tt-rollers]') as HTMLElement;
-  for (const step of ROLLER_STEPS) {
-    rollersHost.appendChild(makeRoller(step, () => current,
-      (v) => setCurrent(v, false), { min: param.min, max: param.max }, opts.sealUndo));
-  }
-
-  redrawWave();                          // initial paint of the tuned phase
-  return { close, value: () => current };
+  mountActive(activeIndex);
+  return { close, value: () => current, index: () => activeIndex };
 }
 
 /**
@@ -163,10 +200,7 @@ function makeRoller(
     <span class="tt-roller-mag">±${step}</span>
     <span class="tt-roller-dn">▼</span>`;
 
-  let active = false;
-  let pid = -1;
-  let startY = 0;
-  let startVal = 0;
+  let active = false, pid = -1, startY = 0, startVal = 0;
   el.addEventListener('pointerdown', (e) => {
     active = true; pid = e.pointerId; startY = e.clientY; startVal = getCurrent();
     try { el.setPointerCapture(e.pointerId); } catch { /* jsdom */ }
@@ -175,15 +209,14 @@ function makeRoller(
   });
   el.addEventListener('pointermove', (e) => {
     if (!active || e.pointerId !== pid) return;
-    const dragPx = startY - e.clientY;                 // up-positive
-    const notches = rollerNotches(dragPx, PX_PER_NOTCH);
+    const notches = rollerNotches(startY - e.clientY, PX_PER_NOTCH);  // up-positive
     apply(applyRoller(startVal, notches, step, range.min, range.max));
   });
   const end = (e: PointerEvent): void => {
     if (e.pointerId !== pid) return;
     active = false; pid = -1;
     el.classList.remove('active');
-    sealUndo();                                        // one drag = one undo
+    sealUndo();
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);

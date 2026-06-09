@@ -1684,3 +1684,13 @@
   .tt-roller-mag {
     color: var(--amber); font-size: 18px; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
   }
+
+  /* Touch tuner: the swipe-navigation strip (label + dimmed neighbours). */
+  .tt-nav { touch-action: none; cursor: ns-resize; }
+  .tt-neighbour {
+    text-align: center; color: var(--fg-2); font-size: 12px;
+    text-transform: lowercase; letter-spacing: 0.3px; min-height: 16px;
+    opacity: 0.7;
+  }
+  .tt-neighbour:first-child::before { content: '▲ '; }
+  .tt-neighbour:last-child::after   { content: ' ▼'; }
