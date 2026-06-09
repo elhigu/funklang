@@ -1,16 +1,26 @@
 // src/ui/size-breakdown-modal.ts
 //
-// Click-to-expand breakdown of the size estimate. Presentation only; it
-// renders a PatchBreakdown handed to open(). Pattern follows help-modal.ts.
-import type { PatchBreakdown } from '../sizecalc/breakdown';
-import { CALIBRATION } from '../sizecalc/calibration-data';
-import { fmtBytes } from '../sizecalc/format';
+// Exact size breakdown. Opens on a patch and computes, in the background, the
+// total .bin size plus how many bytes deleting each phase would free — both by
+// real assembly (size-service / ablation), not estimation. Each figure shows a
+// spinner until its assembly resolves; results are cached so re-opening is
+// instant. The freed-bytes figure is contextual: removing a shared op's
+// non-last use frees only its connection, the last use frees the routine too —
+// the ablation captures that exactly.
+import type { Patch } from '../patch/types';
+import { fmtBytes } from './format';
+import { chipUsage } from '../patch/chip-ram';
+import { exactSize } from '../asm/size-service';
+import { phaseCost } from '../asm/size-ablation';
+import { opByCode } from '../schema/op-metadata';
 
 export interface BreakdownModal {
-  open(b: PatchBreakdown): void;
+  open(patch: Patch): void;
   close(): void;
   isOpen(): boolean;
 }
+
+interface Phase { instr: number; slot: number; fn: number; name: string }
 
 /** Create the overlay inside `root` and return control handles. */
 export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
@@ -21,67 +31,81 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
   overlay.setAttribute('aria-modal', 'true');
   root.appendChild(overlay);
 
-  const close = (): void => overlay.classList.add('hidden');
+  let generation = 0;
+
+  const close = (): void => { generation++; overlay.classList.add('hidden'); };
   const isOpen = (): boolean => !overlay.classList.contains('hidden');
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
 
-  overlay.addEventListener('click', (ev) => {
-    if (ev.target === overlay) close();
-  });
+  const open = (patch: Patch): void => {
+    const gen = ++generation;
+    const chip = chipUsage(patch);
 
-  const open = (b: PatchBreakdown): void => {
-    const accuracy = `±~${CALIBRATION.fit.meanPct}% typical · mean ${fmtBytes(CALIBRATION.fit.meanErr)}, max ${fmtBytes(CALIBRATION.fit.maxErr)} vs real patches`;
+    // Gather non-empty phases, grouped by instrument for display.
+    const byInstr = new Map<number, Phase[]>();
+    patch.instruments.forEach((ins, i) => {
+      ins.slots.forEach((s, sl) => {
+        if (s.fn === 0) return;
+        const arr = byInstr.get(i) ?? [];
+        arr.push({ instr: i, slot: sl, fn: s.fn, name: opByCode(s.fn)?.name ?? `op${s.fn}` });
+        byInstr.set(i, arr);
+      });
+    });
 
-    const opRows = b.opTypesUsed
-      .map((o) => `<tr><td>${o.name}</td><td class="num">~${fmtBytes(o.weight)}</td></tr>`)
-      .join('');
+    const spin = '<span class="size-spin" aria-label="computing">⟳</span>';
+    const phaseId = (p: Phase): string => `bd-${p.instr}-${p.slot}`;
 
-    const instrRows = b.perInstrument
-      .filter((i) => i.slots.length > 0 || i.sampleBytes > 0)
-      .map(
-        (i) =>
-          `<tr><td>${String(i.instrIdx + 1).padStart(2, '0')}</td>` +
-          `<td class="num">~${fmtBytes(i.weight)}</td>` +
-          `<td class="num">${fmtBytes(i.sampleBytes)}</td></tr>`,
-      )
-      .join('');
-
-    const varRow = b.code.nVarOperands > 0
-      ? `<tr><td>· ${b.code.nVarOperands} variable operand(s)</td><td class="num">${fmtBytes(b.code.varOperandBytes)}</td></tr>`
-      : '';
-    const importRow = b.code.importBytes > 0
-      ? `<tr><td>· imported samples</td><td class="num">${fmtBytes(b.code.importBytes)}</td></tr>`
-      : '';
+    let instrRows = '';
+    for (const [i, phases] of byInstr) {
+      const ins = patch.instruments[i]!;
+      const name = (ins.name ?? '').trim() || '(unnamed)';
+      instrRows +=
+        `<tr class="bd-instr-head"><td>${String(i + 1).padStart(2, '0')} ${name}</td>` +
+        `<td class="num">${fmtBytes(Math.max(0, ins.sampleLength | 0))} chip</td></tr>`;
+      for (const p of phases) {
+        instrRows += `<tr><td>· ${p.name}</td><td class="num" id="${phaseId(p)}">${spin}</td></tr>`;
+      }
+    }
+    if (!instrRows) instrRows = '<tr><td colspan="2">no phases</td></tr>';
 
     overlay.innerHTML = `
       <div class="size-breakdown-inner" role="document">
         <header><h2>SIZE BREAKDOWN</h2><button id="size-breakdown-close" aria-label="Close">✕</button></header>
-        <p class="size-breakdown-note">Rough estimate of the exported .bin code size (${accuracy}). For the exact size, export the patch from the original AmigaKlang.</p>
+        <p class="size-breakdown-note">Exact .bin code size, assembled in-browser. Each phase shows how many bytes <strong>deleting it</strong> would free in this patch (a shared op's routine is only freed when its last use is removed).</p>
         <section>
-          <h3>Totals (top group sums to the estimate)</h3>
           <table>
-            <tr><td>size (rough)</td><td class="num">~${fmtBytes(b.code.totalBytes)}</td></tr>
-            <tr><td>· base (empty .bin)</td><td class="num">${fmtBytes(b.code.floor)}</td></tr>
-            <tr><td>· ${b.code.distinctOps.length} op type(s)</td><td class="num">${fmtBytes(b.code.distinctOpBytes)}</td></tr>
-            <tr><td>· ${b.code.nSlots} slot(s)</td><td class="num">${fmtBytes(b.code.slotBytes)}</td></tr>
-            ${varRow}
-            ${importRow}
-            <tr><td>chip-RAM (resident)</td><td class="num">${fmtBytes(b.chip.residentTotal)}</td></tr>
+            <tr><td><strong>total .bin code</strong></td><td class="num" id="bd-total">${spin}</td></tr>
+            <tr><td>chip-RAM (resident)</td><td class="num">${fmtBytes(chip.residentTotal)}</td></tr>
+            <tr><td>· generated samples</td><td class="num">${fmtBytes(chip.sampleBytes)}</td></tr>
+            <tr><td>· imported samples</td><td class="num">${fmtBytes(chip.importBytes)}</td></tr>
+            <tr><td>· empty module</td><td class="num">${fmtBytes(chip.modBytes)}</td></tr>
           </table>
         </section>
         <section>
-          <h3>Op types used — relative weight (which op is heavy; not summed)</h3>
-          <table><tr><th>op</th><th class="num">rel.</th></tr>${opRows || '<tr><td colspan="2">none</td></tr>'}</table>
-        </section>
-        <section>
-          <h3>Per instrument — relative op weight + exact sample chip</h3>
-          <table>
-            <tr><th>#</th><th class="num">rel.</th><th class="num">sample chip</th></tr>
-            ${instrRows || '<tr><td colspan="3">none</td></tr>'}
-          </table>
+          <h3>Per phase — bytes freed by deleting it</h3>
+          <table><tr><th>instrument / phase</th><th class="num">freed</th></tr>${instrRows}</table>
         </section>
       </div>`;
     (overlay.querySelector('#size-breakdown-close') as HTMLButtonElement).addEventListener('click', close);
     overlay.classList.remove('hidden');
+
+    // Total size.
+    void exactSize(patch).then((r) => {
+      if (gen !== generation) return;
+      const cell = overlay.querySelector('#bd-total');
+      if (cell) cell.textContent = r.ok ? `${fmtBytes(r.size!)} (${r.size} B)` : 'unavailable';
+    });
+
+    // Per-phase ablation deltas.
+    for (const phases of byInstr.values()) {
+      for (const p of phases) {
+        void phaseCost(patch, p.instr, p.slot).then((r) => {
+          if (gen !== generation) return;
+          const cell = overlay.querySelector(`#${phaseId(p)}`);
+          if (cell) cell.textContent = r.ok ? `−${fmtBytes(r.bytes!)}` : '—';
+        });
+      }
+    }
   };
 
   return { open, close, isOpen };

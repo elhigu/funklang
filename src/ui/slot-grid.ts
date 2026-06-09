@@ -5,9 +5,8 @@
 import type { PatchModel } from '../patch/model';
 import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot, DEFAULT_SAMPLE_LENGTH } from '../patch/types';
 import type { Slot } from '../patch/types';
-import { pickOp, OP_NAME } from './op-picker';
-import { addCost } from '../sizecalc/marginal';
-import { CALIBRATION } from '../sizecalc/calibration-data';
+import { pickOp, OP_NAME, type OpAddCost } from './op-picker';
+import { addOpCost, patchHasOp } from '../asm/size-ablation';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
@@ -17,6 +16,15 @@ import { generateInstrumentName } from './name-generator';
 import { clampLoopOffset, loopLengthFor, minLoopOffset, maxLoopOffset } from '../patch/loop-rules';
 import { isValidCloneSource } from '../patch/clone-graph';
 import type { ParamDef } from '../schema/op-metadata';
+
+/** Lazy op-picker cost provider: exact bytes that adding `op` to `instrIdx`
+ *  would cost in the current patch, resolved per hovered op (one assembly each).
+ *  Null when the op can't be assembled into the patch. */
+function opCostProvider(model: PatchModel, instrIdx: number): (op: number) => Promise<OpAddCost | null> {
+  return (op) =>
+    addOpCost(model.patch, instrIdx, op).then((r) =>
+      r.ok ? { cost: r.bytes!, alreadyPresent: patchHasOp(model.patch, op) } : null);
+}
 
 // Per-clone-slot expansion state, preserved across re-renders. Keyed by
 // the slot object itself so it survives `moveSlot` reordering and is
@@ -228,7 +236,7 @@ function enforceGridTabOrder(root: HTMLElement): void {
  * is a defensive second line of defence).
  */
 async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): Promise<void> {
-  const code = await pickOp((op) => addCost(model.patch, op, CALIBRATION));
+  const code = await pickOp(opCostProvider(model, instrIdx));
   if (code == null) return;
   const ins = model.patch.instruments[instrIdx];
   if (!ins) return;
@@ -895,7 +903,7 @@ function renderRow(
   const opNameBtn = row.querySelector('[data-op-name]') as HTMLButtonElement;
   opNameBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const code = await pickOp((op) => addCost(model.patch, op, CALIBRATION));
+    const code = await pickOp(opCostProvider(model, instrIdx));
     if (code == null || code === slot.fn) return;
     const next = resetSlotForOp(slot, code);
     // Apply each changed field via setSlotParam so model events fire properly

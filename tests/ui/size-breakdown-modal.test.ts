@@ -1,9 +1,21 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+//
+// The breakdown modal now computes EXACT figures by assembly/ablation. We mock
+// those so the DOM/presentation is testable without vasm; the async results
+// fill the cells once resolved.
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.mock('../../src/asm/size-service', () => ({
+  exactSize: vi.fn(async () => ({ ok: true, size: 2024 })),
+}));
+vi.mock('../../src/asm/size-ablation', () => ({
+  phaseCost: vi.fn(async () => ({ ok: true, bytes: 128 })),
+}));
+
 import { emptyPatch, emptySlot } from '../../src/patch/types';
-import { CALIBRATION } from '../../src/sizecalc/calibration-data';
-import { computeBreakdown } from '../../src/sizecalc/breakdown';
 import { mountBreakdownModal } from '../../src/ui/size-breakdown-modal';
+
+function flush(): Promise<void> { return new Promise((r) => setTimeout(r, 0)); }
 
 describe('breakdown modal', () => {
   let root: HTMLElement;
@@ -13,31 +25,44 @@ describe('breakdown modal', () => {
     document.body.appendChild(root);
   });
 
-  it('is hidden until opened and shows op-types-used rows when open', () => {
+  it('is hidden until opened, then shows the total row + per-phase rows', () => {
     const modal = mountBreakdownModal(root);
     const overlay = root.querySelector('#size-breakdown-overlay') as HTMLElement;
     expect(overlay.classList.contains('hidden')).toBe(true);
 
     const p = emptyPatch();
     p.instruments[0]!.slots = [{ ...emptySlot(), fn: 2, outVar: 1 }];
-    modal.open(computeBreakdown(p, CALIBRATION));
+    modal.open(p);
     expect(overlay.classList.contains('hidden')).toBe(false);
-    expect(overlay.textContent).toContain('osc_saw');
+    expect(overlay.textContent).toContain('total .bin code');
+    expect(overlay.textContent).toContain('osc_saw');     // the phase row
+    expect(overlay.textContent!.toLowerCase()).toContain('freed');
+    expect(overlay.querySelector('.size-spin')).not.toBeNull(); // cells start spinning
   });
 
-  it('labels the estimate as rough/approximate with the real-patch ± notice', () => {
+  it('fills the exact total + freed bytes once assembly resolves', async () => {
     const modal = mountBreakdownModal(root);
-    modal.open(computeBreakdown(emptyPatch(), CALIBRATION));
+    const p = emptyPatch();
+    p.instruments[0]!.slots = [{ ...emptySlot(), fn: 2, outVar: 1 }];
+    modal.open(p);
+    await flush();
+    const overlay = root.querySelector('#size-breakdown-overlay') as HTMLElement;
+    expect(overlay.querySelector('#bd-total')!.textContent).toContain('2024 B');
+    expect(overlay.textContent).toContain('−128 B'); // freed bytes from ablation
+  });
+
+  it('describes the figures as exact (not a rough estimate)', () => {
+    const modal = mountBreakdownModal(root);
+    modal.open(emptyPatch());
     const overlay = root.querySelector('#size-breakdown-overlay') as HTMLElement;
     const txt = overlay.textContent!.toLowerCase();
-    expect(txt).toContain('rough'); // clearly labelled approximate
-    expect(txt).toContain('typical'); // "±~N% typical …"
-    expect(txt).toContain('amigaklang'); // points web users to the exact-size path
+    expect(txt).toContain('exact');
+    expect(txt).not.toContain('rough');
   });
 
   it('closes on outside click', () => {
     const modal = mountBreakdownModal(root);
-    modal.open(computeBreakdown(emptyPatch(), CALIBRATION));
+    modal.open(emptyPatch());
     const overlay = root.querySelector('#size-breakdown-overlay') as HTMLElement;
     overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(overlay.classList.contains('hidden')).toBe(true);

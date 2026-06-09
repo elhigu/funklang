@@ -8,7 +8,7 @@ import type { Patch } from '../patch/types';
 import { emitAkGenerate } from '../asm/akgen';
 import { emitInst } from '../codegen/emit-inst';
 import { assembleBin } from '../asm/assemble-bin';
-import { fmtBytes } from '../sizecalc/format';
+import { fmtBytes } from './format';
 
 export interface CodeExportModal {
   open(patch: Patch): void;

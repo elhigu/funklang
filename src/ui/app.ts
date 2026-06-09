@@ -18,9 +18,6 @@ import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
 import { wireSizeStatusbar, type SizeStatusbar } from './size-statusbar';
 import { mountCodeExportModal } from './code-export-modal';
-import { annotateSlotSizes } from './annotate-slot-sizes';
-import { computeBreakdown } from '../sizecalc/breakdown';
-import { CALIBRATION } from '../sizecalc/calibration-data';
 import { bytesToInt16 } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
@@ -394,7 +391,7 @@ export function bootApp(root: HTMLElement): void {
       },
       onTuneParam: openTunerFor,
     });
-    runRender();   // also paints slot byte-cost labels via annotateActiveSizes
+    runRender();
     refreshOutputMasterBtn();
     updateLabels();
 
@@ -411,14 +408,6 @@ export function bootApp(root: HTMLElement): void {
     // reassigned to the freshly-built host earlier in this rebuild,
     // so it points at the new node — no need to re-querySelector.
     if (prevScrollTop > 0 && gridHostEl) gridHostEl.scrollTop = prevScrollTop;
-  };
-
-  // Paint per-slot byte-cost labels onto the active instrument's grid. Uses
-  // the module-scoped gridHostEl (whose direct child is `.slots`). Safe to
-  // call repeatedly — annotateSlotSizes upserts its spans.
-  const annotateActiveSizes = (): void => {
-    if (!gridHostEl) return;
-    annotateSlotSizes(gridHostEl, model.patch, state.activeIdx, CALIBRATION);
   };
 
   /** Re-tag .selected / .active on slot rows without rebuilding the grid. */
@@ -673,10 +662,6 @@ export function bootApp(root: HTMLElement): void {
         updateSlotWaves(host, taps);
       }
     }
-    // Slot byte-cost labels are derived from the patch model, not the render
-    // output, so paint them even when lastRender is null (e.g. a cyclic-clone
-    // render leaves the canvases blank). annotateActiveSizes guards gridHostEl.
-    annotateActiveSizes();
     if (waveViewer) {
       const finalAudible = lastRender ? bytesToInt16(lastRender.bytes) : null;
       const target = (state.outputTarget.instrIdx === state.activeIdx && state.outputTarget.slotIdx != null && lastRender)
@@ -828,7 +813,7 @@ export function bootApp(root: HTMLElement): void {
     playAuditionInternal({ force: true });
   });
 
-  sizeBar = wireSizeStatusbar(root, model, () => state.selection.instrIdx);
+  sizeBar = wireSizeStatusbar(root, model);
 
   model.events.on((e) => {
     // Undo/redo synthesises a 'reset' event — rebuild everything from scratch.

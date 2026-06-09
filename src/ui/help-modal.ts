@@ -118,35 +118,32 @@ export function helpOverlayHtml(): string {
             </table>
 
             <h3>Size &amp; memory readout</h3>
-            <p>The footer shows a <strong>rough</strong> estimate of the patch's
-            exported <em>size</em> — the relocatable sample-generation <code>.bin</code>
-            you embed in a demo, plus any imported-sample bytes — a relative weight
-            for the selected instrument (<code>sel</code>), and resident chip-RAM.
-            Click it for a full breakdown.</p>
-            <p>The code part is a calibrated <strong>estimate (~±20%)</strong>,
-            always marked <code>~</code> — fit on designed test patches plus 32 real
-            ones and checked leave-one-out, so no live formula is exact; for the
-            precise number, export the patch from the original AmigaKlang. The
-            headline sums a <strong>base</strong> (empty .bin), a per-distinct-op
-            term, a <strong>concave</strong> slot term (<code>nSlots^0.8</code> —
-            per-slot code folds as the patch grows), and a per-variable-operand term.
-            Imported-sample bytes are added exactly (they cost disk space even though
-            the .bin doesn't embed them — the host supplies them at <code>ImpAdr</code>).</p>
-            <p><strong>CODE</strong> (top menu) generates, entirely in the browser, the
-            m68k <code>.asm</code>, the C generators (for reuse in your demo engine), and
-            the <strong>exact</strong> Amiga <code>.bin</code> for the current patch — and
-            shows its exact size. The .bin is produced by a byte-for-byte port of the
-            author's <code>Aklang2Asm</code> generator assembled with vasm-WebAssembly, so
-            it matches the real tool's output and is much smaller than the estimate's
-            gcc-build figure.</p>
-            <p><strong>Per-phase cost is contextual.</strong> Each slot shows
-            <code>−N</code>: how much deleting it would free <em>right now</em>. An op's
-            routine is shared by every phase using that op, so deleting a reused phase
-            frees only its per-use connection — the routine stays. Delete the
-            <em>last</em> phase of an op and it frees the whole routine (the label is
-            highlighted), and any sibling's number updates live. The op picker shows the
-            same the other way: <code>+N</code> per op is what adding it would cost here,
-            cheaper (<code>·shared</code>) when that op is already used.</p>
+            <p>The footer shows the patch's <strong>exact</strong> exported
+            <em>size</em> — the relocatable sample-generation <code>.bin</code> you embed
+            in a demo — and resident chip-RAM. The size is the <em>real</em> byte count:
+            the patch is assembled to its actual Amiga <code>.bin</code> in the browser
+            (a byte-for-byte port of the author's <code>Aklang2Asm</code> generator,
+            assembled with vasm-WebAssembly). No estimate, no calibration.</p>
+            <p>Because real assembly takes a moment, the size is computed off the UI
+            thread in a <strong>Web Worker</strong>; a small <span class="size-spin">⟳</span>
+            spins in the footer while a freshly-edited patch is assembled, then the exact
+            byte count appears. Results are cached, so revisiting a patch is instant. If a
+            patch uses something the asm generator can't build (e.g. a variable
+            <code>enva</code>, which the original tool also rejects) the footer reads
+            <em>size&nbsp;unavailable</em> — chip-RAM is always exact regardless.</p>
+            <p>Click the footer for a <strong>per-phase breakdown</strong>: the exact total
+            plus, for each phase, how many bytes <strong>deleting it</strong> would free
+            <em>right now</em> (computed by re-assembling the patch without that phase). This
+            is contextual — an op's routine is shared by every phase using that op, so
+            deleting a reused phase frees only its per-use connection, while deleting the
+            <em>last</em> phase of an op frees its whole routine.</p>
+            <p>The <strong>op picker</strong> shows the same the other way: hover an op and
+            its <code>+N</code> exact add-cost is assembled on the spot (<code>·shared</code>
+            when that op is already used, so only its connection is added).</p>
+            <p><strong>CODE</strong> (top menu) downloads, entirely in the browser, the m68k
+            <code>.asm</code>, the C generators (for reuse in your demo engine), and the exact
+            <code>.bin</code> for the current patch — the same assembly that drives the size
+            readout.</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>

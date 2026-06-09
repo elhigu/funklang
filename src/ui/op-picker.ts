@@ -5,6 +5,7 @@
 
 import { OP_DEFS } from '../schema/op-metadata';
 import type { OpDef } from '../schema/op-metadata';
+import { fmtBytes } from './format';
 
 /** Backwards-compat lookup table — code → display name. */
 export const OP_NAME: Record<number, string> = (() => {
@@ -44,7 +45,10 @@ function groupedDefs(): Array<{ title: string; defs: OpDef[] }> {
  *  op is already used elsewhere its shared routine is already paid, so it's cheaper. */
 export interface OpAddCost { cost: number; alreadyPresent: boolean }
 
-export function pickOp(costOf?: (op: number) => OpAddCost): Promise<number | null> {
+/** `costOf` is resolved LAZILY on hover/focus (each call assembles a variant of
+ *  the patch), so the picker opens instantly and only the op you look at gets
+ *  priced. Resolve to null when the op can't be assembled into the patch. */
+export function pickOp(costOf?: (op: number) => Promise<OpAddCost | null>): Promise<number | null> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'op-picker-overlay';
@@ -93,16 +97,29 @@ export function pickOp(costOf?: (op: number) => OpAddCost): Promise<number | nul
         nameEl.className = 'op-picker-name';
         nameEl.textContent = def.name;
         btn.appendChild(nameEl);
+        // Exact add-cost, computed lazily the first time this op is hovered/
+        // focused (each lookup assembles a variant of the patch). Until then the
+        // slot is blank; while assembling it spins.
+        let loadCost: (() => void) | null = null;
         if (costOf && !def.unsupported) {
-          const c = costOf(def.code);
           const cost = document.createElement('span');
           cost.className = 'op-picker-cost';
-          // ~bytes this op adds here; "shared" flag when its routine is already paid.
-          cost.textContent = `+${c.cost < 1024 ? `${c.cost} B` : `${(c.cost / 1024).toFixed(1)} kB`}${c.alreadyPresent ? ' · shared' : ''}`;
-          cost.title = c.alreadyPresent
-            ? 'This op is already used in the patch — only its per-use connection code is added.'
-            : 'Adds this op’s shared routine + one use.';
           btn.appendChild(cost);
+          let started = false;
+          loadCost = (): void => {
+            if (started) return;
+            started = true;
+            cost.classList.add('size-spin');
+            cost.textContent = '⟳';
+            void costOf(def.code).then((c) => {
+              cost.classList.remove('size-spin');
+              if (!c) { cost.textContent = ''; return; }
+              cost.textContent = `+${fmtBytes(c.cost)}${c.alreadyPresent ? ' · shared' : ''}`;
+              cost.title = c.alreadyPresent
+                ? 'This op is already used in the patch — only its per-use connection code is added.'
+                : 'Adds this op’s code + one use.';
+            });
+          };
         }
         if (def.description) {
           // Carried for the detail strip + as a native tooltip fallback.
@@ -113,8 +130,8 @@ export function pickOp(costOf?: (op: number) => OpAddCost): Promise<number | nul
           btn.disabled = true;
           btn.classList.add('op-picker-card-unsupported');
         }
-        btn.addEventListener('mouseenter', () => showDetail(def));
-        btn.addEventListener('focus', () => showDetail(def));
+        btn.addEventListener('mouseenter', () => { showDetail(def); loadCost?.(); });
+        btn.addEventListener('focus', () => { showDetail(def); loadCost?.(); });
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           done(def.code);

@@ -1,9 +1,21 @@
 // tests/ui/size-statusbar.test.ts
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+//
+// The footer now shows the EXACT assembled .bin size (async, via size-service).
+// We mock the service so these DOM tests stay fast and never touch vasm.
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
+
+vi.mock('../../src/asm/size-service', () => ({
+  peekSize: vi.fn(),
+  exactSize: vi.fn(async () => ({ ok: true, size: 2024 })),
+}));
+
 import { emptyPatch, emptySlot } from '../../src/patch/types';
 import { PatchModel } from '../../src/patch/model';
 import { wireSizeStatusbar } from '../../src/ui/size-statusbar';
+import { peekSize } from '../../src/asm/size-service';
+
+const peek = peekSize as unknown as Mock;
 
 describe('size status bar', () => {
   let root: HTMLElement;
@@ -15,31 +27,48 @@ describe('size status bar', () => {
     btn.id = 'size-status';
     root.appendChild(btn);
     document.body.appendChild(root);
+    peek.mockReset();
   });
 
-  it('renders the rough size + chip totals and the selected instrument figure', () => {
-    const p = emptyPatch();
-    p.instruments[0]!.slots = [{ ...emptySlot(), fn: 2, outVar: 1 }];
-    const model = new PatchModel(p);
-    let sel = 0;
-    wireSizeStatusbar(root, model, () => sel);
-    expect(btn.textContent).toMatch(/~size/);
+  it('shows the exact size + chip total when the size is already cached', () => {
+    peek.mockReturnValue({ ok: true, size: 2024 });
+    const model = new PatchModel(emptyPatch());
+    wireSizeStatusbar(root, model);
+    expect(btn.textContent).toMatch(/size/);
+    expect(btn.textContent).toMatch(/2024 B/);
     expect(btn.textContent).toMatch(/chip/);
-    expect(btn.textContent).toMatch(/sel/);
+    expect(btn.querySelector('.size-spin')).toBeNull();
+  });
+
+  it('shows a spinner while a new (uncached) patch is being assembled', () => {
+    peek.mockReturnValue(undefined);
+    const model = new PatchModel(emptyPatch());
+    wireSizeStatusbar(root, model);
+    expect(btn.querySelector('.size-spin')).not.toBeNull();
+    expect(btn.textContent).toMatch(/chip/);
+  });
+
+  it('shows "size unavailable" when the patch cannot be assembled', () => {
+    peek.mockReturnValue({ ok: false, error: 'variable enva' });
+    const model = new PatchModel(emptyPatch());
+    wireSizeStatusbar(root, model);
+    expect(btn.querySelector('.size-warn')).not.toBeNull();
+    expect(btn.textContent).toMatch(/unavailable/);
   });
 
   it('refreshes when the model emits a change', () => {
-    const p = emptyPatch();
-    const model = new PatchModel(p);
-    wireSizeStatusbar(root, model, () => 0);
-    const before = btn.textContent;
+    peek.mockReturnValue({ ok: true, size: 2024 });
+    const model = new PatchModel(emptyPatch());
+    wireSizeStatusbar(root, model);
+    const before = peek.mock.calls.length;
     model.insertSlot(0, 0, { ...emptySlot(), fn: 2, outVar: 1 });
-    expect(btn.textContent).not.toBe(before);
+    expect(peek.mock.calls.length).toBeGreaterThan(before);
   });
 
   it('opens the breakdown modal on click', () => {
+    peek.mockReturnValue({ ok: true, size: 2024 });
     const model = new PatchModel(emptyPatch());
-    wireSizeStatusbar(root, model, () => 0);
+    wireSizeStatusbar(root, model);
     btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const overlay = root.querySelector('#size-breakdown-overlay') as HTMLElement;
     expect(overlay).toBeTruthy();
