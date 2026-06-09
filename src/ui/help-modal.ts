@@ -35,9 +35,10 @@ export function helpOverlayHtml(): string {
               </tbody>
             </table>
 
-            <h3>Slider (when bar is focused — click it once)</h3>
+            <h3>Slider (when bar is focused — click it once, or <kbd>Tab</kbd> to it)</h3>
             <table class="help-kbd">
               <tbody>
+                <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Move between fields. Only value sliders and the source-instrument picker are tab stops — the op-name, var/output selects and 🔊 / ✕ / + buttons are skipped (still clickable by mouse)</td></tr>
                 <tr><td>Click anywhere on the bar</td><td>Set value to that position; bar gains focus</td></tr>
                 <tr><td>Drag</td><td>Value follows the mouse X (release to commit)</td></tr>
                 <tr><td>Wheel over the slider</td><td>Coarse step (range-aware: ~3 % of range or log on freq knobs)</td></tr>

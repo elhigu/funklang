@@ -170,6 +170,7 @@ export function renderSlotGrid(
   // button opens the picker for model index 0.
   if (visibleIdx.length === 0) {
     slots.appendChild(makeEmptyPlaceholder(model, instrIdx, full));
+    enforceGridTabOrder(root);
     return;
   }
 
@@ -184,6 +185,33 @@ export function renderSlotGrid(
         showInsertBefore: r === 0,
       }),
     );
+  }
+  enforceGridTabOrder(root);
+}
+
+/**
+ * Tab-order policy for the slot grid. Moving with Tab / Shift+Tab between
+ * fields should land ONLY on the value sliders (the `.kbar` knob bars, which
+ * carry their own `tabindex="0"`) and the source-selector comboboxes
+ * (`.param-ref-select` — the clone/chordgen source-instrument picker and the
+ * imported-sample picker). Every OTHER focusable control in the grid — the
+ * op-picker button, the var-source / enum / output-variable selects, and the
+ * 🔊 / expand / delete / insert buttons — is pulled out of the sequential tab
+ * order with `tabindex="-1"`. They stay fully operable by mouse and, once
+ * focused, by Enter/Space; only keyboard field-to-field traversal skips them.
+ *
+ * Sliders are <span> knob bars, so they're never matched by the focusable
+ * selector below and are left untouched; ref-selects ARE matched and are
+ * explicitly left alone. Runs on every (re)render, including the recursive
+ * call that builds an expanded clone block, so nested grids inherit the
+ * same policy.
+ */
+function enforceGridTabOrder(root: HTMLElement): void {
+  const focusables = root.querySelectorAll<HTMLElement>(
+    'button, select, input, textarea, a[href]',
+  );
+  for (const el of focusables) {
+    if (!el.matches('.param-ref-select')) el.setAttribute('tabindex', '-1');
   }
 }
 
