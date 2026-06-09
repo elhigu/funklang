@@ -15,8 +15,12 @@ async function firstSlotBoxes(page: import('@playwright/test').Page) {
   };
 }
 
+// 806px is the width the user reported the 5-column layout breaking at (the
+// sidebar is still expanded here, so the editor itself is cramped). It must
+// stack — and nothing may overflow the viewport.
 test('narrow: waveform stacks under the parameters at a fixed ~2-row height', async ({ page }) => {
-  await page.setViewportSize({ width: 560, height: 900 });
+  const VW = 806;
+  await page.setViewportSize({ width: VW, height: 1000 });
   await page.goto('/');
   await page.setInputFiles('#hidden-file-input', '../loctro5 3 chippisamplea.akp');
   await page.waitForSelector('.slot', { state: 'attached' });
@@ -30,6 +34,9 @@ test('narrow: waveform stacks under the parameters at a fixed ~2-row height', as
   // Fixed height ≈ two parameter rows (50px).
   expect(wave.height).toBeGreaterThanOrEqual(46);
   expect(wave.height).toBeLessThanOrEqual(56);
+
+  // The layout must NOT break: the waveform's right edge stays on-screen.
+  expect(wave.x + wave.width).toBeLessThanOrEqual(VW + 1);
 
   // The WAVEFORM column header is gone (no column to head).
   await expect(page.locator('.grid-head > div', { hasText: 'WAVEFORM' })).toBeHidden();

@@ -338,6 +338,11 @@
     background: var(--bg-0);
     display: flex;
     flex-direction: column;
+    /* Query container so the slot grid reflows on ITS OWN width, not the
+       viewport — the available editor width depends on the sidebar state
+       (240px rail vs collapsed) as much as the viewport, so a viewport
+       media query would fire at the wrong moment. */
+    container: editor / inline-size;
   }
   /* Header + viewer stay pinned at the top of `main`; they're flex
      items that refuse to shrink. */
@@ -1555,18 +1560,22 @@
     .sidebar.sb-open .instr-list    { display: block; }
   }
 
-  /* ─── very narrow: drop the per-slot waveform under the parameters ─────
-     When the wave column would be too thin to read, restack each slot so
+  /* ─── narrow editor: drop the per-slot waveform under the parameters ───
+     Fires on the slot grid's OWN width (container query on `main`), so it
+     reflows the moment the editor itself gets cramped — independent of the
+     sidebar state. When the wave column would start squeezing the knobs
+     (and shoving the thumbnails off the right edge), restack each slot so
      the waveform sits BELOW the op parameters at a fixed height equal to
      two parameter rows (2×22px knob bars + the 6px row gap = 50px). The
-     # / OUT / FUNCTION columns stay on the left spanning both rows; the
-     WAVEFORM header is dropped since the column no longer exists. */
-  @media (max-width: 640px) {
-    .grid-head { grid-template-columns: 44px 64px 144px minmax(0, 1fr); }
+     # / OUT / FUNCTION columns shrink and stay on the left spanning both
+     rows; the WAVEFORM header is dropped since the column no longer exists. */
+  @container editor (max-width: 760px) {
+    .grid-head { grid-template-columns: 34px 50px 104px minmax(0, 1fr); }
+    .grid-head > div { padding: 0 8px; }
     .grid-head > div:nth-child(5) { display: none; }   /* WAVEFORM header */
 
     .slot {
-      grid-template-columns: 44px 64px 144px minmax(0, 1fr);
+      grid-template-columns: 34px 50px 104px minmax(0, 1fr);
       grid-template-areas:
         "num out op params"
         "num out op wave";
@@ -1574,15 +1583,31 @@
     .slot > .col-num    { grid-area: num; }
     .slot > .col-out    { grid-area: out; }
     .slot > .col-op     { grid-area: op; }
-    .slot > .col-params { grid-area: params; }
+    .slot > .col-params { grid-area: params; min-width: 0; }
     .slot > .wave-cell  { grid-area: wave; }
+
+    /* Compact the left side so the params + waveform get the space. */
+    .slot .col   { padding: 0 8px; }
+    .col-op .op-name-btn { padding: 2px 4px; font-size: 13px; }
+    .params      { padding: 8px 8px; gap: 5px; }
+    .param       { gap: 6px; font-size: 12px; min-width: 0; }
+    .param .pname { min-width: 28px; font-size: 11px; }
+    .param .pval  { min-width: 28px; }
+    .param-var-select,
+    .param-mode-select,
+    .param-enum-select,
+    .param-ref-select {
+      font-size: 11px;
+      padding: 2px 18px 2px 5px;
+      max-width: 96px;
+      min-width: 0;
+    }
+    /* Knob bars give up width so the value digits don't clip. */
+    .knob .kbar { min-width: 56px; }
 
     .wave-cell {
       height: 50px;          /* = 2 parameter rows (2×22px kbar + 6px gap) */
-      padding: 3px 14px 6px;
+      padding: 3px 8px 6px;
       align-self: start;
     }
-    /* Knob bars can give up some width here so the value digits next to
-       them don't clip in the now-narrower params column. */
-    .knob .kbar { min-width: 64px; }
   }
