@@ -95,8 +95,8 @@ are theirs; funklang is a reimplementation, not original synth research.
 ### Links
 
 - Live app: https://funklang.mkael.net
+- Pouët: https://www.pouet.net/prod.php?which=85351
 - Published site repo: https://github.com/elhigu/funklang.mkael.net
-- Source repo: _<add link>_
-- Pouët (AmigaKlang): _<add link>_
 
-funklang reimplementation by Mikael Lepistö. AmigaKlang © Jochen Feldkötter.
+funklang reimplementation by **Mikael Lepistö** (elhigu / funktion).
+AmigaKlang © Jochen "Virgill" Feldkötter.
