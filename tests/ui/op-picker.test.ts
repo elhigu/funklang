@@ -70,4 +70,21 @@ describe('op-picker', () => {
     expect(card.classList.contains('op-picker-card-unsupported')).toBe(true);
     document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
+
+  it('disabledOf greys an op out and prevents picking it (used for loop_gen)', async () => {
+    let resolved: number | null | undefined;
+    const p = pickOp(undefined, (op) => (op === 22 ? 'loop_gen must be last' : null));
+    p.then((c) => { resolved = c; });
+    const loopGen = document.querySelector('[data-op-code="22"]') as HTMLButtonElement;
+    expect(loopGen.disabled).toBe(true);
+    expect(loopGen.classList.contains('op-picker-card-unsupported')).toBe(true);
+    expect(loopGen.title).toContain('loop_gen');
+    // A supported op (osc_saw, fn=2) stays enabled.
+    expect((document.querySelector('[data-op-code="2"]') as HTMLButtonElement).disabled).toBe(false);
+    // Clicking the disabled card does not resolve the picker.
+    loopGen.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+    expect(resolved).toBeUndefined();
+    document.querySelector('.op-picker-cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
 });

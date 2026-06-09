@@ -4,7 +4,7 @@
 
 import type { PatchModel } from '../patch/model';
 import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot, DEFAULT_SAMPLE_LENGTH } from '../patch/types';
-import type { Slot } from '../patch/types';
+import type { Slot, Instrument } from '../patch/types';
 import { pickOp, OP_NAME, type OpAddCost } from './op-picker';
 import { addOpCost, patchHasOp } from '../asm/size-ablation';
 import { makeKnob } from './knob';
@@ -25,6 +25,34 @@ function opCostProvider(model: PatchModel, instrIdx: number): (op: number) => Pr
   return (op) =>
     addOpCost(model.patch, instrIdx, op).then((r) =>
       r.ok ? { cost: r.bytes!, alreadyPresent: patchHasOp(model.patch, op) } : null);
+}
+
+/** Last filled (non-empty) slot model-index in an instrument, or -1. */
+function lastFilledIdx(ins: Instrument): number {
+  let last = -1;
+  for (let i = 0; i < ins.slots.length; i++) if (ins.slots[i]!.fn !== 0) last = i;
+  return last;
+}
+
+/** Model index of the instrument's loop_gen slot, or -1. */
+function loopGenIdxOf(ins: Instrument): number {
+  return ins.slots.findIndex((s) => isPostRenderOp(s.fn));
+}
+
+/**
+ * Picker `disabledOf` for loop_gen: it must be UNIQUE per instrument and occupy
+ * the LAST filled slot. `slotIdx` is the slot being changed, or -1 for a fresh
+ * insert (placement is then handled by tryInsertAt's clamp-to-end). Returns a
+ * reason string to grey the card out, or null to allow it.
+ */
+function loopGenDisabled(ins: Instrument, slotIdx: number): (op: number) => string | null {
+  return (op) => {
+    if (!isPostRenderOp(op)) return null;
+    const lg = loopGenIdxOf(ins);
+    if (lg >= 0 && lg !== slotIdx) return 'This instrument already has a loop_gen — only one is allowed.';
+    if (slotIdx >= 0 && slotIdx !== lastFilledIdx(ins)) return 'loop_gen must be the last op — only the last slot can become loop_gen.';
+    return null;
+  };
 }
 
 // Per-clone-slot expansion state, preserved across re-renders. Keyed by
@@ -237,7 +265,11 @@ function enforceGridTabOrder(root: HTMLElement): void {
  * is a defensive second line of defence).
  */
 async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): Promise<void> {
-  const code = await pickOp(opCostProvider(model, instrIdx));
+  const ins0 = model.patch.instruments[instrIdx];
+  const code = await pickOp(
+    opCostProvider(model, instrIdx),
+    ins0 ? loopGenDisabled(ins0, -1) : undefined,
+  );
   if (code == null) return;
   const ins = model.patch.instruments[instrIdx];
   if (!ins) return;
@@ -820,7 +852,8 @@ function renderRow(
   row.dataset['slot'] = String(slotIdx);
   row.dataset['modelSlot'] = String(slotIdx);
   row.dataset['rowIdx'] = String(rowIdx);
-  row.draggable = true;
+  // loop_gen is pinned to the last slot — it can't be dragged elsewhere.
+  row.draggable = !isPostRenderOp(slot.fn);
   if (opts.selectedSlot === slotIdx) row.classList.add('selected', 'active');
   const isOutputTarget = opts.outputSlot === slotIdx
     && (opts.outputInstr === undefined || opts.outputInstr === instrIdx);
@@ -890,8 +923,14 @@ function renderRow(
   const opNameBtn = row.querySelector('[data-op-name]') as HTMLButtonElement;
   opNameBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const code = await pickOp(opCostProvider(model, instrIdx));
+    const ins = model.patch.instruments[instrIdx];
+    if (!ins) return;
+    const disabled = loopGenDisabled(ins, slotIdx);
+    const code = await pickOp(opCostProvider(model, instrIdx), disabled);
     if (code == null || code === slot.fn) return;
+    // Defensive: the picker greys loop_gen out when it can't go here, but never
+    // apply a disallowed loop_gen change even if that's bypassed.
+    if (disabled(code)) return;
     const next = resetSlotForOp(slot, code);
     // Apply each changed field via setSlotParam so model events fire properly
     // (one event per write is fine — the listener debounces redraw).
@@ -988,7 +1027,9 @@ function renderRow(
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     const rect = row.getBoundingClientRect();
-    const above = (e.clientY - rect.top) < rect.height / 2;
+    // Nothing may land after loop_gen, so hovering its row only ever means
+    // "drop above it".
+    const above = isPostRenderOp(slot.fn) ? true : (e.clientY - rect.top) < rect.height / 2;
     row.classList.toggle('drop-above', above);
     row.classList.toggle('drop-below', !above);
   });
@@ -1002,10 +1043,19 @@ function renderRow(
     const from = parseInt(fromStr, 10);
     if (!Number.isFinite(from)) return;
     const rect = row.getBoundingClientRect();
-    const above = (e.clientY - rect.top) < rect.height / 2;
+    const above = isPostRenderOp(slot.fn) ? true : (e.clientY - rect.top) < rect.height / 2;
     let to = above ? slotIdx : slotIdx + 1;
     if (from === to || from === to - 1) return;
     if (to > from) to -= 1;
+    // loop_gen stays last: never let a non-loop_gen op land at or after it.
+    const ins = model.patch.instruments[instrIdx];
+    if (ins) {
+      const lg = loopGenIdxOf(ins);
+      if (lg >= 0 && !isPostRenderOp(ins.slots[from]?.fn ?? 0)) {
+        const lgAfterRemoval = from < lg ? lg - 1 : lg;  // its index once `from` is pulled out
+        if (to > lgAfterRemoval) to = lgAfterRemoval;
+      }
+    }
     model.moveSlot(instrIdx, from, to);
   });
 

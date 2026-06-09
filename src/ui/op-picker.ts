@@ -47,8 +47,13 @@ export interface OpAddCost { cost: number; alreadyPresent: boolean }
 
 /** `costOf` is resolved LAZILY on hover/focus (each call assembles a variant of
  *  the patch), so the picker opens instantly and only the op you look at gets
- *  priced. Resolve to null when the op can't be assembled into the patch. */
-export function pickOp(costOf?: (op: number) => Promise<OpAddCost | null>): Promise<number | null> {
+ *  priced. Resolve to null when the op can't be assembled into the patch.
+ *  `disabledOf` greys an op out in the current context: return a reason string
+ *  (shown as the card's tooltip) to disable it, or null to allow it. */
+export function pickOp(
+  costOf?: (op: number) => Promise<OpAddCost | null>,
+  disabledOf?: (op: number) => string | null,
+): Promise<number | null> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'op-picker-overlay';
@@ -97,11 +102,15 @@ export function pickOp(costOf?: (op: number) => Promise<OpAddCost | null>): Prom
         nameEl.className = 'op-picker-name';
         nameEl.textContent = def.name;
         btn.appendChild(nameEl);
+        // Context disable (e.g. loop_gen when one already exists / this isn't
+        // the last slot). Unsupported ops are always disabled.
+        const disabledReason = def.unsupported ? null : (disabledOf?.(def.code) ?? null);
+        const isDisabled = def.unsupported || disabledReason != null;
         // Exact add-cost, computed lazily the first time this op is hovered/
         // focused (each lookup assembles a variant of the patch). Until then the
         // slot is blank; while assembling it spins.
         let loadCost: (() => void) | null = null;
-        if (costOf && !def.unsupported) {
+        if (costOf && !isDisabled) {
           const cost = document.createElement('span');
           cost.className = 'op-picker-cost';
           btn.appendChild(cost);
@@ -128,14 +137,16 @@ export function pickOp(costOf?: (op: number) => Promise<OpAddCost | null>): Prom
           btn.dataset['opDesc'] = def.description;
           btn.title = def.description;
         }
-        if (def.unsupported) {
+        if (isDisabled) {
           btn.disabled = true;
           btn.classList.add('op-picker-card-unsupported');
+          if (disabledReason) btn.title = disabledReason;
         }
         btn.addEventListener('mouseenter', () => { showDetail(def); loadCost?.(); });
         btn.addEventListener('focus', () => { showDetail(def); loadCost?.(); });
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
+          if (isDisabled) return;   // disabled cards are never selectable
           done(def.code);
         });
         grid.appendChild(btn);
