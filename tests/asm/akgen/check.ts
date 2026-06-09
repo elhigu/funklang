@@ -117,6 +117,20 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 9, outVar: 4, val1: 1, val2: 4 },
       ];
       break;
+    case 'mul':
+      // Mul 865-888. inputs = [val1(selector->v?), val2(varlit: sel->v? else literal)].
+      // Cover the three output/operand branches + value classes:
+      //  - out != in1 != in2, const non-power-of-2 val2 (50) -> move/muls path
+      //  - out != in1 != in2, const power-of-2 val2 (64) -> move/muls path (no special-casing in Mul)
+      //  - out == in1 (val1 selector == outVar) -> muls @V2,@OR branch
+      //  - out == in2 (val2 selector == outVar) -> muls @V1,@OR branch (variable operand)
+      ins.slots = [
+        { ...emptySlot(), fn: 10, outVar: 1, val1: 2, val2Value: 50 },
+        { ...emptySlot(), fn: 10, outVar: 2, val1: 3, val2Value: 64 },
+        { ...emptySlot(), fn: 10, outVar: 3, val1: 3, val2Value: 50 },
+        { ...emptySlot(), fn: 10, outVar: 4, val1: 1, val2: 4 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
