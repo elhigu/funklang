@@ -12,10 +12,10 @@ export type { CalibrationData, FitQuality } from './calibration-types';
 
 export const CALIBRATION: CalibrationData = {
   floor: 228,
-  perDistinctOp: 131,
-  perSlotPow: 62.112,
+  perDistinctOp: 136,
+  perSlotPow: 62.733,
   slotPower: 0.8,
-  perVarOperand: 129,
+  perVarOperand: 126,
   opWeight: {
     1: 188,
     2: 116,
@@ -45,8 +45,8 @@ export const CALIBRATION: CalibrationData = {
   modLengthEmpty: 2108,
   fitted: true,
   fit: {
-    meanErr: 1330,
-    maxErr: 7232,
+    meanErr: 1320,
+    maxErr: 7253,
     meanPct: 20,
   },
 };
