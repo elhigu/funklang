@@ -1554,3 +1554,35 @@
     .sidebar.sb-open .sb-title-num  { display: none; }
     .sidebar.sb-open .instr-list    { display: block; }
   }
+
+  /* ─── very narrow: drop the per-slot waveform under the parameters ─────
+     When the wave column would be too thin to read, restack each slot so
+     the waveform sits BELOW the op parameters at a fixed height equal to
+     two parameter rows (2×22px knob bars + the 6px row gap = 50px). The
+     # / OUT / FUNCTION columns stay on the left spanning both rows; the
+     WAVEFORM header is dropped since the column no longer exists. */
+  @media (max-width: 640px) {
+    .grid-head { grid-template-columns: 44px 64px 144px minmax(0, 1fr); }
+    .grid-head > div:nth-child(5) { display: none; }   /* WAVEFORM header */
+
+    .slot {
+      grid-template-columns: 44px 64px 144px minmax(0, 1fr);
+      grid-template-areas:
+        "num out op params"
+        "num out op wave";
+    }
+    .slot > .col-num    { grid-area: num; }
+    .slot > .col-out    { grid-area: out; }
+    .slot > .col-op     { grid-area: op; }
+    .slot > .col-params { grid-area: params; }
+    .slot > .wave-cell  { grid-area: wave; }
+
+    .wave-cell {
+      height: 50px;          /* = 2 parameter rows (2×22px kbar + 6px gap) */
+      padding: 3px 14px 6px;
+      align-self: start;
+    }
+    /* Knob bars can give up some width here so the value digits next to
+       them don't clip in the now-narrower params column. */
+    .knob .kbar { min-width: 64px; }
+  }
