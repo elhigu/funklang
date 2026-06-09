@@ -1170,6 +1170,32 @@ export function cloneReverse(st: AkGenState, output: string, inputs: string[]): 
   return empty.replaceAll('@OS', text);
 }
 
+/** Program.cs ImportedSample 1630-1635. dan-script: imported_sample(smp,
+ *  instance). inputs[1]=instance (-> GetInstanceOffset *4 -> @BS).
+ *
+ *  NOTE: this method is UNREACHABLE through the shipped pipeline. The exporter
+ *  (emit-inst-special.emitImported) emits op 20 as a bare C-style expression
+ *  (`smp < ImpLength[g] ? *(BYTE*)(BaseImpAdr[g]+smp)<<8 : 0`), not an
+ *  `imported_sample(...)` statement, so Main's `Contains("imported_sample(")`
+ *  dispatch never fires and the oracle emits no code for it (just the leading
+ *  comment). We port the method verbatim for completeness; dispatchOp keeps it
+ *  wired so that IF a future exporter ever emits `imported_sample(...)`,
+ *  byte-output stays faithful. */
+export function importedSample(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const instanceOffset = getInstanceOffset(inputs[1]!, 4);
+  let empty = '';
+  empty += '\t\t\t\tmoveq\t#0,@OR\n';
+  empty += '\t\t\t\tcmp.l\tAK_ExtSmpLen+@BS(a5),d7\n';
+  empty = empty + '\t\t\t\tbge.s\t.NoClone_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.l\tAK_ExtSmpAddr+@BS(a5),a4\n';
+  empty += '\t\t\t\tmove.b\t(a4,d7.l),@OR\n';
+  empty += '\t\t\t\tasl.w\t#8,@OR\n';
+  empty = empty + '.NoClone_' + st.localLabel + '\n';
+  empty = empty.replaceAll('@OR', newValue);
+  return empty.replaceAll('@BS', instanceOffset);
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -1202,7 +1228,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'chordgen(', gen: chordGen },
   { match: 'clone(', gen: clone },
   { match: 'clone_reverse(', gen: cloneReverse },
-  { match: 'imported_sample(', gen: stub('imported_sample') },
+  { match: 'imported_sample(', gen: importedSample },
   { match: 'distortion(', gen: distortion },
   { match: 'adsr(', gen: adsr },
 ];

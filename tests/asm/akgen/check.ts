@@ -420,6 +420,31 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 17, outVar: 4, freq: 1, val2Value: 0, gain: 2, gainVal: 0 },
       ];
       break;
+    case 'imported':
+    case 'imported_sample':
+      // ImportedSample 1630-1635 / Form1.cs case 20. dan-script for op 20 is
+      // emitted by the exporter (emit-inst-special.emitImported) as a bare
+      // C-style expression keyed on the import index `gain`, NOT an
+      // `imported_sample(...)` statement:
+      //   vN = (smp < ImpLength[g] ? *(BYTE*)(BaseImpAdr[g]+smp)<<8 : 0)
+      // Main's op dispatch keys on Contains("imported_sample(") and finds no
+      // such token in that expression, so the oracle emits no instructions for
+      // the slot (only the leading `; <line>` comment). Our dispatchOp likewise
+      // matches nothing and emits ''. The ImportedSample method is faithfully
+      // ported but UNREACHABLE through this pipeline (same as Clone); this
+      // fixture proves byte-identity (both sides emit no imported-sample code)
+      // across import-index value classes.
+      //  - import index 0 (g=0)
+      //  - power-of-2 index (g=4)
+      //  - non-power-of-2 index (g=3)
+      //  - max index (g=7)
+      ins.slots = [
+        { ...emptySlot(), fn: 20, outVar: 1, gain: 0 },
+        { ...emptySlot(), fn: 20, outVar: 2, gain: 4 },
+        { ...emptySlot(), fn: 20, outVar: 3, gain: 3 },
+        { ...emptySlot(), fn: 20, outVar: 4, gain: 7 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
