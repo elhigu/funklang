@@ -73,6 +73,21 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 5, outVar: 4, freqVal: 555, gain: 1, width: 1 },
       ];
       break;
+    case 'osc_noise':
+      // Osc_Noise 694-730. dan-script is osc_noise(smp, <gain>); the oracle's
+      // inputs[0] is the `smp` token -> RemapVar -> 'd7'. The method ignores
+      // the gain arg entirely, so every slot drives the SAME reachable path:
+      // 'd7' has no '#', is != '#128' and not in mulRightShifts -> the
+      // move/and @GN,@TR1(d4) + muls d4 / asr.l #7 branch.
+      // We still vary gainVal across const/power-of-2/non-power-of-2 to prove
+      // the gain has no effect on emitted bytes, plus a variable gain operand.
+      ins.slots = [
+        { ...emptySlot(), fn: 6, outVar: 1, gainVal: 64 },
+        { ...emptySlot(), fn: 6, outVar: 2, gainVal: 50 },
+        { ...emptySlot(), fn: 6, outVar: 3, gainVal: 128 },
+        { ...emptySlot(), fn: 6, outVar: 4, gain: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

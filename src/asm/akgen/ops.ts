@@ -192,6 +192,45 @@ export function oscPulse(st: AkGenState, output: string, inputs: string[]): stri
   return empty;
 }
 
+/** Program.cs Osc_Noise 694-730. Sets usedNoise=true (-> AK_NoiseSeeds in VarsCode).
+ * inputs[0] is the operand (the dan-script `smp` token -> d7); the method does
+ * NOT bump currentWordInstance. */
+export function oscNoise(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const text = remapVarToRegisterOrImmediate(inputs[0]!);
+  const newValue2 = Object.prototype.hasOwnProperty.call(st.mulRightShifts, text)
+    ? st.mulRightShifts[text]!
+    : '';
+  let empty = '';
+  empty += '\t\t\t\tmove.l\tAK_NoiseSeeds+0(a5),d4\n';
+  empty += '\t\t\t\tmove.l\tAK_NoiseSeeds+4(a5),d5\n';
+  empty += '\t\t\t\teor.l\td5,d4\n';
+  empty += '\t\t\t\tmove.l\td4,AK_NoiseSeeds+0(a5)\n';
+  empty += '\t\t\t\tadd.l\td5,AK_NoiseSeeds+8(a5)\n';
+  empty += '\t\t\t\tadd.l\td4,AK_NoiseSeeds+4(a5)\n';
+  if (!text.includes('#')) {
+    empty += '\t\t\t\tmove.w\t@GN,@TR1\n';
+    empty += '\t\t\t\tand.w\t#255,@TR1\n';
+  }
+  empty += '\t\t\t\tmove.w\tAK_NoiseSeeds+10(a5),@OR\n';
+  if (text !== '#128') {
+    if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, text)) {
+      empty += '\t\t\t\tasr.w\t@GS,@OR\n';
+    } else {
+      empty += '\t\t\t\tmuls\t@TR1,@OR\n';
+      empty += '\t\t\t\tasr.l\t#7,@OR\n';
+    }
+  }
+  empty = text.includes('#')
+    ? empty.replaceAll('@TR1', text)
+    : empty.replaceAll('@TR1', 'd4');
+  empty = empty.replaceAll('@GN', text);
+  empty = empty.replaceAll('@GS', newValue2);
+  empty = empty.replaceAll('@OR', newValue);
+  st.usedNoise = true;
+  return empty;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -209,7 +248,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'osc_tri(', gen: oscTri },
   { match: 'osc_sine(', gen: oscSine },
   { match: 'osc_pulse(', gen: oscPulse },
-  { match: 'osc_noise(', gen: stub('osc_noise') },
+  { match: 'osc_noise(', gen: oscNoise },
   { match: 'sh(', gen: stub('sh') },
   { match: 'envd(', gen: stub('envd') },
   { match: 'enva(', gen: stub('enva') },
