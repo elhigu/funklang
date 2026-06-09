@@ -119,17 +119,18 @@ export function helpOverlayHtml(): string {
             you embed in a demo, plus any imported-sample bytes — a relative weight
             for the selected instrument (<code>sel</code>), and resident chip-RAM.
             Click it for a full breakdown.</p>
-            <p>The code part is a calibrated <strong>estimate (~±10–15%)</strong>,
-            always marked <code>~</code> — fit on real patches, so no live formula
-            is exact; for the precise number, export the patch from the original
-            AmigaKlang. It's an <strong>additive per-op</strong> model: a base, each
-            op type's routine (counted <strong>once</strong> — reused ops are cheap),
-            a per-slot cost, and extra for each <strong>variable</strong> operand (a
-            variable <code>enva</code> attack, say, costs far more code than a constant
-            one). Per-op / per-instrument / per-slot figures are real bytes that
-            <em>sum</em> to the headline. Imported-sample bytes are added exactly
-            (they cost disk space even though the .bin doesn't embed them — the host
-            supplies them at <code>ImpAdr</code>).</p>
+            <p>The code part is a calibrated <strong>estimate (~±20%)</strong>,
+            always marked <code>~</code> — fit on designed test patches plus 32 real
+            ones and checked leave-one-out, so no live formula is exact; for the
+            precise number, export the patch from the original AmigaKlang. The
+            headline sums a <strong>base</strong> (empty .bin), a per-distinct-op
+            term, a <strong>concave</strong> slot term (<code>nSlots^0.8</code> —
+            per-slot code folds as the patch grows), and a per-variable-operand term.
+            The per-op / per-instrument / per-slot figures are <strong>relative
+            weights</strong> ("which op is heavy") and deliberately do <em>not</em>
+            sum to the headline. Imported-sample bytes are added exactly (they cost
+            disk space even though the .bin doesn't embed them — the host supplies
+            them at <code>ImpAdr</code>).</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>

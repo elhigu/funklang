@@ -5,37 +5,39 @@ Generated patches compiled through the real toolchain (`compilePatch` /
 blob** you embed in a demo (the exe columns are kept for reference only).
 Regenerate with `npm run corpus:run` (needs wineWow; writes `measurements.csv`).
 
-- `producer.ts`, `modes.ts`, `op-instruments.ts`, `corpus-spec.ts` — pure patch generators.
+- `producer.ts`, `modes.ts`, `op-instruments.ts`, `corpus-spec.ts` — single-op / per-mode generators.
+- `gen-combos.ts` — **designed combination** patches: varied op subsets + repetition counts, written
+  as real `.akp` into `generated/`. These break the collinearity of real patches so per-op costs are identifiable.
+- `gen-large.ts` — large designed patches (60–210 slots) for the big-patch regime.
+- `rand-args.ts` — randomizes each slot's constant args. CRITICAL: identical args let LTO fold repeated
+  calls into loops (a 190-slot patch → ~1.6 kB instead of ~16 kB); real patches never fold like that.
+- `measure-real.ts` — compiles the real validation patches (`../../../patches/*.akp` curated fixtures +
+  `real/*.akp` gathered set) → `real:*` rows.
 - `measurements-csv.ts` — CSV (de)serialization (`binBytes` is the .bin size column).
-- `run-corpus.ts` — compiles every synthetic corpus item (exe + .bin), writes `measurements.csv`.
-- `measure-real.ts` — appends `real:*` rows: real `../../../patches/*.akp` compiled to .bin,
-  so the fit is anchored on real multi-instrument structure, not just single-op synthetics.
-- `measurements.csv` — committed dataset (deterministic; lets the fitter run without wine).
+- `measurements.csv` — committed dataset (lets the fitter run without wine).
 
-## Model: additive per-op (fit UNWEIGHTED)
+## Model: base-anchored, concave in slots
 
-`../fit/fit-calibration.ts` fits, on synthetic + real `.bin` sizes:
+`../fit/fit-calibration.ts` fits (relative-%-weighted) on designed combos + real patches:
 
 ```
-binBytes ≈ base + Σ_distinct opRoutine[op] + perSlot·nSlots + perVarOperand·nVarOperands
+codeBytes = floor + perDistinctOp·distinctOps + perSlotPow·nSlots^slotPower + perVarOperand·nVarOperands
 ```
 
-≈ **10% mean** on real patches (max ~4 kB), and *coherent* — the breakdown's
-per-op / per-slot figures are real bytes that sum to the headline. For the exact
-number, export the patch from the original AmigaKlang.
+**Leave-one-out ≈ 20% mean** over the 32 real patches; the empty `.bin` floor is exact and
+real intro patches land within ~10% (e.g. `testing-patch` −7%, was +106% under the old additive sum).
+For the exact size, export from the original AmigaKlang.
 
-**Fit unweighted — this is the whole trick.** An earlier version weighted the
-real patches ×8, which drove the base negative and inflated per-op costs, making
-the additive model look hopeless (≈60% over) and forcing a fallback aggregate
-model (`base + perDistinctOp·distinctOps + perSlot·slots`, ≈18%). Fit *unweighted*,
-the per-op routine costs settle to "effective" values that absorb the `.bin`'s
-mild sub-additivity (whole-program LTO + `--gc-sections` share helper code), and
-the additive model both wins on accuracy and stays coherent.
+Why this shape (learned against the real patches):
+- **floor** = measured empty `.bin`; anchoring it keeps small patches honest.
+- `.bin` size is dominated by slot count (corr 0.94) but **sub-linear**: per-slot code drops from ~150 B
+  (small patches) to ~65 B (large) as whole-program LTO folds shared code — hence `nSlots^slotPower` (≈0.8), not linear.
+- variable operands add real code (a variable `enva` attack costs far more than a constant one); distinct op types add routines.
+- Fit is **relative-weighted** (`w=1/binBytes`) so a 300-byte patch counts as much, by percent, as a 19 kB one.
 
-Operand mode matters a lot per op (bin over each op's all-const baseline): a
-variable `enva` attack adds ~676 B, a variable `osc_saw` freq ~164 B — captured
-by `perVarOperand` and visible per-slot in the breakdown. Real-patch operand
-modes are recomputed from the `.akp` files at fit time.
+A non-negative per-op SUM does NOT work: it over-predicts dense patches badly (the in-sample "10%" of an
+earlier additive model was overfit — out-of-sample / on `testing-patch` it was +96%). Per-op `opWeight`
+(isolated single-op cost) is kept only as a relative "which op is heavy" hint in the breakdown.
 
 ## Dataset notes (run 2026-06-07)
 

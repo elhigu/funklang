@@ -7,10 +7,10 @@ import { computeBreakdown } from '../../src/sizecalc/breakdown';
 import { annotateSlotSizes } from '../../src/ui/annotate-slot-sizes';
 
 // Fixed test calibration (decoupled from the live fitted CALIBRATION so re-fits
-// don't churn these assertions): osc_saw routine 64 + perSlot 64.
+// don't churn these assertions): osc_saw relative weight 64.
 const CAL: CalibrationData = {
-  base: 1000, perSlot: 64, perVarOperand: 50, floor: 200,
-  opRoutine: { 2: 64 }, modLengthEmpty: 0, fitted: true,
+  floor: 200, perDistinctOp: 100, perSlotPow: 50, slotPower: 0.8, perVarOperand: 50,
+  opWeight: { 2: 64 }, modLengthEmpty: 0, fitted: true,
   fit: { meanErr: 0, maxErr: 0, meanPct: 0 },
 };
 
@@ -37,11 +37,11 @@ describe('annotateSlotSizes', () => {
     document.body.innerHTML = '';
   });
 
-  it('writes each slot marginal: routine+perSlot on first use, perSlot on reuse', () => {
+  it('writes each slot the op relative weight (same op → same weight)', () => {
     const p = emptyPatch();
     p.instruments[0]!.slots = [
-      { ...emptySlot(), fn: 2, outVar: 1 }, // saw, first use → routine 64 + perSlot 64 = 128
-      { ...emptySlot(), fn: 2, outVar: 1 }, // saw reuse → perSlot 64
+      { ...emptySlot(), fn: 2, outVar: 1 }, // saw
+      { ...emptySlot(), fn: 2, outVar: 1 }, // saw reuse — same op, same weight
     ];
     host = gridWithSlots([0, 1]);
     document.body.appendChild(host);
@@ -50,7 +50,7 @@ describe('annotateSlotSizes', () => {
 
     const labels = host.querySelectorAll('[data-slot-size]');
     expect(labels.length).toBe(2);
-    expect(labels[0]!.textContent).toContain('~128 B');
+    expect(labels[0]!.textContent).toContain('~64 B');
     expect(labels[1]!.textContent).toContain('~64 B');
   });
 

@@ -25,12 +25,12 @@ export function wireSizeStatusbar(
   const refresh = (): void => {
     const b = computeBreakdown(model.patch, CALIBRATION);
     const sel = b.perInstrument[getSelectedInstr()];
-    // Code is a rough estimate (~±10–15%) → always prefix `~`. `sel` is the
-    // selected instrument's marginal code contribution; chip is exact.
-    const selTxt = sel && sel.codeBytes > 0 ? ` · sel ~${fmtBytes(sel.codeBytes)}` : '';
+    // Code is a rough estimate → always prefix `~`. `sel` is the selected
+    // instrument's relative op weight (which ops are heavy); chip is exact.
+    const selTxt = sel && sel.weight > 0 ? ` · sel ~${fmtBytes(sel.weight)}` : '';
     btn.textContent =
       `~size ${fmtBytes(b.code.totalBytes)}${selTxt} · chip ${fmtBytes(b.chip.residentTotal)}`;
-    btn.title = `Rough exported-size estimate (code ±~${CALIBRATION.fit.meanPct}%, + exact imported-sample bytes). Click for breakdown.`;
+    btn.title = `Rough exported-size estimate (±~${CALIBRATION.fit.meanPct}%, + exact imported-sample bytes). Click for breakdown.`;
   };
 
   btn.addEventListener('click', () => {

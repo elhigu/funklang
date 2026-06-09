@@ -32,7 +32,7 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
     const accuracy = `±~${CALIBRATION.fit.meanPct}% typical · mean ${fmtBytes(CALIBRATION.fit.meanErr)}, max ${fmtBytes(CALIBRATION.fit.maxErr)} vs real patches`;
 
     const opRows = b.opTypesUsed
-      .map((o) => `<tr><td>${o.name}</td><td class="num">~${fmtBytes(o.routineBytes)}</td></tr>`)
+      .map((o) => `<tr><td>${o.name}</td><td class="num">~${fmtBytes(o.weight)}</td></tr>`)
       .join('');
 
     const instrRows = b.perInstrument
@@ -40,14 +40,11 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
       .map(
         (i) =>
           `<tr><td>${String(i.instrIdx + 1).padStart(2, '0')}</td>` +
-          `<td class="num">~${fmtBytes(i.codeBytes)}</td>` +
+          `<td class="num">~${fmtBytes(i.weight)}</td>` +
           `<td class="num">${fmtBytes(i.sampleBytes)}</td></tr>`,
       )
       .join('');
 
-    const flooredRow = b.code.floored
-      ? `<tr><td>· (min .bin floor)</td><td class="num">${fmtBytes(b.code.codeBytes)}</td></tr>`
-      : '';
     const varRow = b.code.nVarOperands > 0
       ? `<tr><td>· ${b.code.nVarOperands} variable operand(s)</td><td class="num">${fmtBytes(b.code.varOperandBytes)}</td></tr>`
       : '';
@@ -58,28 +55,27 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
     overlay.innerHTML = `
       <div class="size-breakdown-inner" role="document">
         <header><h2>SIZE BREAKDOWN</h2><button id="size-breakdown-close" aria-label="Close">✕</button></header>
-        <p class="size-breakdown-note">Rough estimates — enough to get a hunch of which operations add lots of code and which are cheap. ${accuracy}. For the exact size, export the patch from the original AmigaKlang.</p>
+        <p class="size-breakdown-note">Rough estimate of the exported .bin code size (${accuracy}). For the exact size, export the patch from the original AmigaKlang.</p>
         <section>
-          <h3>Totals (these sum to the estimate)</h3>
+          <h3>Totals (top group sums to the estimate)</h3>
           <table>
             <tr><td>size (rough)</td><td class="num">~${fmtBytes(b.code.totalBytes)}</td></tr>
-            <tr><td>· base</td><td class="num">${fmtBytes(b.code.base)}</td></tr>
-            <tr><td>· ${b.code.distinctOps.length} op routine(s)</td><td class="num">${fmtBytes(b.code.routineBytes)}</td></tr>
+            <tr><td>· base (empty .bin)</td><td class="num">${fmtBytes(b.code.floor)}</td></tr>
+            <tr><td>· ${b.code.distinctOps.length} op type(s)</td><td class="num">${fmtBytes(b.code.distinctOpBytes)}</td></tr>
             <tr><td>· ${b.code.nSlots} slot(s)</td><td class="num">${fmtBytes(b.code.slotBytes)}</td></tr>
             ${varRow}
-            ${flooredRow}
             ${importRow}
             <tr><td>chip-RAM (resident)</td><td class="num">${fmtBytes(b.chip.residentTotal)}</td></tr>
           </table>
         </section>
         <section>
-          <h3>Op routines — code paid once per op type (heaviest first)</h3>
-          <table><tr><th>op</th><th class="num">routine</th></tr>${opRows || '<tr><td colspan="2">none</td></tr>'}</table>
+          <h3>Op types used — relative weight (which op is heavy; not summed)</h3>
+          <table><tr><th>op</th><th class="num">rel.</th></tr>${opRows || '<tr><td colspan="2">none</td></tr>'}</table>
         </section>
         <section>
-          <h3>Per instrument — code contribution + exact sample chip</h3>
+          <h3>Per instrument — relative op weight + exact sample chip</h3>
           <table>
-            <tr><th>#</th><th class="num">code</th><th class="num">sample chip</th></tr>
+            <tr><th>#</th><th class="num">rel.</th><th class="num">sample chip</th></tr>
             ${instrRows || '<tr><td colspan="3">none</td></tr>'}
           </table>
         </section>
