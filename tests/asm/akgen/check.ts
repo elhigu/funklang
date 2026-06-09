@@ -131,6 +131,19 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 10, outVar: 4, val1: 1, val2: 4 },
       ];
       break;
+    case 'ctrl':
+      // Control 920-934. dan-script: vN = ctrl(vM); inputs = [source var (val1)].
+      // The source is always a variable selector (RemapVar -> d0..d3), so the
+      // only branch is text != text2 (out != src) vs text == text2 (out == src).
+      //  - out != src (outVar 1, val1 selector 2 -> d1) -> move.w emitted
+      //  - out != src again (outVar 2, val1 selector 3) -> move.w emitted
+      //  - out == src (outVar 3, val1 selector 3 -> both d2) -> move.w skipped
+      ins.slots = [
+        { ...emptySlot(), fn: 14, outVar: 1, val1: 2 },
+        { ...emptySlot(), fn: 14, outVar: 2, val1: 3 },
+        { ...emptySlot(), fn: 14, outVar: 3, val1: 3 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

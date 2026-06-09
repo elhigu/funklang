@@ -309,6 +309,21 @@ export function mul(_st: AkGenState, output: string, inputs: string[]): string {
   return empty.replaceAll('@V2', text3);
 }
 
+/** Program.cs Control 920-934. inputs = [source var]. */
+export function control(_st: AkGenState, output: string, inputs: string[]): string {
+  const text = remapVarToRegisterOrImmediate(output);
+  const text2 = remapVarToRegisterOrImmediate(inputs[0]!);
+  let text3 = '';
+  if (text !== text2) {
+    text3 += '\t\t\t\tmove.w\t@IR,@OR\n';
+  }
+  text3 += '\t\t\t\tmoveq\t#9,d4\n';
+  text3 += '\t\t\t\tasr.w\td4,@OR\n';
+  text3 += '\t\t\t\tadd.w\t#64,@OR\n';
+  text3 = text3.replaceAll('@OR', text);
+  return text3.replaceAll('@IR', text2);
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -332,7 +347,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'enva(', gen: stub('enva') },
   { match: 'mul(', gen: mul },
   { match: 'add(', gen: add },
-  { match: 'ctrl(', gen: stub('ctrl') },
+  { match: 'ctrl(', gen: control },
   { match: 'dly_cyc(', gen: stub('dly_cyc') },
   { match: 'cmb_flt_n(', gen: stub('cmb_flt_n') },
   { match: 'reverb(', gen: stub('reverb') },
