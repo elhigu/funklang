@@ -15,135 +15,71 @@ export function helpOverlayHtml(): string {
             <button class="help-close" id="help-close" aria-label="Close">✕</button>
           </div>
           <div class="help-body">
-            <h3>Playback &amp; transport</h3>
-            <table class="help-kbd">
-              <tbody>
-                <tr><td><kbd>Space</kbd></td><td>Replay the selected output (always — even if the audio toggle is muted)</td></tr>
-                <tr><td>Click 🔊 on a slot</td><td>Set that slot as the playback output and audition it once</td></tr>
-                <tr><td>Click ▶ next to OUTPUT</td><td>Toggle auto-playback (green = plays on every change, red = no auto play)</td></tr>
-                <tr><td><kbd>Shift</kbd>+click ▶</td><td>Play a 0.8 s sine test tone (audio-chain diagnostic — logs Player state)</td></tr>
-              </tbody>
-            </table>
+            <p class="help-intro">New here? Grab example patches from
+            <a href="https://github.com/kieranhj/archieklang/tree/main/patches" target="_blank" rel="noopener">the archieklang patches folder</a>
+            (download a <code>.akp</code>, then <strong>OPEN&nbsp;PATCH</strong>). Build sound
+            from synthetic operators — funklang has no sample import.</p>
 
-            <h3>Instrument selection (sidebar)</h3>
-            <table class="help-kbd">
-              <tbody>
-                <tr><td>Click instrument</td><td>Select + audition (if audio toggle is on)</td></tr>
-                <tr><td>Mouse wheel over list</td><td>Step ± to previous / next non-empty instrument</td></tr>
-                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Same — wraps around past the ends</td></tr>
-                <tr><td>Drag an instrument row</td><td>Reorder instruments in the sidebar. Clone/chordgen sources auto-rewire to follow the moved instrument; links that would violate Klang's "source must be a lower-numbered instrument" rule reset to instrument 01</td></tr>
-                <tr><td>Narrow screen</td><td>The sidebar collapses to a rail of instrument numbers (names hidden), the selected one emphasised. Drag the rail up/down with a finger to roll the selection; tap a number to pick it</td></tr>
-              </tbody>
-            </table>
+            <h3>Playback</h3>
+            <table class="help-kbd"><tbody>
+              <tr><td><kbd>Space</kbd></td><td>Replay the selected output (even if muted)</td></tr>
+              <tr><td>🔊 on a slot</td><td>Make that slot the playback output + audition it</td></tr>
+              <tr><td>▶ next to OUTPUT</td><td>Toggle auto-play on every edit (green) / off (red)</td></tr>
+            </tbody></table>
 
-            <h3>Slider (when bar is focused — click it once, or <kbd>Tab</kbd> to it)</h3>
-            <table class="help-kbd">
-              <tbody>
-                <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Move between fields. Only value sliders and the source-instrument picker are tab stops — the op-name, var/output selects and 🔊 / ✕ / + buttons are skipped (still clickable by mouse)</td></tr>
-                <tr><td>Click anywhere on the bar</td><td>Set value to that position; bar gains focus</td></tr>
-                <tr><td>Drag</td><td>Value follows the mouse X (release to commit)</td></tr>
-                <tr><td>Touch the bar (touch screen)</td><td>Opens the touch value tuner: the active phase's params are listed (selected one emphasised), with a big slider + ±1/±10/±100 roller knobs (drag a roller to step) and a live waveform of the tuned phase. Tap a row to pick a param; swipe up/down to walk through params — crossing into another slot moves the editor's selected phase. Each drag is one undo. Mouse/pen still drag inline</td></tr>
-                <tr><td>Wheel over the slider</td><td>Coarse step (range-aware: ~3 % of range or log on freq knobs)</td></tr>
-                <tr><td><kbd>Shift</kbd>+wheel</td><td>16 × coarse step (big jumps)</td></tr>
-                <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>± step (1 normally; 2 for even-only knobs like loop offset / sample length)</td></tr>
-                <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd></td><td>± 16 × step</td></tr>
-                <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>± coarse step (range-aware)</td></tr>
-                <tr><td><kbd>Shift</kbd>+<kbd>←</kbd> / <kbd>→</kbd></td><td>± 16 × coarse step</td></tr>
-                <tr><td><i>(small ranges)</i></td><td>Sliders with fewer than 64 values have no separate coarse mode — coarse collapses to ± step</td></tr>
-                <tr><td>Double-click the value</td><td>Type exact value (<kbd>↑</kbd>/<kbd>↓</kbd> step in the editor too)</td></tr>
-                <tr><td>Right-click</td><td>Reset to default</td></tr>
-              </tbody>
-            </table>
+            <h3>Instruments (sidebar)</h3>
+            <table class="help-kbd"><tbody>
+              <tr><td>Click / <kbd>↑</kbd><kbd>↓</kbd> / wheel</td><td>Select an instrument (auditions if auto-play is on)</td></tr>
+              <tr><td>Drag a row</td><td>Reorder; clone/chordgen sources auto-rewire (links that break Klang's lower-index rule reset to 01)</td></tr>
+              <tr><td>Hover a row → ✕</td><td>Reset that instrument (confirms first)</td></tr>
+            </tbody></table>
 
-            <h3>Slots</h3>
-            <table class="help-kbd">
-              <tbody>
-                <tr><td>Click slot row</td><td>Set as the edit selection (amber bar on the left)</td></tr>
-                <tr><td>Click slot function name</td><td>Change op type (opens the op picker)</td></tr>
-                <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
-                <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
-                <tr><td>Slot reorder scroll</td><td>Moving a slot up/down preserves the slot-grid scroll position — you won't get yanked back to the top</td></tr>
-                <tr><td>Narrow screen waveform</td><td>When the window is too narrow for a separate waveform column, each slot's waveform drops below its parameters at a fixed compact height (two parameter rows). Narrower still, the OUT-var + op-name selectors move to their own row above the parameters</td></tr>
-                <tr><td>mul const value</td><td>Edit the integer knob OR type a float in the sidecar field — they share the same underlying value (val / 32767 ≈ float ∈ [-1.0, 1.0])</td></tr>
-                <tr><td>Clone offset</td><td>Max = source instrument's sample length − 2. Changing source rescales the offset by the SL ratio so the same fractional sample position is preserved (even-snapped)</td></tr>
-                <tr><td>New slot outVar default</td><td>Picks a variable that an earlier slot already reads (so the chain feeds something), falling back to the first unused variable</td></tr>
-                <tr><td>Newly inserted slot defaults</td><td>Per-op factory values applied on insert — e.g. vol = gain 128, osc_saw/tri/sine = freq 50/gain 64, osc_pulse adds width 63, osc_noise = gain 64, enva = attack 16/gain 64, envd = decay 16/sustain 64/gain 64, add = val1 v1/val2 0, dly_cyc = gain 128, cmb_flt_n = gain 64 (delay 0, feedback 0), reverb = feedback 64/gain 64, sv_flt_n = cutoff 16/reso 16/LP, distortion = gain 64, sample_hold = step 8. See <code>src/schema/op-metadata.ts::INSERT_DEFAULTS</code></td></tr>
-                <tr><td>add op input</td><td>val1 is variable-only (no constant); first insert defaults to v1</td></tr>
-                <tr><td>cmb_flt_n / reverb feedback label</td><td>Re-labelled from <code>fbk</code> to <code>feedback</code> (no behaviour change)</td></tr>
-                <tr><td>imported_sample, vocoder</td><td>Marked unsupported in the op picker (no engine codegen)</td></tr>
-                <tr><td>Sample length</td><td>The instrument header's length is the same horizontal knob the slot rows use — click/drag the bar to set, dblclick to type, wheel for coarse (Shift × 16). Step 2 (even only)</td></tr>
-                <tr><td>Even-only fields</td><td>For knobs with step=2 (loop_gen offset, sample length) every mutation (drag / wheel / arrow / numeric editor) snaps to the nearest even value; ArrowUp = ±2, Shift+ArrowUp = ±32</td></tr>
-                <tr><td>Frequency knobs</td><td>Drag uses a SOFT power-curve taper (bar midpoint ≈ 25 % of the range) so the low end is reachable without becoming the whole bar. Wheel / arrows still step linearly</td></tr>
-                <tr><td>BASE selector (header)</td><td>Flip every numeric display between decimal and hex. Inputs accept either format ("0x10" works in dec mode too)</td></tr>
-                <tr><td><kbd>Enter</kbd> in a text/number field</td><td>Commits the value and removes focus</td></tr>
-                <tr><td>Click empty instrument row</td><td>Selects it — first inserted slot auto-names the instrument and sets length to 12288 (12 KB)</td></tr>
-                <tr><td>Hover an instrument row</td><td>✕ button appears — reset the instrument (confirms first)</td></tr>
-                <tr><td>CLOSE</td><td>Discards the current patch and opens a fresh, blank project. Disabled when the patch is already empty</td></tr>
-                <tr><td>IMPORT / EXPORT .AKI</td><td>In the instrument header's ⋯ menu (with REMOVE) — they only ever applied to the active instrument anyway. Collapsed into the menu so they don't crowd the name + length</td></tr>
-                <tr><td>REMOVE (instrument header)</td><td>Wipes the active instrument back to empty. Asks for confirmation; greyed out when the instrument is already empty. Length field + slider also grey out for an untouched instrument and re-enable when you add the first slot</td></tr>
-                <tr><td>Autosave</td><td>Every minute the patch is snapshotted to localStorage (up to 30 minutes of history). On page refresh, the latest snapshot loads automatically</td></tr>
-                <tr><td>REVERT AUTOSAVE</td><td>Opens the autosave panel on the right. First row is your CURRENT state (saved at open time) so you can always click your way back. Click any row to restore it; arrow-up/down browses with audition playback. Escape closes</td></tr>
-                <tr><td>Click <kbd>+</kbd> at a slot's bottom-left corner</td><td>Insert a new slot right after this one</td></tr>
-                <tr><td>Click <kbd>+</kbd> at the FIRST row's top-left corner</td><td>Insert a new slot at the very beginning</td></tr>
-                <tr><td>Empty instrument</td><td>Shows a single placeholder row with a <kbd>+</kbd> button — click it to add the first slot</td></tr>
-                <tr><td>Grey-out <kbd>+</kbd> buttons</td><td>Instrument is at the editor cap (16 slots) — delete one to insert another</td></tr>
-                <tr><td>Click ▶ on a clone slot</td><td>Expand the source instrument inline (collapsed by default)</td></tr>
-                <tr><td>loop_gen is pinned to the bottom</td><td>Picking loop_gen from the op picker always lands at the last slot; inserting any other op when loop_gen exists lands BEFORE it. The bottom-left [+] on the loop_gen row is disabled — only ONE loop_gen per instrument</td></tr>
-                <tr><td>Wheel over a dropdown</td><td>Step through its options</td></tr>
-              </tbody>
-            </table>
+            <h3>Knobs / sliders</h3>
+            <table class="help-kbd"><tbody>
+              <tr><td>Click / drag</td><td>Set value (freq knobs use a soft taper so the low end is reachable)</td></tr>
+              <tr><td>Wheel / <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></td><td>Step (hold <kbd>Shift</kbd> for ×16; even-only fields step by 2)</td></tr>
+              <tr><td>Double-click</td><td>Type an exact value · <kbd>Right-click</kbd> resets to default</td></tr>
+              <tr><td>Touch (phone/tablet)</td><td>Opens the value tuner: big slider + ±1/±10/±100 rollers, live waveform; swipe up/down to walk params</td></tr>
+              <tr><td><kbd>Tab</kbd></td><td>Moves between value sliders + the source picker (other controls are mouse-only)</td></tr>
+              <tr><td>BASE (header)</td><td>Switch all numbers dec/hex (inputs accept either, e.g. <code>0x10</code>)</td></tr>
+            </tbody></table>
 
-            <h3>Validation</h3>
-            <table class="help-kbd">
-              <tbody>
-                <tr><td>Red instrument row in the sidebar</td><td>One or more of this instrument's slots has an unwired var-source, an unset var-or-const selector, or a clone/chordgen source that isn't a lower-indexed instrument. Fix the underlying red dropdown and the row returns to normal</td></tr>
-                <tr><td>Red var-source dropdown</td><td>The selected v1..v4 isn't written by any earlier slot — input will be silence</td></tr>
-                <tr><td>(unset) suffix in dropdown</td><td>Same: that variable hasn't been written yet</td></tr>
-                <tr><td>Clone source dropdown is empty / red</td><td>Clone source must be a LOWER-numbered instrument; instrument 01 can never clone</td></tr>
-                <tr><td>Loop offset</td><td>Always even, ≥ floor(sampleLength/4)×2, ≤ sampleLength−2. The loop_gen slot's offset knob and the wave-viewer's left edge both snap to the same valid set</td></tr>
-                <tr><td>Drag loop edge in the top wave-viewer</td><td>Hover near the pink left edge — cursor turns into ↔. Drag to retune the offset (auto-snapped to the valid even position)</td></tr>
-                <tr><td>Sample length</td><td>Always even (odd values round down on every keystroke). Patches loaded from .akp are normalised at load so the displayed length is always even</td></tr>
-              </tbody>
-            </table>
+            <h3>Slots (phases)</h3>
+            <table class="help-kbd"><tbody>
+              <tr><td>Click row / op name</td><td>Select the phase / change its op (op picker)</td></tr>
+              <tr><td>✕ · drag # · <kbd>+</kbd> corners</td><td>Delete · reorder · insert a slot before/after</td></tr>
+              <tr><td>Empty instrument</td><td>Click the <kbd>+</kbd> placeholder — the first slot auto-names it and sets a 12 KB length</td></tr>
+              <tr><td>▶ on a clone slot</td><td>Expand the source instrument inline</td></tr>
+              <tr><td>loop_gen</td><td>Always pinned to the last slot; only one per instrument</td></tr>
+              <tr><td>mul const</td><td>Integer knob and the float sidecar share one value (val / 32767 ≈ −1..1)</td></tr>
+              <tr><td>⋯ menu (header)</td><td>IMPORT / EXPORT <code>.aki</code> + REMOVE for the active instrument</td></tr>
+            </tbody></table>
+
+            <h3>Validation (red = needs fixing)</h3>
+            <table class="help-kbd"><tbody>
+              <tr><td>Red instrument row</td><td>A slot has an unwired var-source / unset selector / bad clone source — fix the red dropdown</td></tr>
+              <tr><td>Red dropdown / (unset)</td><td>That v1–v4 isn't written by an earlier slot (would be silence); clone source must be a lower-numbered instrument</td></tr>
+              <tr><td>Loop edge (top wave-view)</td><td>Drag the pink left edge to retune the loop offset (snaps to the valid even position)</td></tr>
+            </tbody></table>
 
             <h3>File &amp; history</h3>
-            <table class="help-kbd">
-              <tbody>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save patch (silent if the file was opened via OPEN PATCH)</td></tr>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save patch as…</td></tr>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo (knob drags coalesce into one entry)</td></tr>
-                <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo</td></tr>
-                <tr><td><kbd>?</kbd> or <kbd>Esc</kbd></td><td>Toggle / close this help</td></tr>
-              </tbody>
-            </table>
+            <table class="help-kbd"><tbody>
+              <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save / Save as…</td></tr>
+              <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo / Redo (drags coalesce into one undo)</td></tr>
+              <tr><td>Autosave / REVERT AUTOSAVE</td><td>Snapshot to localStorage every minute (30 min kept); restore from the panel</td></tr>
+              <tr><td><kbd>?</kbd> or <kbd>Esc</kbd></td><td>Toggle / close this help</td></tr>
+            </tbody></table>
 
-            <h3>Size &amp; memory readout</h3>
-            <p>The footer shows the patch's <strong>exact</strong> exported
-            <em>size</em> — the relocatable sample-generation <code>.bin</code> you embed
-            in a demo — and resident chip-RAM. The size is the <em>real</em> byte count:
-            the patch is assembled to its actual Amiga <code>.bin</code> in the browser
-            (a byte-for-byte port of the author's <code>Aklang2Asm</code> generator,
-            assembled with vasm-WebAssembly). No estimate, no calibration.</p>
-            <p>Because real assembly takes a moment, the size is computed off the UI
-            thread in a <strong>Web Worker</strong>; a small <span class="size-spin">⟳</span>
-            spins in the footer while a freshly-edited patch is assembled, then the exact
-            byte count appears. Results are cached, so revisiting a patch is instant. If a
-            patch uses something the asm generator can't build (e.g. a variable
-            <code>enva</code>, which the original tool also rejects) the footer reads
-            <em>size&nbsp;unavailable</em> — chip-RAM is always exact regardless.</p>
-            <p>Click the footer for a <strong>per-phase breakdown</strong>: the exact total
-            plus, for each phase, how many bytes <strong>deleting it</strong> would free
-            <em>right now</em> (computed by re-assembling the patch without that phase). This
-            is contextual — an op's routine is shared by every phase using that op, so
-            deleting a reused phase frees only its per-use connection, while deleting the
-            <em>last</em> phase of an op frees its whole routine.</p>
-            <p>The <strong>op picker</strong> shows the same the other way: hover an op and
-            its <code>+N</code> exact add-cost is assembled on the spot (<code>·shared</code>
-            when that op is already used, so only its connection is added).</p>
-            <p><strong>CODE</strong> (top menu) downloads, entirely in the browser, the m68k
-            <code>.asm</code>, the C generators (for reuse in your demo engine), and the exact
-            <code>.bin</code> for the current patch — the same assembly that drives the size
-            readout.</p>
+            <h3>Size &amp; CODE export</h3>
+            <p>The footer shows the patch's <strong>exact</strong> exported <code>.bin</code>
+            size + resident chip-RAM — the real byte count, assembled in-browser (a
+            byte-for-byte port of <code>Aklang2Asm</code> + vasm-WebAssembly). A
+            <span class="size-spin">⟳</span> spins while a new patch assembles; results cache.
+            Click the footer for a per-phase breakdown (bytes each phase frees if deleted);
+            the op picker shows each op's exact add-cost on hover. <strong>CODE</strong> (top
+            menu) downloads the <code>.asm</code>, the C generators, and the exact
+            <code>.bin</code>. Patches the generator can't build (e.g. variable
+            <code>enva</code>) read <em>size unavailable</em>.</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>

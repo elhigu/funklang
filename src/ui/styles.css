@@ -1789,3 +1789,44 @@
   .tt-roller-mag {
     color: var(--amber); font-size: 18px; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
   }
+
+  /* Example-patches intro line at the top of the help modal. */
+  .help-intro {
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    background: var(--bg-0);
+    border: 1px solid var(--grid-dim);
+    color: var(--fg-1);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .help-intro a { color: var(--amber); }
+
+  /* ─── portrait phones ─────────────────────────────────────────────────
+     The editor itself already restacks via the `editor` container queries
+     (≤860 / 760 / 480) and the sidebar collapses to a rail (≤1000). This block
+     only tightens the surrounding chrome — the footer and the modals — for
+     ~360–430px portrait screens. Everything is scoped to the media query, so
+     the desktop layout is untouched. (The viewport meta in index.html is what
+     lets any of these breakpoints fire on a phone in the first place.) */
+  @media (max-width: 600px) {
+    footer { gap: 8px; padding: 0 8px; font-size: 10px; }
+    .footer-status { gap: 8px; min-width: 0; overflow: hidden; }
+    .footer-status .selection,
+    .footer-status .output {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    .footer-right { display: none; }    /* drop the READY badge to free width */
+    .size-status { padding: 0 4px; }
+
+    /* Modals use nearly the full small screen and scroll internally. */
+    .help-card,
+    .op-picker { width: min(640px, 96vw); max-height: 90vh; }
+    .code-export-inner { width: min(760px, 96vw); }
+    .size-breakdown-inner { width: min(560px, 96vw); }
+
+    /* Comfortable touch targets for the most-tapped slot controls. */
+    .slot .slot-del,
+    .slot .slot-output-btn,
+    .slot-corner-insert { min-width: 28px; min-height: 28px; }
+  }

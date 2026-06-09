@@ -56,8 +56,13 @@ describe('help-modal', () => {
 
   it('the markup carries the expected section headers', () => {
     const headers = Array.from(root.querySelectorAll('.help-body h3')).map((h) => h.textContent);
-    expect(headers).toContain('Playback & transport');
-    expect(headers).toContain('Slots');
-    expect(headers).toContain('Validation');
+    expect(headers).toContain('Playback');
+    expect(headers).toContain('Slots (phases)');
+    expect(headers).toContain('Validation (red = needs fixing)');
+  });
+
+  it('links to example .akp patches', () => {
+    const a = root.querySelector('.help-intro a') as HTMLAnchorElement | null;
+    expect(a?.getAttribute('href')).toContain('kieranhj/archieklang');
   });
 });

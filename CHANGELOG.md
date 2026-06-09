@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Mobile / portrait support.** Added the `viewport` meta tag (which lets the
+  existing editor container-queries and sidebar-collapse actually fire on a
+  phone) and phone-tuned the surrounding chrome (footer, modals, touch targets).
+- Help modal links to example `.akp` patches (the archieklang patches folder).
+- `THIRD-PARTY-NOTICES.md` — attribution + terms for vasm, the Emscripten runtime,
+  and the reimplemented AmigaKlang/Aklang2Asm work.
+
+### Changed
+- Trimmed the help modal (it had grown very verbose).
+- Renamed `sizelab/` → `groundtruth/` (it's the oracle/fixtures/verification layer
+  now, not the deleted size estimator).
+- Corrected the vasm license wording (source-available freeware, not "free for use").
+
 ## [1.0.0] — 2026-06-09
 
 First public release. A browser reimplementation of Jochen "Virgill"
