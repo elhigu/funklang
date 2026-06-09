@@ -254,6 +254,40 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 11, outVar: 2, val1: 3, freqVal: 400, gainVal: 50 },
       ];
       break;
+    case 'cmb_flt_n':
+      // CombFilter 1021-1138. dan-script: cmb_flt_n(instance, var1(signal),
+      //   freq(DL/delay length), val2(FB/feedback), gain(GN/output gain)).
+      //  - inputs[1]=val1 selector (signal var) -> @VL = d0..d3
+      //  - inputs[2]=delay length: freq/freqVal. const '#' -> num2 path (cmp @DL<<1);
+      //    variable selector (no '#') -> clamp #2047 path
+      //  - inputs[3]=feedback: val2/val2Value. const power-of-2 (64 -> mulRightShifts
+      //    -> asr.w @FS,d4); const non-power-of-2 (50 -> muls @FB); 128 -> skipped;
+      //    variable selector -> move/and @FB,d6 + muls
+      //  - inputs[4]=output gain: gain/gainVal. const power-of-2 (64 -> mulRightShifts
+      //    -> asr.w @GS,@OR); const non-power-of-2 (50 -> muls @GN); 128 -> straight
+      //    move.w d4,@OR; variable selector -> move/and @GN,d5 + muls
+      // Each slot bumps currentLargeBufferInstance++ (num = N*4096): slot0 num=0
+      // (move.l a1,a4), slots 1..7 num<32767 (lea @IN2(a1)), slot8+ num>=32767
+      // (move.l a1,a4 + add.l #@IN2). 9 slots hit all three @IN2 branches.
+      ins.slots = [
+        // num=0 (move.l a1,a4); const DL=512; fb power-of-2 (64 -> asr.w @FS); gain power-of-2 (64 -> asr.w @GS)
+        { ...emptySlot(), fn: 12, outVar: 1, val1: 2, freqVal: 512, val2Value: 64, gainVal: 64 },
+        // num=4096 (<32767, lea); const DL=300; fb non-power-of-2 (50 -> muls @FB); gain non-power-of-2 (50 -> muls @GN)
+        { ...emptySlot(), fn: 12, outVar: 2, val1: 3, freqVal: 300, val2Value: 50, gainVal: 50 },
+        // num=8192 (lea); const DL=200; fb 128 (skipped); gain 128 (straight move d4,@OR)
+        { ...emptySlot(), fn: 12, outVar: 3, val1: 4, freqVal: 200, val2Value: 128, gainVal: 128 },
+        // num=12288 (lea); variable DL (freq sel -> clamp #2047 path); variable fb
+        //   (val2 sel -> move/and @FB,d6 + muls); variable gain (gain sel -> move/and @GN,d5 + muls)
+        { ...emptySlot(), fn: 12, outVar: 4, val1: 4, freq: 1, val2: 2, gain: 3 },
+        // fillers to push currentLargeBufferInstance over 32767/4096 ~= 8
+        { ...emptySlot(), fn: 12, outVar: 1, val1: 2, freqVal: 100, val2Value: 50, gainVal: 50 },
+        { ...emptySlot(), fn: 12, outVar: 2, val1: 3, freqVal: 100, val2Value: 50, gainVal: 50 },
+        { ...emptySlot(), fn: 12, outVar: 3, val1: 4, freqVal: 100, val2Value: 50, gainVal: 50 },
+        { ...emptySlot(), fn: 12, outVar: 1, val1: 2, freqVal: 100, val2Value: 50, gainVal: 50 },
+        // num=32768 (>=32767, move.l a1,a4 + add.l #@IN2); const DL=400; fb 64; gain 50
+        { ...emptySlot(), fn: 12, outVar: 2, val1: 3, freqVal: 400, val2Value: 64, gainVal: 50 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

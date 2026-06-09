@@ -662,6 +662,110 @@ export function delay(st: AkGenState, output: string, inputs: string[]): string 
   return empty;
 }
 
+/** Program.cs CombFilter 1021-1138. inputs = [instance, signalVar(VL),
+ *  delayLen(DL, freq/freqVal), feedback(FB, val2/val2Value, uses mulRightShifts),
+ *  outGain(GN, gain/gainVal, uses mulRightShifts)]. Bumps currentLargeBufferInstance++
+ *  and currentWordInstance++. */
+export function combFilter(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = String(st.currentWordInstance * 2);
+  const num = st.currentLargeBufferInstance * 4096;
+  const newValue3 = String(num);
+  const newValue4 = remapVarToRegisterOrImmediate(inputs[1]!);
+  const text = remapVarToRegisterOrImmediate(inputs[2]!);
+  const num2 = text.includes('#');
+  const text2 = remapVarToRegisterOrImmediate(inputs[3]!);
+  const newValue5 = Object.prototype.hasOwnProperty.call(st.mulRightShifts, text2)
+    ? st.mulRightShifts[text2]!
+    : '';
+  const text3 = remapVarToRegisterOrImmediate(inputs[4]!);
+  const newValue6 = Object.prototype.hasOwnProperty.call(st.mulRightShifts, text3)
+    ? st.mulRightShifts[text3]!
+    : '';
+  let empty = '';
+  if (num === 0) {
+    empty += '\t\t\t\tmove.l\ta1,a4\n';
+  } else if (num < 32767) {
+    empty += '\t\t\t\tlea\t\t@IN2(a1),a4\n';
+  } else {
+    empty += '\t\t\t\tmove.l\ta1,a4\n';
+    empty += '\t\t\t\tadd.l\t#@IN2,a4\n';
+  }
+  empty += '\t\t\t\tmove.w\tAK_OpInstance+@IN1(a5),d5\n';
+  empty += '\t\t\t\tmove.w\t(a4,d5.w),d4\n';
+  if (text2 !== '#128') {
+    if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, text2)) {
+      empty += '\t\t\t\tasr.w\t@FS,d4\n';
+    } else if (text2.includes('#')) {
+      empty += '\t\t\t\tmuls\t@FB,d4\n';
+      empty += '\t\t\t\tasr.l\t#7,d4\n';
+    } else {
+      empty += '\t\t\t\tmove.w\t@FB,d6\n';
+      empty += '\t\t\t\tand.w\t#255,d6\n';
+      empty += '\t\t\t\tmuls\td6,d4\n';
+      empty += '\t\t\t\tasr.l\t#7,d4\n';
+    }
+  }
+  empty += '\t\t\t\tadd.w\t@VL,d4\n';
+  empty = empty + '\t\t\t\tbvc.s\t.CombAddNoClamp_' + st.localLabel + '\n';
+  empty += '\t\t\t\tspl\t\td4\n';
+  empty += '\t\t\t\text.w\td4\n';
+  empty += '\t\t\t\teor.w\t#$7fff,d4\n';
+  empty = empty + '.CombAddNoClamp_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td4,(a4,d5.w)\n';
+  if (num2) {
+    empty += '\t\t\t\taddq.w\t#2,d5\n';
+    empty += '\t\t\t\tcmp.w\t@DL<<1,d5\n';
+    empty = empty + '\t\t\t\tblt.s\t.NoCombReset_' + st.localLabel + '\n';
+    empty += '\t\t\t\tmoveq\t#0,d5\n';
+    empty = empty + '.NoCombReset_' + st.localLabel + '\n';
+    empty += '\t\t\t\tmove.w  d5,AK_OpInstance+@IN1(a5)\n';
+  } else {
+    empty += '\t\t\t\tmove.w\t@DL,d6\n';
+    empty += '               cmp.w\t#2047,d6\n';
+    empty = empty + '\t\t\t\tble.s\t.NoClampComb_' + st.localLabel + '\n';
+    empty += '\t\t\t\tmove.w  #2047,d6\n';
+    empty = empty + '.NoClampComb_' + st.localLabel + '\n';
+    empty += '\t\t\t\tadd.w\td6,d6\n';
+    empty += '\t\t\t\taddq.w\t#2,d5\n';
+    empty += '\t\t\t\tcmp.w\td6,d5\n';
+    empty = empty + '\t\t\t\tblt.s\t.NoCombReset_' + st.localLabel + '\n';
+    empty += '\t\t\t\tmoveq\t#0,d5\n';
+    empty = empty + '.NoCombReset_' + st.localLabel + '\n';
+    empty += '\t\t\t\tmove.w  d5,AK_OpInstance+@IN1(a5)\n';
+  }
+  if (text3 !== '#128') {
+    if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, text3)) {
+      empty += '\t\t\t\tmove.w\td4,@OR\n';
+      empty += '\t\t\t\tasr.w\t@GS,@OR\n';
+    } else if (text3.includes('#')) {
+      empty += '\t\t\t\tmove.w\td4,@OR\n';
+      empty += '\t\t\t\tmuls\t@GN,@OR\n';
+      empty += '\t\t\t\tasr.l\t#7,@OR\n';
+    } else {
+      empty += '\t\t\t\tmove.w\t@GN,d5\n';
+      empty += '\t\t\t\tand.w\t#255,d5\n';
+      empty += '\t\t\t\tmove.w\td4,@OR\n';
+      empty += '\t\t\t\tmuls\td5,@OR\n';
+      empty += '\t\t\t\tasr.l\t#7,@OR\n';
+    }
+  } else {
+    empty += '\t\t\t\tmove.w\td4,@OR\n';
+  }
+  empty = empty.replaceAll('@IN1', newValue2);
+  empty = empty.replaceAll('@IN2', newValue3);
+  empty = empty.replaceAll('@VL', newValue4);
+  empty = empty.replaceAll('@DL', text);
+  empty = empty.replaceAll('@GN', text3);
+  empty = empty.replaceAll('@GS', newValue6);
+  empty = empty.replaceAll('@FB', text2);
+  empty = empty.replaceAll('@FS', newValue5);
+  empty = empty.replaceAll('@OR', newValue);
+  st.currentLargeBufferInstance++;
+  st.currentWordInstance++;
+  return empty;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -687,7 +791,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'add(', gen: add },
   { match: 'ctrl(', gen: control },
   { match: 'dly_cyc(', gen: delay },
-  { match: 'cmb_flt_n(', gen: stub('cmb_flt_n') },
+  { match: 'cmb_flt_n(', gen: combFilter },
   { match: 'reverb(', gen: stub('reverb') },
   { match: 'sv_flt_n(', gen: svFilter },
   { match: 'onepole_flt(', gen: onePoleFilter },
