@@ -470,6 +470,30 @@
      confirm() prompt the styling should warn the user. */
   .instr-remove-btn:hover { color: var(--red); border-color: var(--red); }
 
+  /* Instrument actions menu (⋯) — keeps IMPORT / EXPORT / REMOVE out of the
+     header so they don't crowd the name + length; they drop into a small
+     panel on click. */
+  .instr-menu { position: relative; margin-left: auto; align-self: center; }
+  .instr-menu-btn {
+    background: var(--bg-2); color: var(--amber); border: 1px solid var(--grid);
+    font: inherit; font-size: 15px; line-height: 1; padding: 3px 10px; cursor: pointer;
+  }
+  .instr-menu-btn:hover { border-color: var(--amber); }
+  .instr-menu-items {
+    position: absolute; top: 100%; right: 0; z-index: 40;
+    display: none; flex-direction: column; min-width: 150px;
+    background: var(--bg-1); border: 1px solid var(--grid);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+  .instr-menu.open .instr-menu-items { display: flex; }
+  /* Inside the dropdown the buttons are full-width rows (override the inline
+     .instr-aki-btn margin/size). */
+  .instr-menu-items > .instr-aki-btn {
+    margin: 0; width: 100%; text-align: left;
+    border: none; border-bottom: 1px solid var(--grid-dim);
+    padding: 9px 14px; font-size: 11px;
+  }
+
   /* Length knob greyed when the instrument has never been touched
      (no slots, no name, no length). Adding the first slot auto-applies
      the 12 KB default which re-enables it. */
@@ -477,8 +501,9 @@
   .length-pair .knob.knob-disabled { cursor: not-allowed; }
   /* The length-pair wraps the makeKnob output — keep it inline so the
      knob doesn't collapse onto its own line in the instrument header. */
-  .length-pair { display: inline-flex; align-items: center; gap: 6px; }
-  .length-pair .knob { min-width: 220px; }
+  .length-pair { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .length-pair .knob { min-width: 0; flex: 1 1 160px; max-width: 220px; }
+  .length-pair .knob .kbar { min-width: 0; }
 
   /* Sample-length slider that lives alongside the number field. */
   .length-pair {
@@ -1581,6 +1606,10 @@
      # / OUT / FUNCTION columns shrink and stay on the left spanning both
      rows; the WAVEFORM header is dropped since the column no longer exists. */
   @container editor (max-width: 760px) {
+    /* Stack the instrument header: name row above the length/badge row, so
+       the length never crowds the name sideways. */
+    .instr-header { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; }
+
     .grid-head { grid-template-columns: 34px 50px 104px minmax(0, 1fr); }
     .grid-head > div { padding: 0 8px; }
     .grid-head > div:nth-child(5) { display: none; }   /* WAVEFORM header */

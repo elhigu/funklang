@@ -54,9 +54,14 @@ export function renderInstrHeader(
         <span class="label">INSTRUMENT</span>
         <span class="label" data-id="instr-num">${num}</span>
         <input data-id="instr-name" class="instr-name-input" value="${escapeHtmlAttr(ins.name)}" />
-        <button class="instr-aki-btn" data-id="aki-import" title="Replace this instrument with one loaded from a .aki file">IMPORT&nbsp;.AKI</button>
-        <button class="instr-aki-btn" data-id="aki-export" title="Save this instrument as a standalone .aki file">EXPORT&nbsp;.AKI</button>
-        <button class="instr-aki-btn instr-remove-btn" data-id="instr-remove" title="Wipe this instrument back to empty (asks for confirmation)">REMOVE</button>
+        <div class="instr-menu" data-id="instr-menu">
+          <button class="instr-menu-btn" data-id="instr-menu-toggle" title="Instrument actions: import / export / remove" aria-haspopup="true" aria-expanded="false">⋯</button>
+          <div class="instr-menu-items">
+            <button class="instr-aki-btn" data-id="aki-import" title="Replace this instrument with one loaded from a .aki file">IMPORT&nbsp;.AKI</button>
+            <button class="instr-aki-btn" data-id="aki-export" title="Save this instrument as a standalone .aki file">EXPORT&nbsp;.AKI</button>
+            <button class="instr-aki-btn instr-remove-btn" data-id="instr-remove" title="Wipe this instrument back to empty (asks for confirmation)">REMOVE</button>
+          </div>
+        </div>
       </div>
       <div class="instr-meta">
         <span class="pair length-pair${isUntouched ? ' disabled' : ''}" data-id="instr-len-host"></span>
@@ -67,9 +72,29 @@ export function renderInstrHeader(
 
   const nameEl  = root.querySelector('[data-id=instr-name]')   as HTMLInputElement;
   const lenHost = root.querySelector('[data-id=instr-len-host]') as HTMLElement;
+  const menu    = root.querySelector('[data-id=instr-menu]')   as HTMLElement;
+  const menuTog = root.querySelector('[data-id=instr-menu-toggle]') as HTMLButtonElement;
   const impBtn  = root.querySelector('[data-id=aki-import]')   as HTMLButtonElement;
   const expBtn  = root.querySelector('[data-id=aki-export]')   as HTMLButtonElement;
   const rmBtn   = root.querySelector('[data-id=instr-remove]') as HTMLButtonElement;
+
+  // Import / Export / Remove live behind a ⋯ menu so they don't crowd the
+  // name + length. Open on the toggle; an outside pointerdown closes (the
+  // listener self-removes, so re-renders don't leak it). Picking an action
+  // re-renders the header, which disposes the menu.
+  const setMenuOpen = (open: boolean): void => {
+    menu.classList.toggle('open', open);
+    menuTog.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) document.addEventListener('pointerdown', onDocDown, true);
+    else document.removeEventListener('pointerdown', onDocDown, true);
+  };
+  function onDocDown(e: PointerEvent): void {
+    if (!menu.contains(e.target as Node)) setMenuOpen(false);
+  }
+  menuTog.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setMenuOpen(!menu.classList.contains('open'));
+  });
 
   nameEl.addEventListener('input', () => {
     model.setInstrumentField(instrIdx, 'name', nameEl.value);
