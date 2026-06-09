@@ -161,6 +161,23 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 8, outVar: 4, val1Value: 40, val2Value: 3, gain: 1 },
       ];
       break;
+    case 'enva':
+      // Env_Attack 820-863 (constant attack). dan-script: enva(smp, attackIdx, 0, gain).
+      //  inputs[1]=val1Value (attack index -> GetDecayValue table), literal
+      //  inputs[2]=ZERO (-> #0<<24 = #0 -> @SV, unused in emitted text)
+      //  inputs[3]=gain (@GN), literal or variable
+      // Each slot bumps currentWordInstance += 2 (the @IN offset). Cover:
+      //  - gain power-of-2 (64 -> asr/GS path)
+      //  - gain non-power-of-2 (50 -> muls/TR1=#50 path)
+      //  - gain 128 (-> text == "#128": scaling skipped)
+      //  - variable gain operand (no '#' -> move/and @GN,@TR1 d4 + muls path)
+      ins.slots = [
+        { ...emptySlot(), fn: 7, outVar: 1, val1Value: 10, gainVal: 64 },
+        { ...emptySlot(), fn: 7, outVar: 2, val1Value: 20, gainVal: 50 },
+        { ...emptySlot(), fn: 7, outVar: 3, val1Value: 30, gainVal: 128 },
+        { ...emptySlot(), fn: 7, outVar: 4, val1Value: 40, gain: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

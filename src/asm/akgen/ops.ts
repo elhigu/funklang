@@ -375,6 +375,50 @@ export function envDecay(st: AkGenState, output: string, inputs: string[]): stri
   return text3;
 }
 
+/** Program.cs Env_Attack 820-863 (constant attack). inputs = [smp, attackIndex, sustain(=0), gain]. */
+export function envAttack(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = String(st.currentWordInstance * 2);
+  const decayValue = getDecayValue(Number.parseInt(inputs[1]!, 10));
+  const newValue3 = '#' + (Number.parseInt(inputs[2]!, 10) << 24);
+  const text = remapVarToRegisterOrImmediate(inputs[3]!);
+  const newValue4 = Object.prototype.hasOwnProperty.call(st.mulRightShifts, text)
+    ? st.mulRightShifts[text]!
+    : '';
+  let text2 = '';
+  if (!text.includes('#')) {
+    text2 += '\t\t\t\tmove.w\t@GN,@TR1\n';
+    text2 += '\t\t\t\tand.w\t#255,@TR1\n';
+  }
+  text2 += '\t\t\t\tmove.l\tAK_OpInstance+@IN(a5),d5\n';
+  text2 += '\t\t\t\tmove.l\td5,@OR\n';
+  text2 += '\t\t\t\tswap\t@OR\n';
+  text2 += '\t\t\t\tadd.l\t@AV,d5\n';
+  text2 = text2 + '\t\t\t\tbvc.s   .EnvANoMax_' + st.localLabel + '\n';
+  text2 += '\t\t\t\tmove.l\t#32767<<16,d5\n';
+  text2 = text2 + '.EnvANoMax_' + st.localLabel + '\n';
+  text2 += '\t\t\t\tmove.l\td5,AK_OpInstance+@IN(a5)\n';
+  if (text !== '#128') {
+    if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, text)) {
+      text2 += '\t\t\t\tasr.w\t@GS,@OR\n';
+    } else {
+      text2 += '\t\t\t\tmuls\t@TR1,@OR\n';
+      text2 += '\t\t\t\tasr.l\t#7,@OR\n';
+    }
+  }
+  text2 = text.includes('#')
+    ? text2.replaceAll('@TR1', text)
+    : text2.replaceAll('@TR1', 'd4');
+  text2 = text2.replaceAll('@IN', newValue2);
+  text2 = text2.replaceAll('@GN', text);
+  text2 = text2.replaceAll('@GS', newValue4);
+  text2 = text2.replaceAll('@OR', newValue);
+  text2 = text2.replaceAll('@AV', decayValue);
+  text2 = text2.replaceAll('@SV', newValue3);
+  st.currentWordInstance += 2;
+  return text2;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -395,7 +439,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'osc_noise(', gen: oscNoise },
   { match: 'sh(', gen: stub('sh') },
   { match: 'envd(', gen: envDecay },
-  { match: 'enva(', gen: stub('enva') },
+  { match: 'enva(', gen: envAttack },
   { match: 'mul(', gen: mul },
   { match: 'add(', gen: add },
   { match: 'ctrl(', gen: control },
