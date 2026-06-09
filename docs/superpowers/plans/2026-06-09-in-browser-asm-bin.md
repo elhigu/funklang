@@ -45,3 +45,29 @@
 - Oracle is closed .NET; if it can't run in this sandbox, the user runs it on Windows to produce reference asm per fixture — verification still works, just not automated here.
 - Bit-exactness of asm is per-op and testable; whole-patch byte-identity of the assembled `.bin` is the acceptance gate.
 - The asm build is *deterministic* (fixed inline fragments) → exact sizes; it may differ from the current gcc `-flto` `.bin` sizes (that's expected — it's a different, ship-quality build the author designed).
+
+---
+
+## Progress (2026-06-09)
+
+**DONE — offline pipeline works end-to-end and is committed:**
+- Phase 0 (oracle): `Aklang2Asm.exe` runs under **mono** (no wine). `npm run asm:bin`.
+- Phase 1 (Dan-script): `emitDanScript(patch)` in `sizelab/exporter/emit-inst.ts` (tested).
+- Pipeline: `sizelab/harness/asm-bin.ts` `asmBinFromPatch()` = emitDanScript → mono Aklang2Asm → vasm-WASM → `.bin`. Verified on real patches.
+- vasm-WASM (`src/asm/vasm.ts`) — the asm→bin half, fully in-browser. ✓
+
+**Findings:**
+- The asm path is **deterministic (exact size)** and **~35% smaller** than the gcc-C build on real patches (e.g. loctro 10596 B vs gcc 16276 B). Tiny patches are bigger (fixed framework).
+- **Limitation**: Aklang2Asm only supports **constant** enva/envd attack (it `Int32.Parse`s it); variable-attack patches (gcc compiles them) fail the asm path. Real demo patches are fine.
+
+**AK_Generate structure (for the Phase 2 TS reimplementation — from a 1-op oracle run):**
+1. Header comment (fixed) + `equ` block: `AK_USE_PROGRESS`, `AK_FINE_PROGRESS`, `AK_FINE_PROGRESS_LEN` (= total sample bytes incl. loops), `AK_SMP_LEN` (= Σ instrument sampleLengths), `AK_EXT_SMP_LEN` (= Σ imported lengths).
+2. `AK_Generate:` prologue — **fixed**: `lea AK_Vars(pc),a5`; progress init; build 31 sample base addresses + 8 external base addresses from `AK_SmpLen`/`AK_SmpAddr` via the `.SmpAdrLoop`/`.ExtSmpAdrLoop`.
+3. Per instrument: `; Instrument N - name`; `moveq #k,d0; bsr AK_ResetVars; moveq #0,d7`; progress (coarse); `.InstNLoop`; **one inline snippet per op slot** (parameterised immediates — e.g. osc_saw = `add.w #freq,AK_OpInstance+<2*var>(a5)` / `move.w ...,d0` / `asr.w #1,d0` + vol scaling); tail `asr.w #8,d0; move.b d0,(a0)+`; fine progress; `addq.l #1,d7; cmp.l AK_SmpLen+<4k>(a5),d7; blt .InstNLoop`. Loop-gen (slot 15) interleaves here.
+4. Epilogue (**fixed**): clear first 2 bytes of each sample; `rts`.
+5. `AK_ResetVars:` clears the working vars used (count depends on ops present).
+6. `AK_Vars:` `rsreset` struct (AK_LPF/HPF/BPF, AK_CHORD1-3, AK_SmpLen rs.l 31, AK_ExtSmpLen rs.l 8, AK_SmpAddr rs.l 31, AK_ExtSmpAddr rs.l 8, AK_OpInstance rs.w <2·#instances>, …) + `dc.l` of the 31 instrument lengths + 8 external lengths + `ds.b AK_VarSize-AK_SmpAddr`.
+
+Phase 2 = port §1–6 to TS (framework templates are fixed; the work is the ~20 op
+snippets + the instance/var allocator), verifying each op's **assembled bytes**
+(vasm-WASM) against the oracle's, op by op. Multi-session; foundation is all in place.
