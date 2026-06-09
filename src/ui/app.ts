@@ -168,24 +168,30 @@ export function bootApp(root: HTMLElement): void {
 
   // Narrow-screen sidebar: CSS collapses the list to a rail of instrument
   // numbers (selected emphasised). A vertical TOUCH drag on the rail rolls
-  // the selection live (a tap on a number still selects it via the row's own
-  // click). Mouse wheel / arrow-key nav is unchanged. selectInstrument is
-  // defined below; these closures only run after boot.
+  // the selection live — one non-empty instrument per row of travel, with
+  // audition, exactly like the mouse wheel. A tap on a number still selects
+  // it via the row's own click. Mouse wheel / arrow-key nav is unchanged.
+  // stepInstrument is defined below; these closures only run after boot.
   const SIDEBAR_ROW_PX = 26;
-  let sbDragPid = -1, sbDragStartY = 0, sbDragStartIdx = 0, sbDragMoved = false;
+  let sbDragPid = -1, sbDragStartY = 0, sbDragStepped = 0, sbDragMoved = false;
   sidebarEl.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'touch') return;
     sbDragPid = e.pointerId; sbDragStartY = e.clientY;
-    sbDragStartIdx = state.activeIdx; sbDragMoved = false;
+    sbDragStepped = 0; sbDragMoved = false;
     try { sidebarEl.setPointerCapture(e.pointerId); } catch { /* jsdom */ }
   });
   sidebarEl.addEventListener('pointermove', (e) => {
     if (e.pointerId !== sbDragPid) return;
     if (Math.abs(e.clientY - sbDragStartY) > 6) sbDragMoved = true;
-    const rows = Math.round((sbDragStartY - e.clientY) / SIDEBAR_ROW_PX);   // up = toward 01
-    const n = model.patch.instruments.length;
-    const target = Math.max(0, Math.min(n - 1, sbDragStartIdx - rows));
-    selectInstrument(target);                                              // no audition while scrubbing
+    // Roll one instrument per row of travel, EXACTLY like the mouse wheel:
+    // step to the next/previous non-empty instrument (wrapping) and audition
+    // it. A longer swipe crosses more rows → rolls through more instruments.
+    const rows = Math.round((e.clientY - sbDragStartY) / SIDEBAR_ROW_PX);   // down = forward
+    const delta = rows - sbDragStepped;
+    if (delta === 0) return;
+    const dir = delta > 0 ? 1 : -1;
+    for (let k = 0; k < Math.abs(delta); k++) stepInstrument(dir, { play: true });
+    sbDragStepped = rows;
   });
   const sbDragEnd = (e: PointerEvent): void => { if (e.pointerId === sbDragPid) sbDragPid = -1; };
   sidebarEl.addEventListener('pointerup', sbDragEnd);

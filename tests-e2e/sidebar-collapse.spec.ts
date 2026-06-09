@@ -44,7 +44,8 @@ test('a touch-drag down the rail rolls the selection to higher instruments', asy
   });
 
   const after = Number(await num.textContent());
-  expect(after).toBeGreaterThan(before);
+  // A ~4-row drag rolls through MULTIPLE instruments (like the wheel), not one.
+  expect(after - before).toBeGreaterThanOrEqual(3);
 });
 
 test('wide screen shows the named list inline', async ({ page }) => {
