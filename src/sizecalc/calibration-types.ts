@@ -33,8 +33,13 @@ export interface CalibrationData {
   /** Code per variable (non-const) operand. */
   perVarOperand: number;
 
-  /** RELATIVE per-op weight (isolated single-op cost). Breakdown only; NOT summed. */
-  opWeight: Record<number, number>;
+  /**
+   * Per-op SHARED routine cost (code added once, the first time the op appears).
+   * Measured from probes; drives context-aware add/remove marginals, NOT the total.
+   */
+  opRoutine: Record<number, number>;
+  /** Per-op CONNECTION cost (each additional use of an already-present op). */
+  opConnection: Record<number, number>;
 
   /** Chip bytes of the resident mod template (chip-RAM term, not code). */
   modLengthEmpty: number;

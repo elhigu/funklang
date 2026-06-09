@@ -53,7 +53,7 @@ export function computeBreakdown(patch: Patch, cal: CalibrationData): PatchBreak
       if (s.fn === 0) continue;
       const firstUse = !seen.has(s.fn);
       if (firstUse) seen.add(s.fn);
-      const w = cal.opWeight[s.fn] ?? 0;
+      const w = (cal.opRoutine[s.fn] ?? 0) + (cal.opConnection[s.fn] ?? 0);
       weight += w;
       slots.push({
         slotIdx,
@@ -74,7 +74,7 @@ export function computeBreakdown(patch: Patch, cal: CalibrationData): PatchBreak
 
   const code = estimateCodeSize(patch, cal);
   const opTypesUsed = code.distinctOps
-    .map((fn) => ({ fn, name: opByCode(fn)?.name ?? `op${fn}`, weight: cal.opWeight[fn] ?? 0 }))
+    .map((fn) => ({ fn, name: opByCode(fn)?.name ?? `op${fn}`, weight: (cal.opRoutine[fn] ?? 0) + (cal.opConnection[fn] ?? 0) }))
     .sort((a, b) => b.weight - a.weight);
 
   return { code, chip: chipUsage(patch, cal.modLengthEmpty), perInstrument, opTypesUsed };

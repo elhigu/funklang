@@ -40,7 +40,11 @@ function groupedDefs(): Array<{ title: string; defs: OpDef[] }> {
     .filter((g) => g.defs.length > 0);
 }
 
-export function pickOp(): Promise<number | null> {
+/** Optional per-op add-cost (bytes this op adds to the CURRENT patch). When the
+ *  op is already used elsewhere its shared routine is already paid, so it's cheaper. */
+export interface OpAddCost { cost: number; alreadyPresent: boolean }
+
+export function pickOp(costOf?: (op: number) => OpAddCost): Promise<number | null> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'op-picker-overlay';
@@ -86,6 +90,17 @@ export function pickOp(): Promise<number | null> {
         btn.className = 'op-picker-btn';
         btn.setAttribute('data-op-code', String(def.code));
         btn.textContent = def.name;        // name only → uniform card height
+        if (costOf && !def.unsupported) {
+          const c = costOf(def.code);
+          const cost = document.createElement('span');
+          cost.className = 'op-picker-cost';
+          // ~bytes this op adds here; "shared" flag when its routine is already paid.
+          cost.textContent = `+${c.cost < 1024 ? `${c.cost} B` : `${(c.cost / 1024).toFixed(1)} kB`}${c.alreadyPresent ? ' ·shared' : ''}`;
+          cost.title = c.alreadyPresent
+            ? 'This op is already used in the patch — only its per-use connection code is added.'
+            : 'Adds this op’s shared routine + one use.';
+          btn.appendChild(cost);
+        }
         if (def.description) {
           // Carried for the detail strip + as a native tooltip fallback.
           btn.dataset['opDesc'] = def.description;

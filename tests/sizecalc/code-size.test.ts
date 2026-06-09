@@ -9,7 +9,7 @@ const CAL: CalibrationData = {
   perSlotPow: 50,
   slotPower: 0.8,
   perVarOperand: 30,
-  opWeight: { 2: 200, 4: 300 },
+  opRoutine: { 2: 200, 4: 300 }, opConnection: { 2: 0, 4: 0 },
   modLengthEmpty: 0,
   fitted: true,
   fit: { meanErr: 0, maxErr: 0, meanPct: 0 },

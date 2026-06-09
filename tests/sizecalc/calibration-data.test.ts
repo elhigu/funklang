@@ -13,9 +13,10 @@ describe('CALIBRATION seed table (anchored power-law model)', () => {
     expect(typeof CALIBRATION.fitted).toBe('boolean');
   });
 
-  it('has an opWeight entry for every known op code', () => {
+  it('has opRoutine + opConnection entries for every known op code', () => {
     for (const def of OP_DEFS) {
-      expect(CALIBRATION.opWeight[def.code], `op ${def.code} (${def.name})`).toBeTypeOf('number');
+      expect(CALIBRATION.opRoutine[def.code], `routine op ${def.code} (${def.name})`).toBeTypeOf('number');
+      expect(CALIBRATION.opConnection[def.code], `connection op ${def.code} (${def.name})`).toBeTypeOf('number');
     }
   });
 
@@ -27,7 +28,10 @@ describe('CALIBRATION seed table (anchored power-law model)', () => {
     expect(CALIBRATION.slotPower).toBeGreaterThan(0);
     expect(CALIBRATION.slotPower).toBeLessThanOrEqual(1); // concave (sub-linear) in slots
     expect(CALIBRATION.perVarOperand).toBeGreaterThan(0);
-    for (const def of OP_DEFS) expect(CALIBRATION.opWeight[def.code]).toBeGreaterThanOrEqual(0);
+    for (const def of OP_DEFS) {
+      expect(CALIBRATION.opRoutine[def.code]).toBeGreaterThanOrEqual(0);
+      expect(CALIBRATION.opConnection[def.code]).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it('records leave-one-out fit residuals', () => {

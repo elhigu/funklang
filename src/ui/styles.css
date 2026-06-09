@@ -1188,12 +1188,18 @@
     cursor: pointer;
     text-align: left;
     /* Single-line, fixed-height cards so the grid stays a tidy matrix —
-       long names ellipsize rather than wrap. */
+       long names ellipsize rather than wrap. Name left, add-cost right. */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.4;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
   }
+  .op-picker-cost { font-size: 10px; opacity: 0.55; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .op-picker-btn:hover .op-picker-cost { opacity: 0.8; }
   .op-picker-btn:hover {
     background: var(--bg-3);
     color: var(--amber);
@@ -1459,4 +1465,4 @@
   .slot-size {
     font: 10px/1 monospace; opacity: 0.65; padding: 0 4px; font-variant-numeric: tabular-nums;
   }
-  .slot-size[data-first-use="1"] { opacity: 0.95; color: #e9c46a; }
+  .slot-size[data-last-use="1"] { opacity: 0.95; color: #e9c46a; }

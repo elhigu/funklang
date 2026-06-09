@@ -6,6 +6,8 @@ import type { PatchModel } from '../patch/model';
 import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot, DEFAULT_SAMPLE_LENGTH } from '../patch/types';
 import type { Slot } from '../patch/types';
 import { pickOp, OP_NAME } from './op-picker';
+import { addCost } from '../sizecalc/marginal';
+import { CALIBRATION } from '../sizecalc/calibration-data';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
@@ -191,7 +193,7 @@ export function renderSlotGrid(
  * is a defensive second line of defence).
  */
 async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): Promise<void> {
-  const code = await pickOp();
+  const code = await pickOp((op) => addCost(model.patch, op, CALIBRATION));
   if (code == null) return;
   const ins = model.patch.instruments[instrIdx];
   if (!ins) return;
@@ -851,7 +853,7 @@ function renderRow(
   const opNameBtn = row.querySelector('[data-op-name]') as HTMLButtonElement;
   opNameBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const code = await pickOp();
+    const code = await pickOp((op) => addCost(model.patch, op, CALIBRATION));
     if (code == null || code === slot.fn) return;
     const next = resetSlotForOp(slot, code);
     // Apply each changed field via setSlotParam so model events fire properly

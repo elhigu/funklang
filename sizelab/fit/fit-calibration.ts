@@ -66,11 +66,19 @@ function main(): void {
   const beta = wridge(rows.map(featVec), rows.map((r) => r.binBytes - floor), rows.map(W), 0.5);
   const [perDistinctOp, perSlotPow, perVarOperand] = beta as [number, number, number];
 
-  // Per-op relative weight = isolated single-op .bin cost over the floor.
-  const opWeight = new Map<number, number>();
-  for (const op of new Set(designed.flatMap((r) => [...feats(r).distinct]))) {
-    const single = designed.find((r) => new RegExp(`^op${op}_(c+|-)$`).test(r.id));
-    if (single) opWeight.set(op, Math.max(0, single.binBytes - floor));
+  // Per-op ROUTINE (shared code, counted once) and CONNECTION (per additional use),
+  // measured from the isolated 1/2/3-copy probes (gen-routine-probes.ts):
+  //   connection = (bin3 - bin1) / 2     routine = max(0, bin1 - floor - connection)
+  // Used for context-aware marginals (add/remove a phase), NOT the headline total.
+  const probeBin = (op: number, n: number): number | undefined => rows.find((r) => r.id === `probe:op${op}_${n}`)?.binBytes;
+  const opRoutine = new Map<number, number>();
+  const opConnection = new Map<number, number>();
+  for (const d of OP_DEFS) {
+    const b1 = probeBin(d.code, 1), b3 = probeBin(d.code, 3);
+    if (b1 == null || b3 == null) continue;
+    const conn = Math.max(0, Math.round((b3 - b1) / 2));
+    opConnection.set(d.code, conn);
+    opRoutine.set(d.code, Math.max(0, Math.round(b1 - floor - conn)));
   }
 
   // Honest accuracy: leave-one-out over the real patches (designed always in train).
@@ -85,8 +93,12 @@ function main(): void {
   const meanPct = Math.round(sumPct / real.length * 100);
   const meanErr = Math.round(sumErr / real.length);
 
-  const opWeightEntries = OP_DEFS.map((d) => d.code).sort((a, b) => a - b)
-    .map((code) => `    ${code}: ${opWeight.has(code) ? c0(opWeight.get(code)!) : (SEED_OPWEIGHT[code] ?? 200)},`).join('\n');
+  // seeds (routine, connection) for ops without probes (chordgen/imported/adsr/vocoder)
+  const SEED: Record<number, [number, number]> = { 18: [300, 300], 20: [100, 200], 23: [120, 250], 24: [200, 200] };
+  const opLine = (code: number, m: Map<number, number>, idx: 0 | 1): string =>
+    `    ${code}: ${m.has(code) ? c0(m.get(code)!) : (SEED[code]?.[idx] ?? (idx ? 250 : 0))},`;
+  const routineEntries = OP_DEFS.map((d) => d.code).sort((a, b) => a - b).map((c) => opLine(c, opRoutine, 0)).join('\n');
+  const connectionEntries = OP_DEFS.map((d) => d.code).sort((a, b) => a - b).map((c) => opLine(c, opConnection, 1)).join('\n');
 
   const file = `// Calibration table for the size estimator (TARGET: .bin code size).
 //
@@ -94,7 +106,8 @@ function main(): void {
 // Base-anchored, concave-in-slots, relative-%-weighted fit on designed combos +
 // real patches. codeBytes = floor + perDistinctOp·distinctOps
 //   + perSlotPow·nSlots^slotPower + perVarOperand·nVarOperands.
-// opWeight is a RELATIVE per-op weight for the breakdown only (NOT summed).
+// opRoutine (shared, once) + opConnection (per use) drive context-aware marginals
+// in the UI (add/remove a phase), measured from probes — NOT summed into the total.
 // Types: ./calibration-types.
 import type { CalibrationData } from './calibration-types';
 
@@ -106,8 +119,11 @@ export const CALIBRATION: CalibrationData = {
   perSlotPow: ${+perSlotPow.toFixed(3)},
   slotPower: ${SLOT_POWER},
   perVarOperand: ${c0(perVarOperand)},
-  opWeight: {
-${opWeightEntries}
+  opRoutine: {
+${routineEntries}
+  },
+  opConnection: {
+${connectionEntries}
   },
   modLengthEmpty: ${MOD_LENGTH_EMPTY},
   fitted: true,

@@ -126,11 +126,16 @@ export function helpOverlayHtml(): string {
             headline sums a <strong>base</strong> (empty .bin), a per-distinct-op
             term, a <strong>concave</strong> slot term (<code>nSlots^0.8</code> —
             per-slot code folds as the patch grows), and a per-variable-operand term.
-            The per-op / per-instrument / per-slot figures are <strong>relative
-            weights</strong> ("which op is heavy") and deliberately do <em>not</em>
-            sum to the headline. Imported-sample bytes are added exactly (they cost
-            disk space even though the .bin doesn't embed them — the host supplies
-            them at <code>ImpAdr</code>).</p>
+            Imported-sample bytes are added exactly (they cost disk space even though
+            the .bin doesn't embed them — the host supplies them at <code>ImpAdr</code>).</p>
+            <p><strong>Per-phase cost is contextual.</strong> Each slot shows
+            <code>−N</code>: how much deleting it would free <em>right now</em>. An op's
+            routine is shared by every phase using that op, so deleting a reused phase
+            frees only its per-use connection — the routine stays. Delete the
+            <em>last</em> phase of an op and it frees the whole routine (the label is
+            highlighted), and any sibling's number updates live. The op picker shows the
+            same the other way: <code>+N</code> per op is what adding it would cost here,
+            cheaper (<code>·shared</code>) when that op is already used.</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>

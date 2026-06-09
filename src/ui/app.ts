@@ -349,8 +349,7 @@ export function bootApp(root: HTMLElement): void {
   // call repeatedly — annotateSlotSizes upserts its spans.
   const annotateActiveSizes = (): void => {
     if (!gridHostEl) return;
-    const instr = computeBreakdown(model.patch, CALIBRATION).perInstrument[state.activeIdx];
-    if (instr) annotateSlotSizes(gridHostEl, instr);
+    annotateSlotSizes(gridHostEl, model.patch, state.activeIdx, CALIBRATION);
   };
 
   /** Re-tag .selected / .active on slot rows without rebuilding the grid. */
