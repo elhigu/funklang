@@ -57,10 +57,12 @@ describe('ablation', () => {
     expect(r.bytes!).toBeGreaterThan(0);
   });
 
-  it('addOpCost reports a non-negative byte delta for an already-used op', async () => {
+  it('addOpCost reports a POSITIVE byte delta (the added slot must actually emit)', async () => {
+    // Regression: the added slot needs a valid outVar, else codegen skips it
+    // (arrayvar==0 → continue) and every op falsely reports +0 B.
     const { i, fn } = firstSlot(patch);
     const r = await addOpCost(patch, i, fn);
     expect(r.ok).toBe(true);
-    expect(r.bytes!).toBeGreaterThanOrEqual(0);
+    expect(r.bytes!).toBeGreaterThan(0);
   });
 });

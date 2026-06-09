@@ -1,9 +1,12 @@
 // Per-instrument validation. Used by the sidebar to flash a row RED when
-// any of its slots reference a variable that no earlier slot has written,
+// any of its slots reference a variable that NO slot writes (true silence),
 // or when a clone/chordgen targets an out-of-order source instrument.
 //
-// The rules here mirror EXACTLY what the slot-grid paints as `.var-unset`
-// red so the sidebar can never disagree with the row-level indicators.
+// A read of a variable written only by a LATER slot is NOT an error: the DSP
+// variable bank persists across samples, so it picks up that slot's previous-
+// sample value — a deliberate one-sample feedback loop (see var-refs.ts, shown
+// cyan in the row dropdowns). So we validate against EVERY writer in the
+// instrument, not just earlier ones — only a var with no writer at all is red.
 
 import { opByCode } from '../schema/op-metadata';
 import { isValidCloneSource } from './clone-graph';
@@ -12,11 +15,14 @@ import type { Patch, Slot } from './types';
 export function isInstrumentValid(patch: Patch, instrIdx: number): boolean {
   const ins = patch.instruments[instrIdx];
   if (!ins) return true;
-  const written = new Set<number>();   // var indices written by earlier slots
+  // Every variable written by any non-empty slot (earlier OR later = feedback).
+  const written = new Set<number>();
+  for (const slot of ins.slots) {
+    if (slot.fn !== 0 && slot.outVar > 0) written.add(slot.outVar);
+  }
   for (const slot of ins.slots) {
     if (slot.fn === 0) continue;       // empty slot — UI hides it
     if (!slotIsValid(slot, instrIdx, written)) return false;
-    if (slot.outVar > 0) written.add(slot.outVar);
   }
   return true;
 }

@@ -35,6 +35,17 @@ describe('isInstrumentValid — var-source / var-or-const wiring', () => {
     expect(isInstrumentValid(p, 0)).toBe(true);
   });
 
+  it('var-source pointing at a var written by a LATER slot is valid (feedback)', () => {
+    // vol reads v2 ; a LATER osc_saw writes v2. The variable bank persists
+    // across samples, so this is a one-sample feedback loop — intentional,
+    // NOT silence. The instrument must NOT be flagged red.
+    const p = patchWith((p) => {
+      p.instruments[0]!.slots.push({ ...emptySlot(), fn: 1, outVar: 1, val1: 2 });
+      p.instruments[0]!.slots.push({ ...emptySlot(), fn: 2, outVar: 2, freqVal: 1000, gainVal: 80 });
+    });
+    expect(isInstrumentValid(p, 0)).toBe(true);
+  });
+
   it('var-source value 0 ("—") is always allowed, never invalid', () => {
     const p = patchWith((p) => {
       p.instruments[0]!.slots.push({ ...emptySlot(), fn: 1, outVar: 1, val1: 0 });

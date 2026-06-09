@@ -13,6 +13,7 @@
 import type { Patch } from '../patch/types';
 import { emptySlot, N_SLOTS_MAX } from '../patch/types';
 import { applyInsertDefaults } from '../schema/op-metadata';
+import { pickSmartOutVar } from '../patch/smart-out-var';
 import { exactSize } from './size-service';
 
 function clonePatch(p: Patch): Patch {
@@ -34,14 +35,16 @@ export function patchWithAddedOp(patch: Patch, instrIdx: number, op: number): Pa
   const c = clonePatch(patch);
   const ins = c.instruments[instrIdx];
   if (!ins) return null;
-  const slot = applyInsertDefaults({ ...emptySlot(), fn: op }, op);
   const free = ins.slots.findIndex((s) => s.fn === 0);
-  if (free >= 0) {
-    ins.slots[free] = slot;
-    return c;
-  }
-  if (ins.slots.length >= N_SLOTS_MAX) return null;
-  ins.slots.push(slot);
+  const at = free >= 0 ? free : ins.slots.length;
+  if (free < 0 && ins.slots.length >= N_SLOTS_MAX) return null;
+  // Mirror the real insert: give the new slot a valid output variable. Codegen
+  // SKIPS slots whose outVar is 0 (`arrayvar==0 → continue`), so an outVar-0
+  // slot would assemble identically to the original and report +0 bytes.
+  const outVar = pickSmartOutVar(ins, at) || 1;
+  const slot = applyInsertDefaults({ ...emptySlot(), fn: op, outVar }, op);
+  if (free >= 0) ins.slots[free] = slot;
+  else ins.slots.push(slot);
   return c;
 }
 
