@@ -178,6 +178,27 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 7, outVar: 4, val1Value: 40, gain: 1 },
       ];
       break;
+    case 'sv_flt_n':
+      // SVFilter 1259-1352. dan-script: sv_flt_n(instance, var1(signal), freq(CO),
+      //   val2(RE/resonance), gain(RAW mode "0".."3")).
+      //  - inputs[1]=val1 selector (signal var, must be non-zero) -> @VL = d0..d3
+      //  - inputs[2]=cutoff: VL(freq,freqVal). In mulLeftShifts -> asl/@CS;
+      //    const non-power-of-2 -> muls @CO; variable selector -> muls @CO (no '#')
+      //  - inputs[3]=resonance: VL(val2,val2Value). In mulLeftShifts -> asl/@RS+ext.l;
+      //    const '#' non-power-of-2 -> muls @RE; variable selector -> move/and/muls
+      //  - inputs[4]=gain RAW -> mode switch 0/1/2/3 (LPF / HPF / BPF(d5) / HPF*2 clamp)
+      // Each slot bumps currentWordInstance += 3. Cover all mode cases x value classes:
+      ins.slots = [
+        // cutoff power-of-2 (128 -> asl/@CS), reso power-of-2 (64 -> asl/@RS+ext.l), mode 0
+        { ...emptySlot(), fn: 15, outVar: 1, val1: 2, freqVal: 128, val2Value: 64, gain: 0 },
+        // cutoff non-power-of-2 const (50 -> muls @CO), reso non-power-of-2 const (50 -> muls @RE), mode 1
+        { ...emptySlot(), fn: 15, outVar: 2, val1: 3, freqVal: 50, val2Value: 50, gain: 1 },
+        // cutoff variable (freq sel -> d0, muls @CO), reso variable (val2 sel -> move/and/muls), mode 2
+        { ...emptySlot(), fn: 15, outVar: 3, val1: 4, freq: 1, val2: 2, gain: 2 },
+        // cutoff non-power-of-2 const (50 -> muls @CO), reso power-of-2 (64 -> asl/@RS), mode 3 (clamp branch)
+        { ...emptySlot(), fn: 15, outVar: 4, val1: 1, freqVal: 50, val2Value: 64, gain: 3 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

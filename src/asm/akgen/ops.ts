@@ -419,6 +419,107 @@ export function envAttack(st: AkGenState, output: string, inputs: string[]): str
   return text2;
 }
 
+/** Program.cs SVFilter 1259-1352. inputs = [instance, signalVar, cutoff(CO),
+ *  resonance(RE), mode("0".."3")]. Bumps currentWordInstance += 3. */
+export function svFilter(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = String(st.currentWordInstance * 2);
+  const newValue3 = remapVarToRegisterOrImmediate(inputs[1]!);
+  const text = remapVarToRegisterOrImmediate(inputs[2]!);
+  const newValue4 = Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text)
+    ? st.mulLeftShifts[text]!
+    : '';
+  const text2 = remapVarToRegisterOrImmediate(inputs[3]!);
+  const newValue5 = Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text2)
+    ? st.mulLeftShifts[text2]!
+    : '';
+  const text3 = inputs[4]!;
+  let empty = '';
+  empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_BPF+@IN(a5),d5\n';
+  empty += '\t\t\t\tasr.w\t#7,d5\n';
+  empty += '\t\t\t\tmove.w\td5,d6\n';
+  empty = Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text)
+    ? empty + '\t\t\t\tasl.w\t@CS,d5\n'
+    : !text.includes('#')
+      ? empty + '\t\t\t\tmuls\t@CO,d5\n'
+      : empty + '\t\t\t\tmuls\t@CO,d5\n';
+  empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_LPF+@IN(a5),d4\n';
+  empty += '\t\t\t\tadd.w\td5,d4\n';
+  empty = empty + '\t\t\t\tbvc.s\t.NoClampLPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tspl\t\td4\n';
+  empty += '\t\t\t\text.w\td4\n';
+  empty += '\t\t\t\teor.w\t#$7fff,d4\n';
+  empty = empty + '.NoClampLPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td4,AK_OpInstance+AK_LPF+@IN(a5)\n';
+  if (Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text2)) {
+    empty += '\t\t\t\tasl.w\t@RS,d6\n';
+    empty += '\t\t\t\text.l\td6\n';
+  } else if (text2.includes('#')) {
+    empty += '\t\t\t\tmuls\t@RE,d6\n';
+  } else {
+    empty += '\t\t\t\tmove.w\t@RE,d5\n';
+    empty += '\t\t\t\tand.w\t#255,d5\n';
+    empty += '\t\t\t\tmuls\td5,d6\n';
+  }
+  empty += '\t\t\t\tmove.w\t@VL,d5\n';
+  empty += '\t\t\t\text.l\td5\n';
+  empty += '\t\t\t\text.l\td4\n';
+  empty += '\t\t\t\tsub.l\td4,d5\n';
+  empty += '\t\t\t\tsub.l\td6,d5\n';
+  empty += '\t\t\t\tcmp.l\t#32767,d5\n';
+  empty = empty + '\t\t\t\tble.s\t.NoClampMaxHPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#32767,d5\n';
+  empty = empty + '\t\t\t\tbra.s\t.NoClampMinHPF_' + st.localLabel + '\n';
+  empty = empty + '.NoClampMaxHPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tcmp.l\t#-32768,d5\n';
+  empty = empty + '\t\t\t\tbge.s\t.NoClampMinHPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#-32768,d5\n';
+  empty = empty + '.NoClampMinHPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td5,AK_OpInstance+AK_HPF+@IN(a5)\n';
+  empty += '\t\t\t\tasr.w\t#7,d5\n';
+  empty = Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text)
+    ? empty + '\t\t\t\tasl.w\t@CS,d5\n'
+    : !text.includes('#')
+      ? empty + '\t\t\t\tmuls\t@CO,d5\n'
+      : empty + '\t\t\t\tmuls\t@CO,d5\n';
+  empty += '\t\t\t\tadd.w\tAK_OpInstance+AK_BPF+@IN(a5),d5\n';
+  empty = empty + '\t\t\t\tbvc.s\t.NoClampBPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tspl\t\td5\n';
+  empty += '\t\t\t\text.w\td5\n';
+  empty += '\t\t\t\teor.w\t#$7fff,d5\n';
+  empty = empty + '.NoClampBPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td5,AK_OpInstance+AK_BPF+@IN(a5)\n';
+  switch (text3) {
+    case '0':
+      empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_LPF+@IN(a5),@OR\n';
+      break;
+    case '1':
+      empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_HPF+@IN(a5),@OR\n';
+      break;
+    case '2':
+      empty += '\t\t\t\tmove.w\td5,@OR\n';
+      break;
+    case '3':
+      empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_HPF+@IN(a5),@OR\n';
+      empty += '\t\t\t\tadd.w\t@OR,@OR\n';
+      empty = empty + '\t\t\t\tbvc.s\t.NoClampMode3_' + st.localLabel + '\n';
+      empty += '\t\t\t\tspl\t\t@OR\n';
+      empty += '\t\t\t\text.w\t@OR\n';
+      empty += '\t\t\t\teor.w\t#$7fff,@OR\n';
+      empty = empty + '.NoClampMode3_' + st.localLabel + '\n';
+      break;
+  }
+  empty = empty.replaceAll('@IN', newValue2);
+  empty = empty.replaceAll('@VL', newValue3);
+  empty = empty.replaceAll('@CO', text);
+  empty = empty.replaceAll('@CS', newValue4);
+  empty = empty.replaceAll('@RE', text2);
+  empty = empty.replaceAll('@RS', newValue5);
+  empty = empty.replaceAll('@OR', newValue);
+  st.currentWordInstance += 3;
+  return empty;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -446,7 +547,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'dly_cyc(', gen: stub('dly_cyc') },
   { match: 'cmb_flt_n(', gen: stub('cmb_flt_n') },
   { match: 'reverb(', gen: stub('reverb') },
-  { match: 'sv_flt_n(', gen: stub('sv_flt_n') },
+  { match: 'sv_flt_n(', gen: svFilter },
   { match: 'onepole_flt(', gen: stub('onepole_flt') },
   { match: 'chordgen(', gen: stub('chordgen') },
   { match: 'clone(', gen: stub('clone') },
