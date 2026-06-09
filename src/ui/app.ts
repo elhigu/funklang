@@ -129,10 +129,9 @@ export function bootApp(root: HTMLElement): void {
       </header>
       ${helpOverlayHtml()}
       <aside class="sidebar" id="sidebar">
-        <button class="sidebar-title" id="sidebar-toggle" aria-expanded="false" title="Instrument list. On narrow screens it collapses to the active number — click to float the full list over the editor.">
+        <div class="sidebar-title" title="Instruments. On a narrow screen this collapses to a rail of numbers — drag to roll the selection, tap a number to pick it.">
           <span class="sb-title-full">PATCH · INSTRUMENTS</span>
-          <span class="sb-title-num" id="sb-active-num">01</span>
-        </button>
+        </div>
         <ul class="instr-list" id="instr-list"></ul>
       </aside>
       <main id="main-area"></main>
@@ -160,8 +159,6 @@ export function bootApp(root: HTMLElement): void {
 
   const listEl = root.querySelector('#instr-list') as HTMLElement;
   const sidebarEl = root.querySelector('#sidebar') as HTMLElement;
-  const sidebarToggleEl = root.querySelector('#sidebar-toggle') as HTMLButtonElement;
-  const sbActiveNumEl = root.querySelector('#sb-active-num') as HTMLElement;
   const nameEl = root.querySelector('#file-name') as HTMLElement;
   const mainEl = root.querySelector('#main-area') as HTMLElement;
   const hidden = root.querySelector('#hidden-file-input') as HTMLInputElement;
@@ -169,24 +166,34 @@ export function bootApp(root: HTMLElement): void {
   const outputLabel = root.querySelector('#output-label') as HTMLElement;
   const outputMasterBtn = root.querySelector('#btn-output-master') as HTMLButtonElement;
 
-  // Narrow-screen sidebar: CSS (a width media query) collapses the
-  // instrument list to a rail showing just the active instrument number;
-  // clicking the header floats the full list over the editor. JS only
-  // toggles the open/closed class — the layout is entirely CSS.
-  const setSidebarOpen = (open: boolean): void => {
-    sidebarEl.classList.toggle('sb-open', open);
-    sidebarToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
-  };
-  sidebarToggleEl.addEventListener('click', (e) => {
-    e.stopPropagation();
-    setSidebarOpen(!sidebarEl.classList.contains('sb-open'));
+  // Narrow-screen sidebar: CSS collapses the list to a rail of instrument
+  // numbers (selected emphasised). A vertical TOUCH drag on the rail rolls
+  // the selection live (a tap on a number still selects it via the row's own
+  // click). Mouse wheel / arrow-key nav is unchanged. selectInstrument is
+  // defined below; these closures only run after boot.
+  const SIDEBAR_ROW_PX = 26;
+  let sbDragPid = -1, sbDragStartY = 0, sbDragStartIdx = 0, sbDragMoved = false;
+  sidebarEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    sbDragPid = e.pointerId; sbDragStartY = e.clientY;
+    sbDragStartIdx = state.activeIdx; sbDragMoved = false;
+    try { sidebarEl.setPointerCapture(e.pointerId); } catch { /* jsdom */ }
   });
-  // A click anywhere outside the floating panel closes it.
-  document.addEventListener('click', (e) => {
-    if (sidebarEl.classList.contains('sb-open') && !sidebarEl.contains(e.target as Node)) {
-      setSidebarOpen(false);
-    }
+  sidebarEl.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== sbDragPid) return;
+    if (Math.abs(e.clientY - sbDragStartY) > 6) sbDragMoved = true;
+    const rows = Math.round((sbDragStartY - e.clientY) / SIDEBAR_ROW_PX);   // up = toward 01
+    const n = model.patch.instruments.length;
+    const target = Math.max(0, Math.min(n - 1, sbDragStartIdx - rows));
+    selectInstrument(target);                                              // no audition while scrubbing
   });
+  const sbDragEnd = (e: PointerEvent): void => { if (e.pointerId === sbDragPid) sbDragPid = -1; };
+  sidebarEl.addEventListener('pointerup', sbDragEnd);
+  sidebarEl.addEventListener('pointercancel', sbDragEnd);
+  // A drag that moved must not also fire a row's tap-select.
+  sidebarEl.addEventListener('click', (e) => {
+    if (sbDragMoved) { e.stopPropagation(); e.preventDefault(); sbDragMoved = false; }
+  }, true);
 
   // Per-render caches of the slot-grid container and wave viewer so we can
   // call updateSlotWaves / viewer.setSample without rebuilding the DOM.
@@ -582,13 +589,10 @@ export function bootApp(root: HTMLElement): void {
       // Sidebar click also auto-plays (subject to the audio toggle), same
       // as wheel/arrow nav. Empty rows are clickable now too — the slot
       // grid renders an empty-state placeholder with a [+] button there.
-      // On a narrow screen, picking also dismisses the floating panel.
-      onPick: (i) => { selectInstrument(i, { play: true }); setSidebarOpen(false); },
+      onPick: (i) => selectInstrument(i, { play: true }),
       onDelete: removeInstrumentWithConfirm,
       onMove: moveInstrumentWithRemap,
     });
-    // Keep the collapsed-rail number in sync with the active instrument.
-    sbActiveNumEl.textContent = String(state.activeIdx + 1).padStart(2, '0');
     updateCloseButton();
   };
 

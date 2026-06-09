@@ -1,57 +1,58 @@
 // On a narrow screen the 240px instrument sidebar collapses to a thin rail
-// showing only the active instrument number. Clicking its header floats the
-// full list OVER the editor (it doesn't reflow the main area); picking an
-// instrument — or clicking outside — dismisses it. On a wide screen the
-// list is always visible and there is no floating behaviour.
+// of instrument NUMBERS — names hidden, the selected number emphasised. A
+// vertical touch-drag on the rail rolls the selection; a tap on a number
+// picks it. On a wide screen the full named list is shown inline.
 
 import { test, expect } from '@playwright/test';
 
-// The sidebar collapses below 1000px (the editor's stack threshold + the
-// sidebar width) — so it's already a rail at this mid-size width.
 const NARROW = { width: 900, height: 800 };
 const WIDE = { width: 1280, height: 800 };
 
-test('narrow screen collapses the sidebar to a number and floats it open', async ({ page }) => {
+test('narrow screen shows a numbers rail with the selected one emphasised', async ({ page }) => {
   await page.setViewportSize(NARROW);
   await page.goto('/');
   await page.setInputFiles('#hidden-file-input', '../loctro5 3 chippisamplea.akp');
-  // The list is collapsed (display:none) so the active row is present but
-  // hidden — wait for it ATTACHED, not visible.
   await page.waitForSelector('.instr-row.active', { state: 'attached' });
 
-  const list = page.locator('#instr-list');
-  const num = page.locator('#sb-active-num');
-  const sidebar = page.locator('#sidebar');
-
-  // Collapsed: the list is hidden, only the active number shows.
-  await expect(list).toBeHidden();
-  await expect(num).toBeVisible();
-  await expect(num).toHaveText(/^\d{2}$/);
-
-  // Click the header → the full list opens and FLOATS over the editor.
-  await page.click('#sidebar-toggle');
-  await expect(sidebar).toHaveClass(/sb-open/);
-  await expect(list).toBeVisible();
-  const box = await sidebar.boundingBox();
-  expect(box!.x).toBeLessThanOrEqual(1);                 // anchored to the left edge
-  expect(box!.width).toBeGreaterThan(200);               // expanded to the full panel, not the 40px rail
-
-  // The panel overlaps the main area (floats, not reflow): its right edge is
-  // past where the 40px rail would end.
-  expect(box!.x + box!.width).toBeGreaterThan(100);
-
-  // Picking an instrument dismisses the panel.
-  await page.locator('.instr-row').nth(1).click();
-  await expect(sidebar).not.toHaveClass(/sb-open/);
-  await expect(list).toBeHidden();
+  // The list is the rail: numbers visible, names hidden.
+  await expect(page.locator('.instr-row.active .num')).toBeVisible();
+  await expect(page.locator('.instr-row.active .name')).toBeHidden();
+  // The rail is narrow (≈40px), not the full 240px list.
+  const box = (await page.locator('#sidebar').boundingBox())!;
+  expect(box.width).toBeLessThan(60);
 });
 
-test('wide screen shows the list inline with no collapse', async ({ page }) => {
+test('a touch-drag down the rail rolls the selection to higher instruments', async ({ page }) => {
+  await page.setViewportSize(NARROW);
+  await page.goto('/');
+  await page.setInputFiles('#hidden-file-input', '../loctro5 3 chippisamplea.akp');
+  await page.waitForSelector('.instr-row.active', { state: 'attached' });
+
+  const num = page.locator('.instr-row.active .num');
+  const before = Number(await num.textContent());
+
+  // Synthesise a touch drag DOWN the rail (~4 rows) → selection rolls forward.
+  await page.evaluate(() => {
+    const sb = document.querySelector('#sidebar')!;
+    const r = sb.getBoundingClientRect();
+    const x = r.x + r.width / 2, y0 = r.y + 100;
+    const mk = (t: string, y: number): PointerEvent =>
+      new PointerEvent(t, { pointerType: 'touch', pointerId: 1, clientX: x, clientY: y, bubbles: true, cancelable: true });
+    sb.dispatchEvent(mk('pointerdown', y0));
+    sb.dispatchEvent(mk('pointermove', y0 + 26 * 4));
+    sb.dispatchEvent(mk('pointerup', y0 + 26 * 4));
+  });
+
+  const after = Number(await num.textContent());
+  expect(after).toBeGreaterThan(before);
+});
+
+test('wide screen shows the named list inline', async ({ page }) => {
   await page.setViewportSize(WIDE);
   await page.goto('/');
   await page.setInputFiles('#hidden-file-input', '../loctro5 3 chippisamplea.akp');
   await page.waitForSelector('.instr-row.active');
 
   await expect(page.locator('#instr-list')).toBeVisible();
-  await expect(page.locator('#sb-active-num')).toBeHidden();   // number only shows on the rail
+  await expect(page.locator('.instr-row.active .name')).toBeVisible();   // names shown when wide
 });

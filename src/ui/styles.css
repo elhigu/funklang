@@ -1557,28 +1557,18 @@
     .brand      { padding: 0; gap: 0; justify-content: center; }
     .brand span { display: none; }
 
-    /* Collapsed rail. */
-    .sidebar       { overflow: hidden; }
-    .sidebar-title { cursor: pointer; padding: 12px 4px 8px; text-align: center; }
+    /* Collapsed rail: every instrument NUMBER stacked, the selected one
+       emphasised. A touch-drag rolls the selection (app.ts); a tap picks.
+       Names are dropped at this width — the number is the handle. */
+    .sidebar       { overflow-y: auto; touch-action: pan-y; }
+    .sidebar-title { padding: 8px 0; text-align: center; font-size: 0; }
+    .sidebar-title::after { content: '⋮'; font-size: 14px; color: var(--amber-dim); }
     .sb-title-full { display: none; }
-    .sb-title-num  { display: block; font-size: 13px; color: var(--amber); }
-    .instr-list    { display: none; }
-
-    /* Opened: float the full list over the editor, header→footer height. */
-    .sidebar.sb-open {
-      position: absolute;
-      top: 44px;
-      bottom: 30px;
-      left: 0;
-      width: 240px;
-      z-index: 50;
-      overflow-y: auto;
-      box-shadow: 6px 0 22px rgba(0, 0, 0, 0.55);
-    }
-    .sidebar.sb-open .sidebar-title { text-align: left; padding: 12px 14px 8px; }
-    .sidebar.sb-open .sb-title-full { display: inline; }
-    .sidebar.sb-open .sb-title-num  { display: none; }
-    .sidebar.sb-open .instr-list    { display: block; }
+    .instr-row     { grid-template-columns: 1fr; padding: 4px 0; justify-items: center; }
+    .instr-row .name, .instr-row .instr-del { display: none; }
+    .instr-row .num { text-align: center; padding: 0; font-size: 12px; }
+    .instr-row.active { background: var(--bg-3); }
+    .instr-row.active .num { color: var(--amber); font-weight: 700; }
   }
 
   /* ─── narrow editor: drop the per-slot waveform under the parameters ───
