@@ -395,6 +395,31 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 18, outVar: 4, gain: 0, freq: 12, width: 11, val1: 11, val2: 1 },
       ];
       break;
+    case 'clone':
+      // Clone 1581-1604 / CloneReverse 1605-1629. dan-script for op 17 is
+      // emitted by the exporter (emit-inst-special.emitClone) as a bare C-style
+      // expression, NOT a `clone(...)` statement:
+      //   vN = ((((smp*(F+32768))>>15)+off) < SmpLength[g]
+      //          ? *(BYTE*)(BaseAdr[g] + idx)<<8 : 0)        when gainVal == 0
+      //   vN = (... ? *(BYTE*)(BaseAdr[g+1] - idx)<<8 : 0)   when gainVal != 0 (reverse)
+      // Main's op dispatch keys on Contains("clone(") / Contains("clone_reverse(")
+      // and finds NEITHER token in that expression, so the oracle emits no
+      // instructions for the slot (only the leading `; <line>` comment). Our
+      // dispatchOp likewise matches nothing and emits ''. The Clone/CloneReverse
+      // methods are faithfully ported but UNREACHABLE through this pipeline; this
+      // fixture proves byte-identity (both sides emit no clone code) across the
+      // forward/reverse + offset value classes.
+      //  - forward, const power-of-2 offset (val2Value 64), const freq
+      //  - forward, const non-power-of-2 offset (val2Value 50), const freq
+      //  - reverse (gainVal 1), offset 8 (boundary, addq path in the dead method)
+      //  - forward, variable freq operand (freq selector) + offset 0
+      ins.slots = [
+        { ...emptySlot(), fn: 17, outVar: 1, freqVal: 1000, val2Value: 64, gain: 0, gainVal: 0 },
+        { ...emptySlot(), fn: 17, outVar: 2, freqVal: 1234, val2Value: 50, gain: 1, gainVal: 0 },
+        { ...emptySlot(), fn: 17, outVar: 3, freqVal: 777, val2Value: 8, gain: 0, gainVal: 1 },
+        { ...emptySlot(), fn: 17, outVar: 4, freq: 1, val2Value: 0, gain: 2, gainVal: 0 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

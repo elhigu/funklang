@@ -1108,6 +1108,68 @@ export function chordGen(st: AkGenState, output: string, inputs: string[]): stri
   return empty;
 }
 
+/** Program.cs Clone 1581-1604. dan-script: clone(smp, instance, offset).
+ *  inputs[1]=instance (-> GetInstanceOffset *4 -> @BS), inputs[2]=offset
+ *  (varlit: const -> #N (@OS add), variable selector -> register).
+ *
+ *  NOTE: this method is UNREACHABLE through the shipped pipeline. The exporter
+ *  (emit-inst-special.emitClone) emits op 17 as a bare C-style expression, not a
+ *  `clone(...)` statement, so Main's `Contains("clone(")` dispatch never fires
+ *  and the oracle emits no code for it (just the leading comment). We port the
+ *  method verbatim for completeness; dispatchOp keeps it wired so that IF a
+ *  future exporter ever emits `clone(...)`, byte-output stays faithful. */
+export function clone(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const instanceOffset = getInstanceOffset(inputs[1]!, 4);
+  const text = remapVarToRegisterOrImmediate(inputs[2]!);
+  const num = text.includes('#') ? Number.parseInt(inputs[2]!, 10) : 0;
+  let text2 = '';
+  if (num > 0) {
+    text2 += '\t\t\t\tmove.l\td7,d6\n';
+    text2 = num > 8 ? text2 + '\t\t\t\tadd.l\t@OS,d6\n' : text2 + '\t\t\t\taddq.l\t@OS,d6\n';
+  }
+  text2 += '\t\t\t\tmoveq\t#0,@OR\n';
+  text2 =
+    num <= 0
+      ? text2 + '\t\t\t\tcmp.l\tAK_SmpLen+@BS(a5),d7\n'
+      : text2 + '\t\t\t\tcmp.l\tAK_SmpLen+@BS(a5),d6\n';
+  text2 = text2 + '\t\t\t\tbge.s\t.NoClone_' + st.localLabel + '\n';
+  text2 += '\t\t\t\tmove.l\tAK_SmpAddr+@BS(a5),a4\n';
+  text2 =
+    num <= 0
+      ? text2 + '\t\t\t\tmove.b\t(a4,d7.l),@OR\n'
+      : text2 + '\t\t\t\tmove.b\t(a4,d6.l),@OR\n';
+  text2 += '\t\t\t\tasl.w\t#8,@OR\n';
+  text2 = text2 + '.NoClone_' + st.localLabel + '\n';
+  text2 = text2.replaceAll('@OR', newValue);
+  text2 = text2.replaceAll('@BS', instanceOffset);
+  return text2.replaceAll('@OS', text);
+}
+
+/** Program.cs CloneReverse 1605-1629. Same unreachable note as Clone. */
+export function cloneReverse(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const instanceOffset = getInstanceOffset(inputs[1]!, 4);
+  const text = remapVarToRegisterOrImmediate(inputs[2]!);
+  const num = text.includes('#') ? Number.parseInt(inputs[2]!, 10) : 0;
+  let empty = '';
+  empty += '\t\t\t\tmove.l\td7,d6\n';
+  if (num > 0) {
+    empty = num > 8 ? empty + '\t\t\t\tadd.l\t@OS,d6\n' : empty + '\t\t\t\taddq.l\t@OS,d6\n';
+  }
+  empty += '\t\t\t\tmoveq\t#0,@OR\n';
+  empty += '\t\t\t\tcmp.l\tAK_SmpLen+@BS(a5),d6\n';
+  empty = empty + '\t\t\t\tbge.s\t.NoClone_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.l\tAK_SmpAddr+@BS+4(a5),a4\n';
+  empty += '\t\t\t\tneg.l\td6\n';
+  empty += '\t\t\t\tmove.b\t-1(a4,d6.l),@OR\n';
+  empty += '\t\t\t\tasl.w\t#8,@OR\n';
+  empty = empty + '.NoClone_' + st.localLabel + '\n';
+  empty = empty.replaceAll('@OR', newValue);
+  empty = empty.replaceAll('@BS', instanceOffset);
+  return empty.replaceAll('@OS', text);
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -1138,8 +1200,8 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'sv_flt_n(', gen: svFilter },
   { match: 'onepole_flt(', gen: onePoleFilter },
   { match: 'chordgen(', gen: chordGen },
-  { match: 'clone(', gen: stub('clone') },
-  { match: 'clone_reverse(', gen: stub('clone_reverse') },
+  { match: 'clone(', gen: clone },
+  { match: 'clone_reverse(', gen: cloneReverse },
   { match: 'imported_sample(', gen: stub('imported_sample') },
   { match: 'distortion(', gen: distortion },
   { match: 'adsr(', gen: adsr },
