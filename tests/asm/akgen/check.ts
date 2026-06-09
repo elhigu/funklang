@@ -330,6 +330,25 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 19, outVar: 4, val1: 4, gain: 1 },
       ];
       break;
+    case 'distortion':
+      // Distortion 1431-1481. dan-script: distortion(var1(signal->VL),
+      //   gain(GN, distortion amount; varlit gain/gainVal, uses mulLeftShifts)).
+      //  - inputs[0]=val1 selector (signal var) -> @VL = d0..d3 (or #0 if val1=0)
+      //  - inputs[1]=gain: varlit. const power-of-2 in mulLeftShifts (#2..#256)
+      //    -> ext.l/asl.l @GS/asr.l #5 path; const non-power-of-2 -> muls @GN;
+      //    variable selector (no '#') -> move/and #255/muls d4 path.
+      // Distortion does NOT bump any instance counter. Cover value classes:
+      ins.slots = [
+        // gain power-of-2 (128 -> mulLeftShifts -> ext.l/asl.l @GS path), signal d1
+        { ...emptySlot(), fn: 16, outVar: 1, val1: 2, gainVal: 128 },
+        // gain non-power-of-2 const (50 -> muls @GN path), signal d2
+        { ...emptySlot(), fn: 16, outVar: 2, val1: 3, gainVal: 50 },
+        // gain power-of-2 (64 -> mulLeftShifts asl path), signal d3
+        { ...emptySlot(), fn: 16, outVar: 3, val1: 4, gainVal: 64 },
+        // variable gain operand (gain sel -> d0, no '#' -> move/and/muls d4 path), signal d3
+        { ...emptySlot(), fn: 16, outVar: 4, val1: 4, gain: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

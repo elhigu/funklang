@@ -911,6 +911,58 @@ export function sampleHold(st: AkGenState, output: string, inputs: string[]): st
   return text2;
 }
 
+/** Program.cs Distortion 1431-1481. dan-script: distortion(var1(signal->VL),
+ *  gain(GN, the distortion amount; varlit gain/gainVal, uses mulLeftShifts)).
+ *  Note: when gain has no '#' (a variable selector), the gain is masked to 8
+ *  bits (and.w #255) then muls; const power-of-2 gains use the mulLeftShifts
+ *  asl path; other const gains use muls directly. */
+export function distortion(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = remapVarToRegisterOrImmediate(inputs[0]!);
+  const text = remapVarToRegisterOrImmediate(inputs[1]!);
+  const newValue3 = Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text)
+    ? st.mulLeftShifts[text]!
+    : '';
+  let empty = '';
+  empty += '\t\t\t\tmove.w\t@VL,d5\n';
+  if (!text.includes('#')) {
+    empty += '\t\t\t\tmove.w\t@GN,d4\n';
+    empty += '\t\t\t\tand.w\t#255,d4\n';
+    empty += '\t\t\t\tmuls\td4,d5\n';
+    empty += '\t\t\t\tasr.l\t#5,d5\n';
+  } else if (Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text)) {
+    empty += '\t\t\t\text.l\td5\n';
+    empty += '\t\t\t\tasl.l\t@GS,d5\n';
+    empty += '\t\t\t\tasr.l\t#5,d5\n';
+  } else {
+    empty += '\t\t\t\tmuls\t@GN,d5\n';
+    empty += '\t\t\t\tasr.l\t#5,d5\n';
+  }
+  empty += '\t\t\t\tcmp.l\t#32767,d5\n';
+  empty = empty + '\t\t\t\tble.s\t.NoClampMaxDist_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#32767,d5\n';
+  empty = empty + '\t\t\t\tbra.s\t.NoClampMinDist_' + st.localLabel + '\n';
+  empty = empty + '.NoClampMaxDist_' + st.localLabel + '\n';
+  empty += '\t\t\t\tcmp.l\t#-32768,d5\n';
+  empty = empty + '\t\t\t\tbge.s\t.NoClampMinDist_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#-32768,d5\n';
+  empty = empty + '.NoClampMinDist_' + st.localLabel + '\n';
+  empty += '\t\t\t\tasr.w\t#1,d5\n';
+  empty += '\t\t\t\tmove.w\td5,@OR\n';
+  empty = empty + '\t\t\t\tbge.s\t.DistNoAbs_' + st.localLabel + '\n';
+  empty += '\t\t\t\tneg.w\td5\n';
+  empty = empty + '.DistNoAbs_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#32767,d6\n';
+  empty += '\t\t\t\tsub.w\td5,d6\n';
+  empty += '\t\t\t\tmuls\td6,@OR\n';
+  empty += '\t\t\t\tswap\t@OR\n';
+  empty += '\t\t\t\tasl.w\t#3,@OR\n';
+  empty = empty.replaceAll('@VL', newValue2);
+  empty = empty.replaceAll('@GN', text);
+  empty = empty.replaceAll('@GS', newValue3);
+  return empty.replaceAll('@OR', newValue);
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -944,7 +996,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'clone(', gen: stub('clone') },
   { match: 'clone_reverse(', gen: stub('clone_reverse') },
   { match: 'imported_sample(', gen: stub('imported_sample') },
-  { match: 'distortion(', gen: stub('distortion') },
+  { match: 'distortion(', gen: distortion },
   { match: 'adsr(', gen: stub('adsr') },
 ];
 
