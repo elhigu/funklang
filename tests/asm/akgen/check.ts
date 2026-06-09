@@ -219,6 +219,41 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 21, outVar: 4, val1: 4, freqVal: 50, gain: 1 },
       ];
       break;
+    case 'dly_cyc':
+      // Delay 936-1018. dan-script: dly_cyc(instance, var1(signal), freq(DL/delay
+      //   length), gain(GN/feedback)). val1 must be non-zero (errIfVal1Zero).
+      //  - inputs[1]=val1 selector (signal var) -> @VL = d0..d3
+      //  - inputs[2]=delay length: freq/freqVal. const '#' -> num2 path (cmp @DL<<1);
+      //    variable selector (no '#') -> clamp #2047 path
+      //  - inputs[3]=feedback gain: gain/gainVal. const '#' non-power-of-2 -> muls
+      //    @GN; gain 128 -> scaling skipped; variable selector -> move/and/muls.
+      //    NOTE: the power-of-2 (mulRightShifts) feedback path is intentionally
+      //    NOT exercised — the oracle emits literal `asr.w @GS,@d4` (a typo in the
+      //    original C#: `@d4` is never substituted), which vasm rejects. That
+      //    branch can never be reproduced byte-for-byte because the oracle itself
+      //    cannot assemble it; we faithfully port the same (broken) text anyway.
+      // Each slot bumps currentLargeBufferInstance++ (num = N*4096): slot0 num=0
+      // (move.l a1,a4), slots 1..7 num<32767 (lea @IN2(a1)), slot8+ num>=32767
+      // (move.l a1,a4 + add.l #@IN2). 9 slots hit all three @IN2 branches.
+      ins.slots = [
+        // num=0 (move.l a1,a4); const DL=512; feedback non-power-of-2 (50 -> muls @GN)
+        { ...emptySlot(), fn: 11, outVar: 1, val1: 2, freqVal: 512, gainVal: 50 },
+        // num=4096 (<32767, lea); const DL=300; feedback non-power-of-2 (50 -> muls @GN)
+        { ...emptySlot(), fn: 11, outVar: 2, val1: 3, freqVal: 300, gainVal: 50 },
+        // num=8192 (lea); const DL=200; feedback 128 (scaling skipped)
+        { ...emptySlot(), fn: 11, outVar: 3, val1: 4, freqVal: 200, gainVal: 128 },
+        // num=12288 (lea); variable DL (freq sel -> clamp #2047 path); variable
+        //   feedback (gain sel -> move/and/muls); signal var d3
+        { ...emptySlot(), fn: 11, outVar: 4, val1: 4, freq: 1, gain: 2 },
+        // fillers to push currentLargeBufferInstance over 32767/4096 ~= 8
+        { ...emptySlot(), fn: 11, outVar: 1, val1: 2, freqVal: 100, gainVal: 50 },
+        { ...emptySlot(), fn: 11, outVar: 2, val1: 3, freqVal: 100, gainVal: 50 },
+        { ...emptySlot(), fn: 11, outVar: 3, val1: 4, freqVal: 100, gainVal: 50 },
+        { ...emptySlot(), fn: 11, outVar: 1, val1: 2, freqVal: 100, gainVal: 50 },
+        // num=32768 (>=32767, move.l a1,a4 + add.l #@IN2); const DL=400; feedback 50
+        { ...emptySlot(), fn: 11, outVar: 2, val1: 3, freqVal: 400, gainVal: 50 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
