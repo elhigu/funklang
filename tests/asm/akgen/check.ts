@@ -46,6 +46,20 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 3, outVar: 4, freqVal: 555, gain: 1 },
       ];
       break;
+    case 'osc_pulse':
+      // Osc_Pulse 581-645. inputs = [instance, freq, gain(GN), width(DC)].
+      // Cover gain classes x width classes:
+      ins.slots = [
+        // gain power-of-2 (64 -> asr/GS path); width const != 63 (cmp.w path)
+        { ...emptySlot(), fn: 5, outVar: 1, freqVal: 1000, gainVal: 64, widthVal: 40 },
+        // gain non-power-of-2 (50 -> muls/TR2 path); width const == 63 (no cmp emitted)
+        { ...emptySlot(), fn: 5, outVar: 2, freqVal: 1234, gainVal: 50, widthVal: 63 },
+        // gain 128 (-> scaling skipped); width variable, differs from gain (move @DC,@TR1)
+        { ...emptySlot(), fn: 5, outVar: 3, freqVal: 777, gainVal: 128, width: 2 },
+        // variable gain (no '#' -> TR2=d5 path); variable width EQUAL to gain (move @TR2,@TR1)
+        { ...emptySlot(), fn: 5, outVar: 4, freqVal: 555, gain: 1, width: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
