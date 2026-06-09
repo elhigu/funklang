@@ -9,7 +9,7 @@ import { asmBinFromPatch } from '../../../sizelab/harness/asm-bin';
 import { emitAkGenerate } from '../../../src/asm/akgen';
 import { assembleM68k } from '../../../src/asm/vasm';
 
-function fixture(key: string): Patch {
+export function fixture(key: string): Patch {
   const p = emptyPatch();
   const ins = p.instruments[0]!;
   ins.name = 't';
@@ -557,4 +557,6 @@ async function main() {
   process.exit(1);
 }
 
-main();
+if (process.argv[1] && process.argv[1].endsWith('check.ts')) {
+  main();
+}
