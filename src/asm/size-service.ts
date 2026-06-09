@@ -33,6 +33,18 @@ const pending = new Map<number, PendingEntry>();
 const cache = new Map<string, SizeResult>();
 const inflight = new Map<string, Promise<SizeResult>>();
 
+// Bound the memo cache: editing + the per-op-hover/per-phase ablations produce a
+// fresh asm key each time, so an unbounded Map would grow for the whole session.
+// Map keeps insertion order, so evicting the first key is FIFO eviction.
+const CACHE_MAX = 512;
+function cacheSet(asm: string, r: SizeResult): void {
+  cache.set(asm, r);
+  if (cache.size > CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+}
+
 async function assembleDirect(asm: string): Promise<SizeResult> {
   const r = await assembleM68k(asm, { format: 'bin' });
   return r.ok
@@ -92,7 +104,7 @@ export async function exactSize(patch: Patch): Promise<SizeResult> {
   const w = getWorker();
   const p = (w ? assembleViaWorker(w, asm) : assembleDirect(asm))
     .then((r) => {
-      cache.set(asm, r);
+      cacheSet(asm, r);
       inflight.delete(asm);
       return r;
     })

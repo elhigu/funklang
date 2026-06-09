@@ -18,6 +18,17 @@ if [[ ! -d deploy/.git ]]; then
   exit 1
 fi
 
+# Release discipline (see AGENTS.md): the package.json version must have a matching
+# entry in CHANGELOG.md before we publish. Bump the version + add a changelog
+# section, then deploy.
+VERSION="$(node -p "require('./package.json').version")"
+if ! grep -q "## \[${VERSION}\]" CHANGELOG.md; then
+  echo "Refusing to deploy: package.json is v${VERSION} but CHANGELOG.md has no '## [${VERSION}]' entry." >&2
+  echo "Bump the version and add a dated changelog section first." >&2
+  exit 1
+fi
+echo "→ Deploying v${VERSION}"
+
 echo "→ Building..."
 npm run build
 

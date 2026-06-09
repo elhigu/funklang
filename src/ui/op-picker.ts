@@ -111,14 +111,16 @@ export function pickOp(costOf?: (op: number) => Promise<OpAddCost | null>): Prom
             started = true;
             cost.classList.add('size-spin');
             cost.textContent = '⟳';
-            void costOf(def.code).then((c) => {
-              cost.classList.remove('size-spin');
-              if (!c) { cost.textContent = ''; return; }
-              cost.textContent = `+${fmtBytes(c.cost)}${c.alreadyPresent ? ' · shared' : ''}`;
-              cost.title = c.alreadyPresent
-                ? 'This op is already used in the patch — only its per-use connection code is added.'
-                : 'Adds this op’s code + one use.';
-            });
+            void costOf(def.code)
+              .then((c) => {
+                cost.classList.remove('size-spin');
+                if (!c) { cost.textContent = ''; return; }
+                cost.textContent = `+${fmtBytes(c.cost)}${c.alreadyPresent ? ' · shared' : ''}`;
+                cost.title = c.alreadyPresent
+                  ? 'This op is already used in the patch — only its per-use connection code is added.'
+                  : 'Adds this op’s code + one use.';
+              })
+              .catch(() => { cost.classList.remove('size-spin'); cost.textContent = ''; });
           };
         }
         if (def.description) {
