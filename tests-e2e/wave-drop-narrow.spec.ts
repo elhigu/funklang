@@ -15,11 +15,11 @@ async function firstSlotBoxes(page: import('@playwright/test').Page) {
   };
 }
 
-// 806px is the width the user reported the 5-column layout breaking at (the
-// sidebar is still expanded here, so the editor itself is cramped). It must
-// stack — and nothing may overflow the viewport.
+// At 700px the sidebar has collapsed to its rail (≤1000px) yet the editor is
+// still only ~660px — below the 760px stack threshold — so the waveform must
+// stack under the params, and nothing may overflow the viewport.
 test('narrow: waveform stacks under the parameters at a fixed ~2-row height', async ({ page }) => {
-  const VW = 806;
+  const VW = 700;
   await page.setViewportSize({ width: VW, height: 1000 });
   await page.goto('/');
   await page.setInputFiles('#hidden-file-input', '../loctro5 3 chippisamplea.akp');

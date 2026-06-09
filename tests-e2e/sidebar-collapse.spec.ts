@@ -6,7 +6,9 @@
 
 import { test, expect } from '@playwright/test';
 
-const NARROW = { width: 600, height: 800 };
+// The sidebar collapses below 1000px (the editor's stack threshold + the
+// sidebar width) — so it's already a rail at this mid-size width.
+const NARROW = { width: 900, height: 800 };
 const WIDE = { width: 1280, height: 800 };
 
 test('narrow screen collapses the sidebar to a number and floats it open', async ({ page }) => {

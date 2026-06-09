@@ -1524,11 +1524,14 @@
   .slot-size[data-last-use="1"] { opacity: 0.95; color: #e9c46a; }
 
   /* ─── narrow screens: collapse the instrument sidebar to a number ──────
-     Below this width the 240px sidebar would crowd the editor. Collapse it
-     to a thin rail that shows only the active instrument number; clicking
-     the header floats the full list OVER the main area (it doesn't reflow
-     the editor). The JS in app.ts only toggles `.sb-open`. */
-  @media (max-width: 720px) {
+     Collapse the 240px sidebar to a thin rail showing only the active
+     instrument number; clicking the header floats the full list OVER the
+     main area (it doesn't reflow the editor). The JS in app.ts only toggles
+     `.sb-open`. Breakpoint = the editor's stack threshold (760px) + the
+     sidebar width (240px): below 1000px viewport, an expanded sidebar would
+     force the slot grid to stack, so we free the space by collapsing the
+     rail instead — keeping the editor in its richer 5-column layout longer. */
+  @media (max-width: 1000px) {
     .app    { grid-template-columns: 40px minmax(0, 1fr); }
     header  { grid-template-columns: 40px minmax(0, 1fr) auto; }
 
