@@ -199,6 +199,26 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 15, outVar: 4, val1: 1, freqVal: 50, val2Value: 64, gain: 3 },
       ];
       break;
+    case 'onepole_flt':
+      // OnePoleFilter 1353-1429. dan-script: onepole_flt(instance, var1(signal),
+      //   freq(CO/cutoff), gain(RAW mode "0"|"1")).
+      //  - inputs[1]=val1 selector (signal var) -> @VL = d0..d3 (or #0 if val1=0)
+      //  - inputs[2]=cutoff: freq/freqVal. In mulLeftShifts -> asl/@CS+ext.l;
+      //    const '#' non-power-of-2 -> muls @CO; variable selector -> move/and/muls
+      //  - inputs[3]=gain RAW -> mode "0" (LPF: move d5) / "1" (HPF: VL-d5)
+      // Each slot bumps currentWordInstance++. Cover cutoff value classes x modes:
+      ins.slots = [
+        // cutoff power-of-2 (128 -> asl/@CS+ext.l), signal var d1, mode 0
+        { ...emptySlot(), fn: 21, outVar: 1, val1: 2, freqVal: 128, gain: 0 },
+        // cutoff non-power-of-2 const (50 -> muls @CO), signal var d2, mode 1 (text2!=text -> move @VL emitted)
+        { ...emptySlot(), fn: 21, outVar: 2, val1: 3, freqVal: 50, gain: 1 },
+        // cutoff variable (freq sel -> d0, move/and/muls), signal var d3, mode 0
+        { ...emptySlot(), fn: 21, outVar: 3, val1: 4, freq: 1, gain: 0 },
+        // cutoff non-power-of-2 const (50 -> muls @CO), signal var == out (val1 sel 4 -> d3 == outVar4),
+        //   mode 1 (text2==text -> move @VL skipped)
+        { ...emptySlot(), fn: 21, outVar: 4, val1: 4, freqVal: 50, gain: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

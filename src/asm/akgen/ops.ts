@@ -520,6 +520,73 @@ export function svFilter(st: AkGenState, output: string, inputs: string[]): stri
   return empty;
 }
 
+/** Program.cs OnePoleFilter 1353-1429. inputs = [instance, signalVar(VL),
+ *  cutoff(CO, uses mulLeftShifts), mode("0"|"1")]. Bumps currentWordInstance++. */
+export function onePoleFilter(st: AkGenState, output: string, inputs: string[]): string {
+  const text = remapVarToRegisterOrImmediate(output);
+  const newValue = String(st.currentWordInstance * 2);
+  const text2 = remapVarToRegisterOrImmediate(inputs[1]!);
+  const text3 = remapVarToRegisterOrImmediate(inputs[2]!);
+  const newValue2 = Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text3)
+    ? st.mulLeftShifts[text3]!
+    : '';
+  const text4 = inputs[3]!;
+  let empty = '';
+  empty += '\t\t\t\tmove.w\tAK_OpInstance+@IN(a5),d5\n';
+  empty += '\t\t\t\tmove.w\td5,d6\n';
+  empty += '\t\t\t\text.l\td6\n';
+  empty += '\t\t\t\tasr.w\t#7,d5\n';
+  if (Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text3)) {
+    empty += '\t\t\t\tasl.w\t@CS,d5\n';
+    empty += '\t\t\t\text.l\td5\n';
+  } else if (text3.includes('#')) {
+    empty += '\t\t\t\tmuls\t@CO,d5\n';
+  } else {
+    empty += '\t\t\t\tmove.w\t@CO,d4\n';
+    empty += '\t\t\t\tand.w\t#255,d4\n';
+    empty += '\t\t\t\tmuls\td4,d5\n';
+  }
+  empty += '\t\t\t\tsub.l\td5,d6\n';
+  empty += '\t\t\t\tmove.w\t@VL,d5\n';
+  empty += '\t\t\t\tasr.w\t#7,d5\n';
+  if (Object.prototype.hasOwnProperty.call(st.mulLeftShifts, text3)) {
+    empty += '\t\t\t\tasl.w\t@CS,d5\n';
+    empty += '\t\t\t\text.l\td5\n';
+  } else if (text3.includes('#')) {
+    empty += '\t\t\t\tmuls\t@CO,d5\n';
+  } else {
+    empty += '\t\t\t\tmove.w\t@CO,d4\n';
+    empty += '\t\t\t\tand.w\t#255,d4\n';
+    empty += '\t\t\t\tmuls\td4,d5\n';
+  }
+  empty += '\t\t\t\tadd.l\td6,d5\n';
+  empty += '\t\t\t\tcmp.l\t#32767,d5\n';
+  empty = empty + '\t\t\t\tble.s\t.NoClampMaxOPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#32767,d5\n';
+  empty = empty + '\t\t\t\tbra.s\t.NoClampMinOPF_' + st.localLabel + '\n';
+  empty = empty + '.NoClampMaxOPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tcmp.l\t#-32768,d5\n';
+  empty = empty + '\t\t\t\tbge.s\t.NoClampMinOPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#-32768,d5\n';
+  empty = empty + '.NoClampMinOPF_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td5,AK_OpInstance+@IN(a5)\n';
+  if (text4 === '0') {
+    empty += '\t\t\t\tmove.w\td5,@OR\n';
+  } else if (text4 === '1') {
+    if (text2 !== text) {
+      empty += '\t\t\t\tmove.w\t@VL,@OR\n';
+    }
+    empty += '\t\t\t\tsub.w\td5,@OR\n';
+  }
+  empty = empty.replaceAll('@IN', newValue);
+  empty = empty.replaceAll('@VL', text2);
+  empty = empty.replaceAll('@CO', text3);
+  empty = empty.replaceAll('@CS', newValue2);
+  empty = empty.replaceAll('@OR', text);
+  st.currentWordInstance++;
+  return empty;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -548,7 +615,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'cmb_flt_n(', gen: stub('cmb_flt_n') },
   { match: 'reverb(', gen: stub('reverb') },
   { match: 'sv_flt_n(', gen: svFilter },
-  { match: 'onepole_flt(', gen: stub('onepole_flt') },
+  { match: 'onepole_flt(', gen: onePoleFilter },
   { match: 'chordgen(', gen: stub('chordgen') },
   { match: 'clone(', gen: stub('clone') },
   { match: 'clone_reverse(', gen: stub('clone_reverse') },
