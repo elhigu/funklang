@@ -1623,6 +1623,35 @@
     }
   }
 
+  /* ─── tiny editor: stack params UNDER the OUT + op selectors ───────────
+     When even the compact OUT / FUNCTION columns can't sit beside the
+     parameters, restack the slot into three rows: the # / OUT-var / op-name
+     selectors on top, the parameters full-width below them, and the waveform
+     under that. (Container query on the slot grid's own width.) */
+  @container editor (max-width: 480px) {
+    .grid-head { display: none; }          /* no room for column headers */
+    .slot {
+      grid-template-columns: 28px 52px minmax(0, 1fr);
+      grid-template-areas:
+        "num out op"
+        "params params params"
+        "wave   wave   wave";
+      row-gap: 2px;
+    }
+    /* op/out no longer span rows — they sit on the top row only. */
+    .slot > .col-num    { grid-area: num; }
+    .slot > .col-out    { grid-area: out; }
+    .slot > .col-op     { grid-area: op; justify-content: flex-start; }
+    .slot > .col-params { grid-area: params; }
+    .slot > .wave-cell  { grid-area: wave; }
+    /* Params get the full width now, so the knobs can breathe again. */
+    .knob .kbar { min-width: 96px; }
+    .param-var-select,
+    .param-mode-select,
+    .param-enum-select,
+    .param-ref-select { max-width: 140px; }
+  }
+
   /* ─── touch value tuner ───────────────────────────────────────────────
      A finger pressing a knob opens this modal (see touch-tuner.ts). Big
      targets: a tall slider for coarse moves + four roller strips for

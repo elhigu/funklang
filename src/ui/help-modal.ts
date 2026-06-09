@@ -63,7 +63,7 @@ export function helpOverlayHtml(): string {
                 <tr><td>Click ✕ next to slot #</td><td>Delete the slot</td></tr>
                 <tr><td>Drag slot # column</td><td>Reorder slots within the instrument</td></tr>
                 <tr><td>Slot reorder scroll</td><td>Moving a slot up/down preserves the slot-grid scroll position — you won't get yanked back to the top</td></tr>
-                <tr><td>Narrow screen waveform</td><td>When the window is too narrow for a separate waveform column, each slot's waveform drops below its parameters at a fixed compact height (two parameter rows)</td></tr>
+                <tr><td>Narrow screen waveform</td><td>When the window is too narrow for a separate waveform column, each slot's waveform drops below its parameters at a fixed compact height (two parameter rows). Narrower still, the OUT-var + op-name selectors move to their own row above the parameters</td></tr>
                 <tr><td>mul const value</td><td>Edit the integer knob OR type a float in the sidecar field — they share the same underlying value (val / 32767 ≈ float ∈ [-1.0, 1.0])</td></tr>
                 <tr><td>Clone offset</td><td>Max = source instrument's sample length − 2. Changing source rescales the offset by the SL ratio so the same fractional sample position is preserved (even-snapped)</td></tr>
                 <tr><td>New slot outVar default</td><td>Picks a variable that an earlier slot already reads (so the chain feeds something), falling back to the first unused variable</td></tr>
