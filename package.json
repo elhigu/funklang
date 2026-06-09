@@ -28,7 +28,8 @@
     "corpus:real": "nix-shell -p wineWowPackages.stable --run 'npx tsx sizelab/corpus/measure-real.ts'",
     "export:bin": "tsx sizelab/harness/export-bin.ts",
     "gate": "npm run typecheck && npm test && npm run e2e",
-    "fit:calibration": "tsx sizelab/fit/fit-calibration.ts"
+    "fit:calibration": "tsx sizelab/fit/fit-calibration.ts",
+    "asm:bin": "nix-shell -p mono --run 'npx tsx sizelab/harness/asm-bin.ts'"
   },
   "keywords": [],
   "author": "",

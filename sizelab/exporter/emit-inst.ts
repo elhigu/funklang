@@ -2,6 +2,7 @@ import type { Patch, Slot } from '../../src/patch/types';
 import { VARTEXT, renderArgs } from './arg-emit';
 import { OP_ARGS } from './op-args';
 import { emitClone, emitImported, emitAdsr } from './emit-inst-special';
+import { highestInstrument } from './emit-ilen';
 
 /** 25-entry op-name table, Form1.cs line 41. 17 (clone) and 20 (imported) are
  *  blank because they emit a bare expression (prefix already opened a paren). */
@@ -39,6 +40,32 @@ export function emitInst(patch: Patch): string {
       s += `${VARTEXT[slot.outVar]} = ${name}(${emitSlotArgs(slot, l, k, ins.sampleLength)});\r\n`;
     }
     s += `}\r\n`;
+  }
+  return s;
+}
+
+/**
+ * Dan-script (`script.txt`) — the input format consumed by Aklang2Asm.exe.
+ * Mirrors Form1.cs 6477–6700: an imports line (8 sample lengths), then per
+ * instrument a `$ name, sampleLen, loopOffset, loopLength, Y|N` header (Y iff a
+ * loop_gen sits in slot 15), a `#` separator, and the same `vN = op(args);`
+ * statements as Inst.h. This is the bridge to the m68k asm path.
+ */
+export function emitDanScript(patch: Patch): string {
+  const imports = Array.from({ length: 8 }, (_, j) => patch.importedSamples[j]?.data.length ?? 0);
+  let s = imports.join(', ') + '\r\n';
+  const highest = highestInstrument(patch);
+  for (let k = 0; k < highest; k++) {
+    const ins = patch.instruments[k];
+    const sampleLength = ins?.sampleLength ?? 0;
+    const loopGen = ins?.slots[15]?.fn === 22 ? 'Y' : 'N';
+    s += `$ ${ins?.name ?? ''}, ${sampleLength}, ${ins?.loopOffset ?? 0}, ${ins?.loopLength ?? 0}, ${loopGen}\r\n#\r\n`;
+    if (!ins) continue;
+    for (let l = 0; l < 16; l++) {
+      const slot = ins.slots[l];
+      if (!slot || slot.outVar === 0 || slot.fn === 22) continue;
+      s += `${VARTEXT[slot.outVar]} = ${OPNAME[slot.fn] ?? ''}(${emitSlotArgs(slot, l, k, sampleLength)});\r\n`;
+    }
   }
   return s;
 }
