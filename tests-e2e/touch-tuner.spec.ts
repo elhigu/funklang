@@ -19,7 +19,7 @@ test('a finger tap on a knob opens the touch value tuner', async ({ page }) => {
 
   const overlay = page.locator('#touch-tuner-overlay');
   await expect(overlay).toBeVisible();
-  await expect(overlay.locator('.tt-roller')).toHaveCount(4);
+  await expect(overlay.locator('.tt-roller')).toHaveCount(3);
   await page.screenshot({ path: 'test-results/touch-tuner.png' });
 
   // Done closes it.

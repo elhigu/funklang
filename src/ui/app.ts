@@ -245,6 +245,13 @@ export function bootApp(root: HTMLElement): void {
         if (!ins) return new Int16Array(0);
         return slotDisplayTap(ins, renderInstrument(model.patch, instrIdx), p.slotIdx);
       },
+      // Swiping to a param in another slot moves the editor's selected phase
+      // so the grid behind the modal (and the footer label) follow along.
+      onActiveChange: (newSlotIdx) => {
+        state.selection = { instrIdx, slotIdx: newSlotIdx };
+        refreshSelectionHighlight();
+        updateLabels();
+      },
     });
   };
 

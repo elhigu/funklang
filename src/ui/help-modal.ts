@@ -42,7 +42,7 @@ export function helpOverlayHtml(): string {
                 <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Move between fields. Only value sliders and the source-instrument picker are tab stops — the op-name, var/output selects and 🔊 / ✕ / + buttons are skipped (still clickable by mouse)</td></tr>
                 <tr><td>Click anywhere on the bar</td><td>Set value to that position; bar gains focus</td></tr>
                 <tr><td>Drag</td><td>Value follows the mouse X (release to commit)</td></tr>
-                <tr><td>Touch the bar (touch screen)</td><td>Opens the touch value tuner: a big slider + ±1/±10/±100/±1000 roller knobs (drag a roller to step), a live waveform of the tuned phase, and swipe up/down to move to the next/previous param. Each drag is one undo. Mouse/pen still drag inline</td></tr>
+                <tr><td>Touch the bar (touch screen)</td><td>Opens the touch value tuner: the active phase's params are listed (selected one emphasised), with a big slider + ±1/±10/±100 roller knobs (drag a roller to step) and a live waveform of the tuned phase. Tap a row to pick a param; swipe up/down to walk through params — crossing into another slot moves the editor's selected phase. Each drag is one undo. Mouse/pen still drag inline</td></tr>
                 <tr><td>Wheel over the slider</td><td>Coarse step (range-aware: ~3 % of range or log on freq knobs)</td></tr>
                 <tr><td><kbd>Shift</kbd>+wheel</td><td>16 × coarse step (big jumps)</td></tr>
                 <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>± step (1 normally; 2 for even-only knobs like loop offset / sample length)</td></tr>

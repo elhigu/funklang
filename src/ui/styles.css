@@ -1673,19 +1673,30 @@
     background: #050507; border: 1px solid var(--grid-dim);
     image-rendering: pixelated;
   }
-  .tt-active { display: flex; align-items: baseline; justify-content: space-between; }
-  .tt-pname {
-    color: var(--fg-1); text-transform: lowercase; font-size: 15px; letter-spacing: 0.3px;
+  /* The PHASE list — every tunable param of the active slot. Swipe to move
+     through params (the strip is the swipe zone); tap a row to select it. */
+  .tt-phase { touch-action: none; cursor: ns-resize; display: flex; flex-direction: column; gap: 1px; }
+  .tt-prow {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 6px 10px; color: var(--fg-2);
+    border-left: 3px solid transparent;
   }
-  .tt-value {
-    color: var(--fg-0); font-size: 28px; font-variant-numeric: tabular-nums;
+  .tt-prow.active {
+    color: var(--fg-0); background: var(--bg-2);
+    border-left-color: var(--amber);
+  }
+  .tt-prow-name { text-transform: lowercase; font-size: 14px; letter-spacing: 0.3px; }
+  .tt-prow-val { font-variant-numeric: tabular-nums; font-size: 14px; }
+  /* Big readout of the selected param's value. */
+  .tt-active-value {
+    color: var(--amber); font-size: 28px; font-variant-numeric: tabular-nums; text-align: right;
   }
   /* The reused knob, blown up for touch. Its own value/label are hidden —
-     the .tt-value readout above already shows the number. */
+     the readouts above already show the number. */
   .tt-slider .knob { width: 100%; }
   .tt-slider .kbar { height: 40px; min-width: 0; }
   .tt-slider .kval, .tt-slider .klabel { display: none; }
-  .tt-rollers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .tt-rollers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .tt-roller {
     display: flex; flex-direction: column; align-items: center; justify-content: space-between;
     height: 120px; padding: 10px 0;
@@ -1698,13 +1709,3 @@
   .tt-roller-mag {
     color: var(--amber); font-size: 18px; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
   }
-
-  /* Touch tuner: the swipe-navigation strip (label + dimmed neighbours). */
-  .tt-nav { touch-action: none; cursor: ns-resize; }
-  .tt-neighbour {
-    text-align: center; color: var(--fg-2); font-size: 12px;
-    text-transform: lowercase; letter-spacing: 0.3px; min-height: 16px;
-    opacity: 0.7;
-  }
-  .tt-neighbour:first-child::before { content: '▲ '; }
-  .tt-neighbour:last-child::after   { content: ' ▼'; }
