@@ -367,6 +367,34 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 23, outVar: 4, val1Value: 40, val2Value: 30, freqVal: 50, gainVal: 64, widthVal: 0 },
       ];
       break;
+    case 'chordgen':
+    case 'chordGen':
+      // ChordGen 1508-1578. dan-script: chordgen(smp, BaseAdr[base], note1,
+      //   note2, note3, val2(@SH)).
+      //  - inputs[1] = BaseAdr[<gain>]: non-numeric -> GetInstanceOffset returns
+      //    "0" (@BS = 0) for a single-instrument patch (every slot).
+      //  - inputs[2..4] = note indices (freq/width/val1, RAW) -> GetChordValue
+      //    table (0..12). Cover: note==0 (chordValue=="#0" -> chord block
+      //    skipped), all-distinct (all three blocks emitted), and duplicate
+      //    notes (later block skipped via chordValue equality tests).
+      //  - inputs[5] = val2 (@SH): const path -> #N; num>8 -> add.w @SH,a4;
+      //    1<=num<=8 -> addq.w @SH,a4; num==0 -> no @SH add. Variable selector
+      //    (val2 sel) -> the move.w/and.w/add.w d4,a4 runtime path.
+      // Each slot bumps currentWordInstance += 6 (the @IN word offset advances).
+      ins.slots = [
+        // notes all distinct (1,2,3); @SH const non-power-of-2 (50 -> add.w)
+        { ...emptySlot(), fn: 18, outVar: 1, gain: 0, freq: 1, width: 2, val1: 3, val2Value: 50 },
+        // note1=0 (chordValue #0 -> first chord block skipped); notes 0,5,7;
+        //   @SH const power-of-2 small (4 -> addq.w)
+        { ...emptySlot(), fn: 18, outVar: 2, gain: 0, freq: 0, width: 5, val1: 7, val2Value: 4 },
+        // duplicate notes (4,4,9): second block skipped (==chordValue), third
+        //   emitted; @SH const 0 -> no @SH add at all
+        { ...emptySlot(), fn: 18, outVar: 3, gain: 0, freq: 4, width: 4, val1: 9, val2Value: 0 },
+        // variable @SH operand (val2 sel -> d0..d3): move.w/and.w/add.w path;
+        //   notes 12,11,11 (third == second -> skipped)
+        { ...emptySlot(), fn: 18, outVar: 4, gain: 0, freq: 12, width: 11, val1: 11, val2: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

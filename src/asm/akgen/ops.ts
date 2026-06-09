@@ -3,7 +3,12 @@
 // stubs that throw until ported.
 
 import type { AkGenState } from './state';
-import { remapVarToRegisterOrImmediate, getDecayValue } from './helpers';
+import {
+  remapVarToRegisterOrImmediate,
+  getDecayValue,
+  getInstanceOffset,
+  getChordValue,
+} from './helpers';
 
 export type OpGen = (st: AkGenState, output: string, inputs: string[]) => string;
 
@@ -1029,6 +1034,80 @@ export function adsr(st: AkGenState, output: string, inputs: string[]): string {
   return result;
 }
 
+/** Program.cs ChordGen 1508-1578. dan-script: chordgen(smp, BaseAdr[base],
+ *  note1, note2, note3, val2(@SH)).
+ *  inputs[0]=smp(d7), inputs[1]=BaseAdr[..] (-> GetInstanceOffset, non-numeric
+ *  so @BS = "0" in a single-instrument patch), inputs[2..4]=chord-note indices
+ *  (GetChordValue table), inputs[5]=val2 (varlit: const -> #N (@SH offset add),
+ *  variable selector -> d0..d3 (the and.w #255 / add.w d4,a4 path)).
+ *  Bumps currentWordInstance += 6. */
+export function chordGen(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = String(st.currentWordInstance * 2);
+  const instanceOffset = getInstanceOffset(inputs[1]!, 4);
+  const chordValue = getChordValue(Number.parseInt(inputs[2]!, 10));
+  const chordValue2 = getChordValue(Number.parseInt(inputs[3]!, 10));
+  const chordValue3 = getChordValue(Number.parseInt(inputs[4]!, 10));
+  const text = remapVarToRegisterOrImmediate(inputs[5]!);
+  const num = text.includes('#') ? Number.parseInt(inputs[5]!, 10) : 0;
+  let empty = '';
+  empty += '\t\t\t\tmove.l\tAK_SmpAddr+@BS(a5),a4\n';
+  empty += '\t\t\t\tmove.b\t(a4,d7.l),d6\n';
+  empty += '\t\t\t\text.w\td6\n';
+  if (!text.includes('#')) {
+    empty += '\t\t\t\tmove.w\t@SH,d4\n';
+    empty += '\t\t\t\tand.w\t#255,d4\n';
+    empty += '\t\t\t\tadd.w\td4,a4\n';
+  } else if (num !== 0) {
+    empty =
+      num > 8 ? empty + '\t\t\t\tadd.w\t@SH,a4\n' : empty + '\t\t\t\taddq.w\t@SH,a4\n';
+  }
+  empty += '\t\t\t\tmoveq\t#0,d4\n';
+  if (chordValue !== '#0') {
+    empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_CHORD1+@IN(a5),d4\n';
+    empty += '\t\t\t\tadd.l\t@N1,AK_OpInstance+AK_CHORD1+@IN(a5)\n';
+    empty += '\t\t\t\tmove.b\t(a4,d4.l),d5\n';
+    empty += '\t\t\t\text.w\td5\n';
+    empty += '\t\t\t\tadd.w\td5,d6\n';
+  }
+  if (chordValue2 !== '#0' && chordValue2 !== chordValue) {
+    empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_CHORD2+@IN(a5),d4\n';
+    empty += '\t\t\t\tadd.l\t@N2,AK_OpInstance+AK_CHORD2+@IN(a5)\n';
+    empty += '\t\t\t\tmove.b\t(a4,d4.l),d5\n';
+    empty += '\t\t\t\text.w\td5\n';
+    empty += '\t\t\t\tadd.w\td5,d6\n';
+  }
+  if (chordValue3 !== '#0' && chordValue3 !== chordValue && chordValue3 !== chordValue2) {
+    empty += '\t\t\t\tmove.w\tAK_OpInstance+AK_CHORD3+@IN(a5),d4\n';
+    empty += '\t\t\t\tadd.l\t@N3,AK_OpInstance+AK_CHORD3+@IN(a5)\n';
+    empty += '\t\t\t\tmove.b\t(a4,d4.l),d5\n';
+    empty += '\t\t\t\text.w\td5\n';
+    empty += '\t\t\t\tadd.w\td5,d6\n';
+  }
+  empty += '\t\t\t\tmove.w\t#255,d5\n';
+  empty += '\t\t\t\tcmp.w\td5,d6\n';
+  empty = empty + '\t\t\t\tblt.s\t.NoClampMaxChord_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td5,d6\n';
+  empty = empty + '\t\t\t\tbra.s\t.NoClampMinChord_' + st.localLabel + '\n';
+  empty = empty + '.NoClampMaxChord_' + st.localLabel + '\n';
+  empty += '\t\t\t\tnot.w\td5\n';
+  empty += '\t\t\t\tcmp.w\td5,d6\n';
+  empty = empty + '\t\t\t\tbge.s\t.NoClampMinChord_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td5,d6\n';
+  empty = empty + '.NoClampMinChord_' + st.localLabel + '\n';
+  empty += '\t\t\t\tasl.w\t#7,d6\n';
+  empty += '\t\t\t\tmove.w\td6,@OR\n';
+  empty = empty.replaceAll('@OR', newValue);
+  empty = empty.replaceAll('@IN', newValue2);
+  empty = empty.replaceAll('@BS', instanceOffset);
+  empty = empty.replaceAll('@SH', text);
+  empty = empty.replaceAll('@N1', chordValue);
+  empty = empty.replaceAll('@N2', chordValue2);
+  empty = empty.replaceAll('@N3', chordValue3);
+  st.currentWordInstance += 6;
+  return empty;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -1058,7 +1137,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'reverb(', gen: reverb },
   { match: 'sv_flt_n(', gen: svFilter },
   { match: 'onepole_flt(', gen: onePoleFilter },
-  { match: 'chordgen(', gen: stub('chordgen') },
+  { match: 'chordgen(', gen: chordGen },
   { match: 'clone(', gen: stub('clone') },
   { match: 'clone_reverse(', gen: stub('clone_reverse') },
   { match: 'imported_sample(', gen: stub('imported_sample') },
