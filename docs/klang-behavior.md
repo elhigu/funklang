@@ -74,3 +74,23 @@ Derived: `FINAL_LOOP_REPEATS = 2` in [funklang/src/ui/app.ts](../src/ui/app.ts).
 Derived:
 - `imported` (op 20, Klang docs call it "imported sample") is shown in the op-picker but disabled (`unsupported: true`).
 - `vocoder` (op 24) IS in `OP_DEFS` so the picker can show it for existing patches, but it's marked `unsupported: true` and disabled. Klang's `synthnodes.h` has no codegen case for it either — funklang's engine no-ops the slot.
+
+## 2026-06-10 — Forward variable references are feedback loops
+
+> "Is it possible to refer future variable in the previous phases where it
+>  creates feedback loop? … System should allow forward feedback references
+>  even without marking them red, but if V3 is not used at all in the
+>  instrument then it should remain red."
+
+Confirmed against the engine: the `v1..v4` bank is reset ONCE per instrument
+render, not per sample ([src/dsp/engine.ts](../src/dsp/engine.ts) — matches
+`main-binary.c` lines 76–82). So a slot reading a variable written only by a
+LATER slot picks up that slot's PREVIOUS-sample output — a valid one-sample
+feedback loop (resonators, comb/karplus, self-oscillation).
+
+Editor rule ([src/patch/var-refs.ts](../src/patch/var-refs.ts), surfaced in the
+var-source / var-or-const dropdowns):
+- written by an EARLIER slot → normal (same-sample read);
+- written only by a LATER slot → `(feedback #N)`, cyan, NOT red (N = the
+  highest-row writer, whose previous-sample value is read);
+- written by NO slot → `(unset)`, red (genuine silence).

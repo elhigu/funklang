@@ -57,8 +57,9 @@ export function helpOverlayHtml(): string {
 
             <h3>Validation (red = needs fixing)</h3>
             <table class="help-kbd"><tbody>
-              <tr><td>Red instrument row</td><td>A slot has an unwired var-source / unset selector / bad clone source — fix the red dropdown</td></tr>
-              <tr><td>Red dropdown / (unset)</td><td>That v1–v4 isn't written by an earlier slot (would be silence); clone source must be a lower-numbered instrument</td></tr>
+              <tr><td>Red instrument row</td><td>A slot has an unwired var-source (a v1–v4 no slot writes) / bad clone source — fix the red dropdown</td></tr>
+              <tr><td>Red dropdown / (unset)</td><td>That v1–v4 is written by NO slot — it's silence. (clone source must be a lower-numbered instrument)</td></tr>
+              <tr><td>Cyan dropdown / (feedback #N)</td><td>That v1–v4 is written only by a LATER slot (phase N). The variable bank persists across samples, so the read picks up phase N's value from the PREVIOUS sample — a deliberate one-sample feedback loop, not an error</td></tr>
               <tr><td>Loop edge (top wave-view)</td><td>Drag the pink left edge to retune the loop offset (snaps to the valid even position)</td></tr>
             </tbody></table>
 
