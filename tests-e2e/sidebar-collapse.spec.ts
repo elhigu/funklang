@@ -20,6 +20,12 @@ test('narrow screen shows a numbers rail with the selected one emphasised', asyn
   // The rail is narrow (≈40px), not the full 240px list.
   const box = (await page.locator('#sidebar').boundingBox())!;
   expect(box.width).toBeLessThan(60);
+
+  // The rail MUST own touch gestures (touch-action:none) — with pan-y the
+  // browser would eat a vertical swipe as native scroll and the drag-roll
+  // would never fire on a real device.
+  const ta = await page.locator('#sidebar').evaluate((el) => getComputedStyle(el).touchAction);
+  expect(ta).toBe('none');
 });
 
 test('a touch-drag down the rail rolls the selection to higher instruments', async ({ page }) => {

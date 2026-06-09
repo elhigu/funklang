@@ -189,6 +189,10 @@ export function bootApp(root: HTMLElement): void {
     const dir = delta > 0 ? 1 : -1;
     for (let k = 0; k < Math.abs(delta); k++) stepInstrument(dir, { play: true });
     sbDragStepped = rows;
+    // Native scroll is disabled on the rail (touch-action:none) so the drag
+    // reaches us — keep the rolled-to number in view ourselves.
+    (sidebarEl.querySelector('.instr-row.active') as HTMLElement | null)
+      ?.scrollIntoView({ block: 'nearest' });
   });
   const sbDragEnd = (e: PointerEvent): void => { if (e.pointerId === sbDragPid) sbDragPid = -1; };
   sidebarEl.addEventListener('pointerup', sbDragEnd);

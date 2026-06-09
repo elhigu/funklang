@@ -1590,8 +1590,12 @@
 
     /* Collapsed rail: every instrument NUMBER stacked, the selected one
        emphasised. A touch-drag rolls the selection (app.ts); a tap picks.
-       Names are dropped at this width — the number is the handle. */
-    .sidebar       { overflow-y: auto; touch-action: pan-y; }
+       Names are dropped at this width — the number is the handle.
+       `touch-action: none` is REQUIRED: with pan-y the browser eats the
+       vertical drag as a native scroll and our pointermove handler never
+       fires — the roll wouldn't work. We drive the scroll ourselves by
+       keeping the selected number in view as it rolls. */
+    .sidebar       { overflow-y: auto; touch-action: none; }
     .sidebar-title { padding: 8px 0; text-align: center; font-size: 0; }
     .sidebar-title::after { content: '⋮'; font-size: 14px; color: var(--amber-dim); }
     .sb-title-full { display: none; }
