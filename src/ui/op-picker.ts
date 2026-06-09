@@ -89,13 +89,16 @@ export function pickOp(costOf?: (op: number) => OpAddCost): Promise<number | nul
         const btn = document.createElement('button');
         btn.className = 'op-picker-btn';
         btn.setAttribute('data-op-code', String(def.code));
-        btn.textContent = def.name;        // name only → uniform card height
+        const nameEl = document.createElement('span');
+        nameEl.className = 'op-picker-name';
+        nameEl.textContent = def.name;
+        btn.appendChild(nameEl);
         if (costOf && !def.unsupported) {
           const c = costOf(def.code);
           const cost = document.createElement('span');
           cost.className = 'op-picker-cost';
           // ~bytes this op adds here; "shared" flag when its routine is already paid.
-          cost.textContent = `+${c.cost < 1024 ? `${c.cost} B` : `${(c.cost / 1024).toFixed(1)} kB`}${c.alreadyPresent ? ' ·shared' : ''}`;
+          cost.textContent = `+${c.cost < 1024 ? `${c.cost} B` : `${(c.cost / 1024).toFixed(1)} kB`}${c.alreadyPresent ? ' · shared' : ''}`;
           cost.title = c.alreadyPresent
             ? 'This op is already used in the patch — only its per-use connection code is added.'
             : 'Adds this op’s shared routine + one use.';

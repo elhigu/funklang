@@ -1154,7 +1154,7 @@
     border: 1px solid var(--amber);
     box-shadow: 0 0 32px var(--amber-glow);
     padding: 18px;
-    width: min(560px, 92vw);
+    width: min(640px, 94vw);
     max-height: 86vh;
     overflow-y: auto;
   }
@@ -1175,8 +1175,8 @@
   }
   .op-picker-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 4px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px;
   }
   .op-picker-btn {
     background: var(--bg-2);
@@ -1184,22 +1184,22 @@
     color: var(--fg-0);
     font: inherit;
     font-size: 12px;
-    padding: 6px 8px;
+    padding: 7px 10px;
     cursor: pointer;
     text-align: left;
-    /* Single-line, fixed-height cards so the grid stays a tidy matrix —
-       long names ellipsize rather than wrap. Name left, add-cost right. */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.4;
+    /* Two-line cards: name on top, add-cost below — both fit clearly. */
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-height: 42px;
+    justify-content: center;
+    overflow: hidden;
+    line-height: 1.35;
   }
-  .op-picker-cost { font-size: 10px; opacity: 0.55; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .op-picker-btn:hover .op-picker-cost { opacity: 0.8; }
+  .op-picker-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .op-picker-cost { font-size: 10px; opacity: 0.6; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--amber-dim); }
+  .op-picker-btn:hover .op-picker-cost { opacity: 0.85; }
   .op-picker-btn:hover {
     background: var(--bg-3);
     color: var(--amber);
