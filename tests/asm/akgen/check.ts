@@ -46,6 +46,19 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 3, outVar: 4, freqVal: 555, gain: 1 },
       ];
       break;
+    case 'osc_sine':
+      // Osc_Sine 647-693. inputs = [instance, freq, gain(GN)].
+      //  - power-of-2 gain (64 -> asr/GS path)
+      //  - non-power-of-2 gain (50 -> muls/TR1=#50 path)
+      //  - gain 128 (-> text != "#128" guard skips scaling)
+      //  - variable gain operand (-> non-# path: move/and @GN,@TR1; TR1=d4)
+      ins.slots = [
+        { ...emptySlot(), fn: 4, outVar: 1, freqVal: 1000, gainVal: 64 },
+        { ...emptySlot(), fn: 4, outVar: 2, freqVal: 1234, gainVal: 50 },
+        { ...emptySlot(), fn: 4, outVar: 3, freqVal: 777, gainVal: 128 },
+        { ...emptySlot(), fn: 4, outVar: 4, freqVal: 555, gain: 1 },
+      ];
+      break;
     case 'osc_pulse':
       // Osc_Pulse 581-645. inputs = [instance, freq, gain(GN), width(DC)].
       // Cover gain classes x width classes:

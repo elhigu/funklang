@@ -85,6 +85,52 @@ export function oscTri(st: AkGenState, output: string, inputs: string[]): string
   return empty;
 }
 
+/** Program.cs Osc_Sine 647-693. */
+export function oscSine(st: AkGenState, output: string, inputs: string[]): string {
+  const orVal = remapVarToRegisterOrImmediate(output);
+  const inVal = String(st.currentWordInstance * 2);
+  const frVal = remapVarToRegisterOrImmediate(inputs[1]!);
+  const gnText = remapVarToRegisterOrImmediate(inputs[2]!);
+  const gsVal = Object.prototype.hasOwnProperty.call(st.mulRightShifts, gnText)
+    ? st.mulRightShifts[gnText]!
+    : '';
+  let empty = '';
+  empty += '\t\t\t\tadd.w\t@FR,AK_OpInstance+@IN(a5)\n';
+  if (!gnText.includes('#')) {
+    empty += '\t\t\t\tmove.w\t@GN,@TR1\n';
+    empty += '\t\t\t\tand.w\t#255,@TR1\n';
+  }
+  empty += '\t\t\t\tmove.w\tAK_OpInstance+@IN(a5),@OR\n';
+  empty += '\t\t\t\tsub.w\t#16384,@OR\n';
+  empty += '\t\t\t\tmove.w\t@OR,d5\n';
+  empty += '\t\t\t\tbge.s\t.SineNoAbs_' + st.localLabel + '\n';
+  empty += '\t\t\t\tneg.w\td5\n';
+  empty += '.SineNoAbs_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#32767,d6\n';
+  empty += '\t\t\t\tsub.w\td5,d6\n';
+  empty += '\t\t\t\tmuls\td6,@OR\n';
+  empty += '\t\t\t\tswap\t@OR\n';
+  empty += '\t\t\t\tasl.w\t#3,@OR\n';
+  if (gnText !== '#128') {
+    if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, gnText)) {
+      empty += '\t\t\t\tasr.w\t@GS,@OR\n';
+    } else {
+      empty += '\t\t\t\tmuls\t@TR1,@OR\n';
+      empty += '\t\t\t\tasr.l\t#7,@OR\n';
+    }
+  }
+  empty = gnText.includes('#')
+    ? empty.replaceAll('@TR1', gnText)
+    : empty.replaceAll('@TR1', 'd4');
+  empty = empty.replaceAll('@IN', inVal);
+  empty = empty.replaceAll('@FR', frVal);
+  empty = empty.replaceAll('@GN', gnText);
+  empty = empty.replaceAll('@GS', gsVal);
+  empty = empty.replaceAll('@OR', orVal);
+  st.currentWordInstance++;
+  return empty;
+}
+
 /** Program.cs Osc_Pulse 581-645. */
 export function oscPulse(st: AkGenState, output: string, inputs: string[]): string {
   const orVal = remapVarToRegisterOrImmediate(output);
@@ -161,7 +207,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'vol(', gen: stub('vol') },
   { match: 'osc_saw(', gen: oscSaw },
   { match: 'osc_tri(', gen: oscTri },
-  { match: 'osc_sine(', gen: stub('osc_sine') },
+  { match: 'osc_sine(', gen: oscSine },
   { match: 'osc_pulse(', gen: oscPulse },
   { match: 'osc_noise(', gen: stub('osc_noise') },
   { match: 'sh(', gen: stub('sh') },
