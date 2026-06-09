@@ -1,4 +1,4 @@
-import type { Slot } from '../../src/patch/types';
+import type { Slot } from '../patch/types';
 import { VARTEXT } from './arg-emit';
 
 function freqExpr(slot: Slot): string {

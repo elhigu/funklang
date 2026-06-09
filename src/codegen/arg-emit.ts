@@ -1,4 +1,4 @@
-import type { Slot } from '../../src/patch/types';
+import type { Slot } from '../patch/types';
 
 export const VARTEXT = ['', 'v1', 'v2', 'v3', 'v4'] as const;
 

@@ -1,5 +1,5 @@
 import type { Patch } from '../../src/patch/types';
-import { highestInstrument } from './emit-ilen';
+import { highestInstrument } from '../../src/codegen/emit-ilen';
 import { MOD_LENGTH_EMPTY } from './minimal-mod';
 
 export function emitIset(patch: Patch): string {

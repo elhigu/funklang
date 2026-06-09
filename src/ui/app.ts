@@ -17,6 +17,7 @@ import { helpOverlayHtml, wireHelp } from './help-modal';
 import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
 import { wireSizeStatusbar, type SizeStatusbar } from './size-statusbar';
+import { mountCodeExportModal } from './code-export-modal';
 import { annotateSlotSizes } from './annotate-slot-sizes';
 import { computeBreakdown } from '../sizecalc/breakdown';
 import { CALIBRATION } from '../sizecalc/calibration-data';
@@ -102,6 +103,7 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-save">SAVE</button>
           <button id="btn-save-as">SAVE&nbsp;AS</button>
           <button id="btn-revert" title="Browse autosaves (snapshot every minute to localStorage)">REVERT&nbsp;AUTOSAVE</button>
+          <button id="btn-export-code" title="Generate m68k asm + C + the exact Amiga .bin for this patch — entirely in the browser">CODE</button>
           <label class="base-toggle-wrap" title="Display numbers as decimal or hexadecimal everywhere">
             <span class="base-toggle-label">BASE</span>
             <select id="display-base">
@@ -856,6 +858,10 @@ export function bootApp(root: HTMLElement): void {
 
   // Help modal: open via ? button or unmodified '?' key; close via X / Esc.
   const help = wireHelp(root);
+
+  // EXPORT CODE panel — in-browser m68k asm + C + exact .bin for the current patch.
+  const codeExport = mountCodeExportModal(root);
+  (root.querySelector('#btn-export-code') as HTMLButtonElement)?.addEventListener('click', () => codeExport.open(model.patch));
 
   // ── Responsive top menu: collapse to a hamburger when the toolbar would
   //    overflow. Measured against the expanded layout so it adapts to the

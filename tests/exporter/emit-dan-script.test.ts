@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { emptyPatch, emptySlot } from '../../src/patch/types';
-import { emitDanScript } from '../../sizelab/exporter/emit-inst';
+import { emitDanScript } from '../../src/codegen/emit-inst';
 
 describe('emitDanScript (Aklang2Asm input format)', () => {
   it('emits the imports line + $ instrument header + vN = op(args) statements', () => {

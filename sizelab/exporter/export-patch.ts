@@ -1,6 +1,6 @@
 import type { Patch } from '../../src/patch/types';
-import { emitIlen } from './emit-ilen';
-import { emitInst } from './emit-inst';
+import { emitIlen } from '../../src/codegen/emit-ilen';
+import { emitInst } from '../../src/codegen/emit-inst';
 import { emitIset, emitIswitch, emitIsetBinary, emitIswitchBinary } from './emit-iset';
 import { emitIsamp } from './emit-isamp';
 import { minimalMod } from './minimal-mod';

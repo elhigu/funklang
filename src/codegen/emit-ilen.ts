@@ -1,4 +1,4 @@
-import type { Patch } from '../../src/patch/types';
+import type { Patch } from '../patch/types';
 import { csHex } from './hex';
 import { normalizeLoop } from './loop-norm';
 

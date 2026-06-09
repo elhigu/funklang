@@ -132,6 +132,13 @@ export function helpOverlayHtml(): string {
             per-slot code folds as the patch grows), and a per-variable-operand term.
             Imported-sample bytes are added exactly (they cost disk space even though
             the .bin doesn't embed them — the host supplies them at <code>ImpAdr</code>).</p>
+            <p><strong>CODE</strong> (top menu) generates, entirely in the browser, the
+            m68k <code>.asm</code>, the C generators (for reuse in your demo engine), and
+            the <strong>exact</strong> Amiga <code>.bin</code> for the current patch — and
+            shows its exact size. The .bin is produced by a byte-for-byte port of the
+            author's <code>Aklang2Asm</code> generator assembled with vasm-WebAssembly, so
+            it matches the real tool's output and is much smaller than the estimate's
+            gcc-build figure.</p>
             <p><strong>Per-phase cost is contextual.</strong> Each slot shows
             <code>−N</code>: how much deleting it would free <em>right now</em>. An op's
             routine is shared by every phase using that op, so deleting a reused phase

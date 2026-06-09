@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { emptySlot } from '../../src/patch/types';
-import { emitClone, emitImported, emitAdsr } from './emit-inst-special';
+import { emitClone, emitImported, emitAdsr } from '../../src/codegen/emit-inst-special';
 
 describe('imported (20)', () => {
   it('inline ImpLength ternary keyed on gain', () => {

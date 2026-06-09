@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { emptyPatch, emptySlot } from '../../src/patch/types';
-import { emitInst, OPNAME } from './emit-inst';
+import { emitInst, OPNAME } from '../../src/codegen/emit-inst';
 import type { Slot } from '../../src/patch/types';
 
 function instr(p: ReturnType<typeof emptyPatch>, k: number, sampleLength: number, slots: Array<Partial<Slot>>) {

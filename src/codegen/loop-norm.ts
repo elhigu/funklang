@@ -1,4 +1,4 @@
-// funklang/sizelab/exporter/loop-norm.ts
+// funklang/src/codegen/loop-norm.ts
 // Mirrors Form1.cs checkloopparams() (1400-1410): the GUI clamps loop offset to
 // at least floor(sampleLength/2)-1 on load, then length = sampleLength - offset.
 export function normalizeLoop(sampleLength: number, loopOffset: number): { off: number; len: number } {

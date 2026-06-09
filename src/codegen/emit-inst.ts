@@ -1,4 +1,4 @@
-import type { Patch, Slot } from '../../src/patch/types';
+import type { Patch, Slot } from '../patch/types';
 import { VARTEXT, renderArgs } from './arg-emit';
 import { OP_ARGS } from './op-args';
 import { emitClone, emitImported, emitAdsr } from './emit-inst-special';

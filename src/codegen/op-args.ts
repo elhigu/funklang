@@ -1,4 +1,4 @@
-// funklang/sizelab/exporter/op-args.ts
+// funklang/src/codegen/op-args.ts
 import type { ArgSpec } from './arg-emit';
 
 export interface OpArgs {

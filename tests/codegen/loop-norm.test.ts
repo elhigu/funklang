@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeLoop } from './loop-norm';
+import { normalizeLoop } from '../../src/codegen/loop-norm';
 
 describe('normalizeLoop', () => {
   it('clamps offset to half-1 when below half (P01)', () => {

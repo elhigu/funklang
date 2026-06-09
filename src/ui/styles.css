@@ -1515,6 +1515,20 @@
   .size-breakdown-inner tr:nth-child(even) td { background: rgba(255,255,255,0.035); }
   .size-breakdown-inner tr:hover td { background: rgba(120,170,255,0.16); }
   .size-breakdown-note { opacity: 0.8; margin: 0 0 0.5rem; }
+  /* Code export panel */
+  .code-export-inner { width: min(760px, 94vw); }
+  .code-export-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .code-export-actions button {
+    background: var(--bg-2); border: 1px solid var(--grid); color: var(--fg-0);
+    font: inherit; font-size: 11px; padding: 4px 8px; cursor: pointer; margin-left: 6px;
+  }
+  .code-export-actions button:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+  .code-export-actions button:disabled { opacity: 0.4; cursor: default; }
+  .code-export-pre {
+    max-height: 50vh; overflow: auto; margin-top: 0.25rem;
+    background: var(--bg-0); border: 1px solid var(--grid-dim); padding: 8px;
+    font-size: 11px; line-height: 1.35; white-space: pre; color: var(--fg-1);
+  }
 
   .size-status {
     background: none; border: none; color: inherit; font: inherit; cursor: pointer;

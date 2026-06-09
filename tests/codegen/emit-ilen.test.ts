@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { emptyPatch, emptySlot } from '../../src/patch/types';
-import { emitIlen, highestInstrument } from './emit-ilen';
+import { emitIlen, highestInstrument } from '../../src/codegen/emit-ilen';
 
 describe('highestInstrument', () => {
   it('is highest index with sampleLength>2, plus one', () => {

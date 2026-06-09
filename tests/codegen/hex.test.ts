@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { csHex } from './hex';
+import { csHex } from '../../src/codegen/hex';
 
 describe('csHex (C# ToString("X"))', () => {
   it('uppercase, no leading zeros', () => {

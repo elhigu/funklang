@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { emptySlot } from '../../src/patch/types';
-import { renderArgs, VARTEXT } from './arg-emit';
+import { renderArgs, VARTEXT } from '../../src/codegen/arg-emit';
 
 describe('renderArgs', () => {
   it('VARTEXT table', () => {

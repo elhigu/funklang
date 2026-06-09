@@ -1,6 +1,6 @@
-// funklang/sizelab/exporter/op-args.test.ts
+// funklang/src/codegen/op-args.test.ts
 import { describe, it, expect } from 'vitest';
-import { OP_ARGS } from './op-args';
+import { OP_ARGS } from '../../src/codegen/op-args';
 
 describe('OP_ARGS table', () => {
   it('osc_saw (2) is instance + 2 varlits', () => {

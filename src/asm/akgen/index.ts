@@ -5,7 +5,7 @@
 // derived identically, then run the framework + op dispatch.
 
 import type { Patch } from '../../patch/types';
-import { emitDanScript } from '../../../sizelab/exporter/emit-inst';
+import { emitDanScript } from '../../codegen/emit-inst';
 import { newAkGenState } from './state';
 import { emitFramework, type ParsedInstrument } from './framework';
 import { dispatchOp } from './ops';

@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Patch } from '../../src/patch/types';
-import { emitDanScript } from '../exporter/emit-inst';
+import { emitDanScript } from '../../src/codegen/emit-inst';
 import { assembleM68k } from '../../src/asm/vasm';
 
 const AKLANG2ASM = join(import.meta.dirname, '..', '..', '..', 'exe_creator', 'aklang2asm.exe');

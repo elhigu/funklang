@@ -1,5 +1,5 @@
 import type { Patch } from '../../src/patch/types';
-import { normalizeLoop } from './loop-norm';
+import { normalizeLoop } from '../../src/codegen/loop-norm';
 
 /** Patch instrument sample-length (and loop, when slot 15 is loop_gen) words
  *  into a copy of `mod`, big-endian u16, mirroring Form1.cs 5646-5666. */
