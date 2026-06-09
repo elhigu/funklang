@@ -77,7 +77,9 @@ Version history: **[CHANGELOG.md](CHANGELOG.md)**.
 
 funklang stands entirely on the shoulders of the AmigaKlang ecosystem and its
 authors. All synthesis design, the `.bin` format, and the code-generation approach
-are theirs; funklang is a reimplementation, not original synth research.
+are theirs; funklang is a reimplementation, not original synth research. Full
+attribution and third-party terms (incl. the bundled vasm/Emscripten) are in
+**[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)**.
 
 - **AmigaKlang & AmigaKlang GUI** — Jochen **"Virgill" Feldkötter**
   (Alcatraz / Haujobb / Maniacs of Noise). The synth, the editor, the rendering core.
@@ -89,7 +91,7 @@ are theirs; funklang is a reimplementation, not original synth research.
 - **LSP & STrinkler (Atari playback)** — **Leonard / Oxygene**.
 - Thanks credited by the original tool: Hellfire, Bartman, Antiriad, Leonard, and the
   tips crew (Soundy, H0ffman, Bifat, Stingray, Aceman, Juice, Tecon).
-- **vasm** (m68k assembler, compiled here to WebAssembly) — **Volker Barthelmann &
+- **vasm** (m68k assembler, compiled here to WebAssembly without any modifications) — **Volker Barthelmann &
   Frank Wille**.
 
 ### Links

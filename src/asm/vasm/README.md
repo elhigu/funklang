@@ -5,8 +5,11 @@ Amiga hunk client-side, with no toolchain or server.
 
 - `vasm-m68k.mjs` + `vasm-m68k.wasm` — prebuilt Emscripten ES module (vasm 2.0e,
   `vasmm68k_mot`: m68k CPU, Motorola syntax). Loaded by `../vasm.ts`.
-- vasm is © Volker Barthelmann (http://sun.hasenbraten.de/vasm/). Free for use;
-  this is an unmodified build of the upstream source, just retargeted to wasm.
+- vasm is © Volker Barthelmann and Frank Wille (http://sun.hasenbraten.de/vasm/).
+  **Source-available freeware** (not OSI open source): non-commercial redistribution
+  of the unmodified work is permitted with attribution. This is an **unmodified**
+  build of the upstream source, only retargeted to WASM (no source changes). See
+  `../../../THIRD-PARTY-NOTICES.md` for the full terms.
 
 ## Syntax note
 vasm uses **Motorola** syntax. The native `m68k-amiga-elf-gcc` emits **GAS**
