@@ -264,6 +264,30 @@ export function oscNoise(st: AkGenState, output: string, inputs: string[]): stri
   return empty;
 }
 
+/** Program.cs Add 891-918. inputs = [val1, val2]. */
+export function add(st: AkGenState, output: string, inputs: string[]): string {
+  const text = remapVarToRegisterOrImmediate(output);
+  const text2 = remapVarToRegisterOrImmediate(inputs[0]!);
+  const text3 = remapVarToRegisterOrImmediate(inputs[1]!);
+  let empty = '';
+  if (text === text2) {
+    empty += '\t\t\t\tadd.w\t@V2,@OR\n';
+  } else if (text === text3) {
+    empty += '\t\t\t\tadd.w\t@V1,@OR\n';
+  } else {
+    empty += '\t\t\t\tmove.w\t@V1,@OR\n';
+    empty += '\t\t\t\tadd.w\t@V2,@OR\n';
+  }
+  empty = empty + '\t\t\t\tbvc.s\t.AddNoClamp_' + st.localLabel + '\n';
+  empty += '\t\t\t\tspl\t\t@OR\n';
+  empty += '\t\t\t\text.w\t@OR\n';
+  empty += '\t\t\t\teor.w\t#$7fff,@OR\n';
+  empty = empty + '.AddNoClamp_' + st.localLabel + '\n';
+  empty = empty.replaceAll('@OR', text);
+  empty = empty.replaceAll('@V1', text2);
+  return empty.replaceAll('@V2', text3);
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -286,7 +310,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'envd(', gen: stub('envd') },
   { match: 'enva(', gen: stub('enva') },
   { match: 'mul(', gen: stub('mul') },
-  { match: 'add(', gen: stub('add') },
+  { match: 'add(', gen: add },
   { match: 'ctrl(', gen: stub('ctrl') },
   { match: 'dly_cyc(', gen: stub('dly_cyc') },
   { match: 'cmb_flt_n(', gen: stub('cmb_flt_n') },

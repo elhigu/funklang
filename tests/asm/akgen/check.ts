@@ -103,6 +103,20 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 6, outVar: 4, gain: 1 },
       ];
       break;
+    case 'add':
+      // Add 891-918. inputs = [val1(selector->v?), val2(varlit: sel->v? else literal)].
+      // Cover the three output/operand branches + value classes:
+      //  - out != in1 != in2, const non-power-of-2 val2 (50) -> move/add path
+      //  - out != in1 != in2, const power-of-2 val2 (64) -> move/add path (no shift in Add)
+      //  - out == in1 (val1 selector == outVar) -> add.w @V2,@OR branch
+      //  - out == in2 (val2 selector == outVar) -> add.w @V1,@OR branch
+      ins.slots = [
+        { ...emptySlot(), fn: 9, outVar: 1, val1: 2, val2Value: 50 },
+        { ...emptySlot(), fn: 9, outVar: 2, val1: 3, val2Value: 64 },
+        { ...emptySlot(), fn: 9, outVar: 3, val1: 3, val2Value: 50 },
+        { ...emptySlot(), fn: 9, outVar: 4, val1: 1, val2: 4 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
