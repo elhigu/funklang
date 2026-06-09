@@ -53,6 +53,13 @@ export interface SlotGridOptions {
    * grid is rendered for the SOURCE instrument).
    */
   onSetOutput?: ((instrIdx: number, slotIdx: number) => void) | undefined;
+  /**
+   * Called when a FINGER presses a value knob — opens the touch value tuner
+   * for that param. `instrIdx` is the slot's instrument (differs from the
+   * active one inside an expanded clone block). Absent on desktop builds /
+   * non-touch; the knob then just drags.
+   */
+  onTuneParam?: ((instrIdx: number, slotIdx: number, field: keyof Slot) => void) | undefined;
 }
 
 /**
@@ -492,6 +499,7 @@ function renderParam(
   slotIdx: number,
   slot: Slot,
   param: ParamDef,
+  onTuneParam?: ((instrIdx: number, slotIdx: number, field: keyof Slot) => void) | undefined,
 ): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'param';
@@ -499,6 +507,10 @@ function renderParam(
   const writeValue = (v: number): void => {
     model.setSlotParam(instrIdx, slotIdx, param.field, v);
   };
+  // Touch hook handed to every value knob below: a finger opens the tuner.
+  const onTouchTune = onTuneParam
+    ? (): void => onTuneParam(instrIdx, slotIdx, param.field)
+    : undefined;
 
   switch (param.type.kind) {
     case 'const-int': {
@@ -521,6 +533,7 @@ function renderParam(
         ...(isCloneOffset ? { step: 2 } : {}),
         defaultValue: 0,
         onChange: writeValue,
+        onTouchTune,
       });
       knob.el.addEventListener('mousedown', (e) => e.stopPropagation());
       knob.el.addEventListener('click', (e) => e.stopPropagation());
@@ -605,6 +618,7 @@ function renderParam(
         scale: param.type.scale,
         defaultValue: 0,
         onChange: writeValue,
+        onTouchTune,
       });
       knob.el.classList.add('param-const-knob');
       knob.el.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -898,7 +912,7 @@ function renderRow(
   const opDef = opByCode(slot.fn);
   if (opDef) {
     for (const p of opDef.params) {
-      knobsHost.appendChild(renderParam(model, instrIdx, slotIdx, slot, p));
+      knobsHost.appendChild(renderParam(model, instrIdx, slotIdx, slot, p, opts.onTuneParam));
     }
   }
   // loop_gen has no slot params, but it owns the instrument's loop

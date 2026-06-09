@@ -1,10 +1,11 @@
 import { PatchModel, adjustIndexForMove } from '../patch/model';
 import { HistoryManager } from '../patch/history';
 import { emptyPatch, emptyInstrument, N_SLOTS_EDITABLE } from '../patch/types';
+import type { Slot } from '../patch/types';
 import { parseAkp, serializeAkp } from '../fileio/akp';
 import { parseAki, serializeAki } from '../fileio/aki';
 import { renderInstrument, CyclicCloneError } from '../dsp/engine';
-import { isPostRenderOp } from '../schema/op-metadata';
+import { isPostRenderOp, opByCode } from '../schema/op-metadata';
 import type { RenderResult } from '../dsp/types';
 import { Player } from '../audio/player';
 import { buildCloneGraph, allDependentsOf } from '../patch/clone-graph';
@@ -30,6 +31,8 @@ import { wireRevertPanel } from './revert-panel';
 import { slotDisplayTap, audibleForTarget, instrumentHasPostRender } from './audio-tap';
 import { firstPopulatedInstrument, isPatchBlank, instrumentIsEmpty } from '../patch/queries';
 import { createEditorState } from './editor-state';
+import { openTouchTuner } from './touch-tuner';
+import { tunableParams, paramIndex } from './param-list';
 import { NOTE_LIST, noteRateHz, DEFAULT_NOTE } from './note-table';
 
 const DEBOUNCE_MS = 80;
@@ -220,6 +223,23 @@ export function bootApp(root: HTMLElement): void {
     }
   };
 
+  // Open the touch value tuner for a finger-pressed knob. Wired into the slot
+  // grid via `onTuneParam`; mouse/pen never reach here (they drag inline).
+  const openTunerFor = (instrIdx: number, slotIdx: number, field: keyof Slot): void => {
+    const params = tunableParams(model.patch, instrIdx);
+    const activeIndex = paramIndex(params, slotIdx, field);
+    if (activeIndex < 0) return;
+    const slot = model.patch.instruments[instrIdx]?.slots[slotIdx];
+    const opName = slot ? (opByCode(slot.fn)?.name ?? '') : '';
+    openTouchTuner(root, {
+      title: `INSTR ${String(instrIdx + 1).padStart(2, '0')} · ${opName}`,
+      params,
+      activeIndex,
+      apply: (p, value) => model.setSlotParam(instrIdx, p.slotIdx, p.field, value),
+      sealUndo: () => history.sealCoalesce(),
+    });
+  };
+
   /**
    * Build a stable CSS selector for `el` based on its ancestor chain inside
    * `root`, using tag+data-* attributes. Used to find the equivalent element
@@ -344,6 +364,7 @@ export function bootApp(root: HTMLElement): void {
         // even when autoplayback-on-change is muted.
         playAuditionInternal({ force: true });
       },
+      onTuneParam: openTunerFor,
     });
     runRender();   // also paints slot byte-cost labels via annotateActiveSizes
     refreshOutputMasterBtn();

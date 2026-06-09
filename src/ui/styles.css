@@ -1618,3 +1618,69 @@
       align-self: start;
     }
   }
+
+  /* ─── touch value tuner ───────────────────────────────────────────────
+     A finger pressing a knob opens this modal (see touch-tuner.ts). Big
+     targets: a tall slider for coarse moves + four roller strips for
+     precise ±1/±10/±100/±1000 stepping. Full-screen scrim, centered panel. */
+  .touch-tuner-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 5, 9, 0.78);
+    touch-action: none;
+  }
+  .tt-panel {
+    width: min(440px, 94vw);
+    background: var(--bg-1);
+    border: 1px solid var(--grid);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .tt-head { display: flex; align-items: center; justify-content: space-between; }
+  .tt-title {
+    font-family: 'Silkscreen', monospace;
+    font-size: 12px; color: var(--amber-dim); letter-spacing: 0.6px;
+  }
+  .tt-close {
+    background: var(--bg-2); color: var(--amber);
+    border: 1px solid var(--grid); font: inherit; font-size: 13px;
+    padding: 8px 16px; cursor: pointer; letter-spacing: 0.5px;
+  }
+  .tt-close:hover { border-color: var(--amber); }
+  .tt-wave {
+    height: 84px;
+    background: #050507; border: 1px solid var(--grid-dim);
+    image-rendering: pixelated;
+  }
+  .tt-active { display: flex; align-items: baseline; justify-content: space-between; }
+  .tt-pname {
+    color: var(--fg-1); text-transform: lowercase; font-size: 15px; letter-spacing: 0.3px;
+  }
+  .tt-value {
+    color: var(--fg-0); font-size: 28px; font-variant-numeric: tabular-nums;
+  }
+  /* The reused knob, blown up for touch. Its own value/label are hidden —
+     the .tt-value readout above already shows the number. */
+  .tt-slider .knob { width: 100%; }
+  .tt-slider .kbar { height: 40px; min-width: 0; }
+  .tt-slider .kval, .tt-slider .klabel { display: none; }
+  .tt-rollers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .tt-roller {
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    height: 120px; padding: 10px 0;
+    background: var(--bg-2); border: 1px solid var(--grid);
+    color: var(--fg-1); cursor: ns-resize; user-select: none;
+    touch-action: none;
+  }
+  .tt-roller.active { border-color: var(--amber); background: var(--bg-3); }
+  .tt-roller-up, .tt-roller-dn { color: var(--fg-2); font-size: 14px; }
+  .tt-roller-mag {
+    color: var(--amber); font-size: 18px; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+  }
