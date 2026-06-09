@@ -237,6 +237,12 @@ export function bootApp(root: HTMLElement): void {
       activeIndex,
       apply: (p, value) => model.setSlotParam(instrIdx, p.slotIdx, p.field, value),
       sealUndo: () => history.sealCoalesce(),
+      // Live "tuned phase": render the instrument fresh and tap the slot.
+      wave: (p) => {
+        const ins = model.patch.instruments[instrIdx];
+        if (!ins) return new Int16Array(0);
+        return slotDisplayTap(ins, renderInstrument(model.patch, instrIdx), p.slotIdx);
+      },
     });
   };
 

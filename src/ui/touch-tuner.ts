@@ -11,6 +11,7 @@
 import { makeKnob } from './knob';
 import type { Knob } from './knob';
 import { formatInt } from './number-format';
+import { drawWaveform } from './waveform';
 import { rollerNotches, applyRoller } from './roller';
 import type { TunableParam } from './param-list';
 
@@ -31,6 +32,12 @@ export interface TouchTunerOpts {
   apply: (p: TunableParam, value: number) => void;
   /** Called on each drag end (finger lift) so one gesture = one undo point. */
   sealUndo: () => void;
+  /**
+   * Current display tap for a param's slot — the "tuned phase". Called on
+   * open and after every value change so the modal shows the waveform moving
+   * live. Omit to leave the wave panel blank.
+   */
+  wave?: ((p: TunableParam) => Int16Array) | undefined;
   /** Called after the overlay is torn down. */
   onClose?: (() => void) | undefined;
 }
@@ -58,7 +65,7 @@ export function openTouchTuner(root: HTMLElement, opts: TouchTunerOpts): TouchTu
         <span class="tt-title">${opts.title}</span>
         <button class="tt-close" id="touch-tuner-close" aria-label="Done">Done</button>
       </div>
-      <div class="tt-wave" data-tt-wave><!-- live waveform (later increment) --></div>
+      <div class="tt-wave" data-tt-wave><canvas data-tt-wave-cv width="420" height="84"></canvas></div>
       <div class="tt-active">
         <span class="tt-pname">${param.label}</span>
         <span class="tt-value" data-tt-value>${formatInt(current)}</span>
@@ -69,6 +76,14 @@ export function openTouchTuner(root: HTMLElement, opts: TouchTunerOpts): TouchTu
   root.appendChild(overlay);
 
   const valueEl = overlay.querySelector('[data-tt-value]') as HTMLElement;
+  const waveCv = overlay.querySelector('[data-tt-wave-cv]') as HTMLCanvasElement;
+
+  // The "tuned phase": redraw the active slot's tap after every change so the
+  // user sees the waveform respond as they tune.
+  const redrawWave = (): void => {
+    if (!opts.wave) return;
+    drawWaveform(waveCv, opts.wave(param), { width: waveCv.width, height: waveCv.height });
+  };
 
   // ── teardown ────────────────────────────────────────────────────────────
   let closed = false;
@@ -99,6 +114,7 @@ export function openTouchTuner(root: HTMLElement, opts: TouchTunerOpts): TouchTu
     valueEl.textContent = formatInt(current);
     opts.apply(param, current);
     if (!fromSlider && slider) slider.setValue(current);
+    redrawWave();                        // tuned phase follows the value
   };
 
   // ── big slider (reuse makeKnob; no onTouchTune → finger drags it) ────────
@@ -124,6 +140,7 @@ export function openTouchTuner(root: HTMLElement, opts: TouchTunerOpts): TouchTu
       (v) => setCurrent(v, false), { min: param.min, max: param.max }, opts.sealUndo));
   }
 
+  redrawWave();                          // initial paint of the tuned phase
   return { close, value: () => current };
 }
 
