@@ -1596,6 +1596,24 @@
     .instr-row.active .num { color: var(--amber); font-weight: 700; }
   }
 
+  /* ─── cramped 5-column editor: compact the param controls ─────────────
+     In the band just above the wave-under-params relayout (~760–840px of
+     editor), the 5-column grid is still shown but the params column is tight
+     — without this the knob bar holds its 120px floor, the row overflows, and
+     the value digits slide UNDER the (opaque) waveform thumbnail. Let the bar
+     give up its floor and cap the selects so the row always fits its column.
+     (Bars still flex to fill when there's room, so wider editors look the
+     same.) Placed before the stack block so that one wins outright at ≤760. */
+  @container editor (max-width: 860px) {
+    .knob .kbar { min-width: 56px; }
+    .slot > .col-params { min-width: 0; padding-right: 10px; }
+    .param { min-width: 0; }
+    .param-var-select,
+    .param-mode-select,
+    .param-enum-select,
+    .param-ref-select { max-width: 120px; }
+  }
+
   /* ─── narrow editor: drop the per-slot waveform under the parameters ───
      Fires on the slot grid's OWN width (container query on `main`), so it
      reflows the moment the editor itself gets cramped — independent of the
