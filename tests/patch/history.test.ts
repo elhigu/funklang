@@ -44,6 +44,24 @@ describe('HistoryManager', () => {
     expect(history.canRedo()).toBe(false);
   });
 
+  it('sealCoalesce() splits same-param edits into separate undo points', () => {
+    // Two edits to the same field within the window normally coalesce to ONE
+    // undo (now is frozen, so both are well inside the 600ms window).
+    model.setSlotParam(0, 0, 'freqVal', 100);
+    model.setSlotParam(0, 0, 'freqVal', 200);
+    history.undo();
+    expect(model.patch.instruments[0]!.slots[0]!.freqVal).toBe(0);   // one undo cleared both
+
+    // With a seal between them (one per drag), they become TWO undo points.
+    model.setSlotParam(0, 0, 'freqVal', 100);
+    history.sealCoalesce();                                          // finger lifted
+    model.setSlotParam(0, 0, 'freqVal', 200);
+    history.undo();
+    expect(model.patch.instruments[0]!.slots[0]!.freqVal).toBe(100); // back one drag
+    history.undo();
+    expect(model.patch.instruments[0]!.slots[0]!.freqVal).toBe(0);   // back the other
+  });
+
   it('coalesces 10 rapid setSlotParam calls on the same field into one entry', () => {
     for (let i = 1; i <= 10; i++) {
       now += 50; // 50ms apart → all inside the 600ms window after the prior event

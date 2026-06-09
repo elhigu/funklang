@@ -114,6 +114,16 @@ export class HistoryManager {
     this.lastEventAt = t;
   }
 
+  /**
+   * Force the next coalescable edit to start a FRESH history entry, even if
+   * it targets the same param within the coalesce window. Used by the touch
+   * value tuner to seal one undo point per drag gesture: call this on finger
+   * lift so two back-to-back drags on the same knob are two separate undos.
+   */
+  sealCoalesce(): void {
+    this.lastKey = null;
+  }
+
   undo(): void {
     if (!this.canUndo()) return;
     const prev = this.past.pop()!;
