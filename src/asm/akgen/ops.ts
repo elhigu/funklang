@@ -766,6 +766,112 @@ export function combFilter(st: AkGenState, output: string, inputs: string[]): st
   return empty;
 }
 
+/** Program.cs Reverb 1140-1257. dan-script: reverb(var1(signal->VL),
+ *  val2(feedback FB, uses mulRightShifts), gain(output gain GN, uses
+ *  mulRightShifts)). 8 comb buffers; each iteration bumps both
+ *  currentLargeBufferInstance++ and currentWordInstance++. */
+export function reverb(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = remapVarToRegisterOrImmediate(inputs[0]!);
+  const text = remapVarToRegisterOrImmediate(inputs[1]!);
+  const newValue3 = Object.prototype.hasOwnProperty.call(st.mulRightShifts, text)
+    ? st.mulRightShifts[text]!
+    : '';
+  const text2 = remapVarToRegisterOrImmediate(inputs[2]!);
+  const newValue4 = Object.prototype.hasOwnProperty.call(st.mulRightShifts, text2)
+    ? st.mulRightShifts[text2]!
+    : '';
+  const array = [557, 593, 641, 677, 709, 743, 787, 809];
+  let empty = '';
+  empty += '\t\t\t\tmove.l\td7,-(sp)\n';
+  empty += '\t\t\t\tsub.l\ta6,a6\n';
+  for (let i = 0; i < 8; i++) {
+    const newValue5 = String(st.currentWordInstance * 2);
+    const num = st.currentLargeBufferInstance * 4096;
+    const newValue6 = String(num);
+    const newValue7 = '#' + array[i]!;
+    if (num === 0) {
+      empty += '\t\t\t\tmove.l\ta1,a4\n';
+    } else if (num < 32767) {
+      empty += '\t\t\t\tlea\t\t@IN2(a1),a4\n';
+    } else {
+      empty += '\t\t\t\tmove.l\ta1,a4\n';
+      empty += '\t\t\t\tadd.l\t#@IN2,a4\n';
+    }
+    empty += '\t\t\t\tmove.w\tAK_OpInstance+@IN1(a5),d5\n';
+    empty += '\t\t\t\tmove.w\t(a4,d5.w),d4\n';
+    if (text !== '#128') {
+      if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, text)) {
+        empty += '\t\t\t\tasr.w\t@FS,d4\n';
+      } else if (text.includes('#')) {
+        empty += '\t\t\t\tmuls\t@FB,d4\n';
+        empty += '\t\t\t\tasr.l\t#7,d4\n';
+      } else {
+        empty += '\t\t\t\tmove.w\t@FB,d6\n';
+        empty += '\t\t\t\tand.w\t#255,d6\n';
+        empty += '\t\t\t\tmuls\td6,d4\n';
+        empty += '\t\t\t\tasr.l\t#7,d4\n';
+      }
+    }
+    empty += '\t\t\t\tadd.w\t@VL,d4\n';
+    empty = empty + '\t\t\t\tbvc.s\t.ReverbAddNoClamp_' + st.localLabel + '_' + i + '\n';
+    empty += '\t\t\t\tspl\t\td4\n';
+    empty += '\t\t\t\text.w\td4\n';
+    empty += '\t\t\t\teor.w\t#$7fff,d4\n';
+    empty = empty + '.ReverbAddNoClamp_' + st.localLabel + '_' + i + '\n';
+    empty += '\t\t\t\tmove.w\td4,(a4,d5.w)\n';
+    empty += '\t\t\t\taddq.w\t#2,d5\n';
+    empty += '\t\t\t\tcmp.w\t@DL<<1,d5\n';
+    empty = empty + '\t\t\t\tble.s\t.NoReverbReset_' + st.localLabel + '_' + i + '\n';
+    empty += '\t\t\t\tmoveq\t#0,d5\n';
+    empty = empty + '.NoReverbReset_' + st.localLabel + '_' + i + '\n';
+    empty += '\t\t\t\tmove.w  d5,AK_OpInstance+@IN1(a5)\n';
+    if (text2 !== '#128') {
+      if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, text2)) {
+        empty += '\t\t\t\tmove.w\td4,d7\n';
+        empty += '\t\t\t\tasr.w\t@GS,d7\n';
+      } else if (text2.includes('#')) {
+        empty += '\t\t\t\tmove.w\td4,d7\n';
+        empty += '\t\t\t\tmuls\t@GN,d7\n';
+        empty += '\t\t\t\tasr.l\t#7,d7\n';
+      } else {
+        empty += '\t\t\t\tmove.w\t@GN,d5\n';
+        empty += '\t\t\t\tand.w\t#255,d5\n';
+        empty += '\t\t\t\tmove.w\td4,d7\n';
+        empty += '\t\t\t\tmuls\td5,d7\n';
+        empty += '\t\t\t\tasr.l\t#7,d7\n';
+      }
+      empty += '\t\t\t\tadd.w\td7,a6\n';
+    } else {
+      empty += '\t\t\t\tadd.w\td4,a6\n';
+    }
+    empty = empty.replaceAll('@IN1', newValue5);
+    empty = empty.replaceAll('@IN2', newValue6);
+    empty = empty.replaceAll('@VL', newValue2);
+    empty = empty.replaceAll('@DL', newValue7);
+    empty = empty.replaceAll('@GN', text2);
+    empty = empty.replaceAll('@GS', newValue4);
+    empty = empty.replaceAll('@FB', text);
+    empty = empty.replaceAll('@FS', newValue3);
+    empty = empty.replaceAll('@OR', newValue);
+    st.currentLargeBufferInstance++;
+    st.currentWordInstance++;
+  }
+  empty += '\t\t\t\tmove.l\ta6,d7\n';
+  empty += '\t\t\t\tcmp.l\t#32767,d7\n';
+  empty = empty + '\t\t\t\tble.s\t.NoReverbMax_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#32767,d7\n';
+  empty = empty + '\t\t\t\tbra.s\t.NoReverbMin_' + st.localLabel + '\n';
+  empty = empty + '.NoReverbMax_' + st.localLabel + '\n';
+  empty += '\t\t\t\tcmp.l\t#-32768,d7\n';
+  empty = empty + '\t\t\t\tbge.s\t.NoReverbMin_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\t#-32768,d7\n';
+  empty = empty + '.NoReverbMin_' + st.localLabel + '\n';
+  empty += '\t\t\t\tmove.w\td7,@OR\n';
+  empty += '\t\t\t\tmove.l\t(sp)+,d7\n';
+  return empty.replaceAll('@OR', newValue);
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -792,7 +898,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'ctrl(', gen: control },
   { match: 'dly_cyc(', gen: delay },
   { match: 'cmb_flt_n(', gen: combFilter },
-  { match: 'reverb(', gen: stub('reverb') },
+  { match: 'reverb(', gen: reverb },
   { match: 'sv_flt_n(', gen: svFilter },
   { match: 'onepole_flt(', gen: onePoleFilter },
   { match: 'chordgen(', gen: stub('chordgen') },

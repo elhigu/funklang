@@ -288,6 +288,30 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 12, outVar: 2, val1: 3, freqVal: 400, val2Value: 64, gainVal: 50 },
       ];
       break;
+    case 'reverb':
+      // Reverb 1140-1257. dan-script: reverb(var1(signal->VL), val2(feedback FB,
+      //   uses mulRightShifts), gain(output gain GN, uses mulRightShifts)).
+      //   val1 must be non-zero (errIfVal1Zero). Each slot is 8 comb iterations
+      //   bumping currentLargeBufferInstance++ AND currentWordInstance++ per
+      //   iteration (so +8 each per slot). @IN2 branch (num=N*4096) within a
+      //   single slot: i=0 num=0 (move.l a1,a4), i=1..7 num=4096..28672 (<32767,
+      //   lea). A SECOND slot starts at large-buffer 8 -> num=32768 (>=32767,
+      //   move.l a1,a4 + add.l #@IN2) on its first iteration, covering the third
+      //   @IN2 branch. Cover FB and GN value classes across slots:
+      //  - FB power-of-2 (64 -> mulRightShifts -> asr.w @FS,d4);
+      //    GN power-of-2 (64 -> move d4,d7 + asr.w @GS,d7)
+      //  - FB non-power-of-2 const (50 -> muls @FB); GN non-power-of-2 const
+      //    (50 -> move d4,d7 + muls @GN,d7)
+      //  - FB 128 (scaling skipped); GN 128 (-> add.w d4,a6 branch)
+      //  - FB variable (val2 sel -> move/and @FB,d6 + muls d6,d4);
+      //    GN variable (gain sel -> move/and @GN,d5 + move d4,d7 + muls d5,d7)
+      ins.slots = [
+        { ...emptySlot(), fn: 13, outVar: 1, val1: 2, val2Value: 64, gainVal: 64 },
+        { ...emptySlot(), fn: 13, outVar: 2, val1: 3, val2Value: 50, gainVal: 50 },
+        { ...emptySlot(), fn: 13, outVar: 3, val1: 4, val2Value: 128, gainVal: 128 },
+        { ...emptySlot(), fn: 13, outVar: 4, val1: 4, val2: 2, gain: 3 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
