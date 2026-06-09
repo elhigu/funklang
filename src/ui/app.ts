@@ -92,12 +92,12 @@ export function bootApp(root: HTMLElement): void {
       <header>
         <div class="brand"><div class="dot"></div><span>FUNKLANG.WEB</span></div>
         <div class="menu">
+          <button id="menu-toggle" class="menu-toggle" aria-label="Menu" aria-expanded="false" title="Menu">☰</button>
+          <div class="menu-items">
           <button id="btn-close" title="Close the current patch — gives you a blank project ready to edit. Disabled when nothing has been done.">CLOSE</button>
           <button id="btn-open">OPEN&nbsp;PATCH</button>
           <button id="btn-save">SAVE</button>
           <button id="btn-save-as">SAVE&nbsp;AS</button>
-          <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶&nbsp;UNDO</button>
-          <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷&nbsp;REDO</button>
           <button id="btn-revert" title="Browse autosaves (snapshot every minute to localStorage)">REVERT&nbsp;AUTOSAVE</button>
           <label class="base-toggle-wrap" title="Display numbers as decimal or hexadecimal everywhere">
             <span class="base-toggle-label">BASE</span>
@@ -116,6 +116,7 @@ export function bootApp(root: HTMLElement): void {
             <button id="btn-audio-toggle" class="audio-toggle on" title="Audio on — click to mute (changes still re-render). Spacebar replays.">▶</button>
           </div>
           <button id="btn-help" class="help-btn" title="Keyboard shortcuts (?)">?</button>
+          </div>
         </div>
         <div class="file-info">
           <span class="file-name" id="file-name">(no patch)</span>
@@ -156,8 +157,6 @@ export function bootApp(root: HTMLElement): void {
   const selectionLabel = root.querySelector('#selection-label') as HTMLElement;
   const outputLabel = root.querySelector('#output-label') as HTMLElement;
   const outputMasterBtn = root.querySelector('#btn-output-master') as HTMLButtonElement;
-  const undoBtn = root.querySelector('#btn-undo') as HTMLButtonElement;
-  const redoBtn = root.querySelector('#btn-redo') as HTMLButtonElement;
 
   // Per-render caches of the slot-grid container and wave viewer so we can
   // call updateSlotWaves / viewer.setSample without rebuilding the DOM.
@@ -176,10 +175,6 @@ export function bootApp(root: HTMLElement): void {
     cloneGraph = buildCloneGraph(model.patch);
   };
 
-  const updateUndoRedoButtons = (): void => {
-    undoBtn.disabled = !history.canUndo();
-    redoBtn.disabled = !history.canRedo();
-  };
 
   /**
    * If `state.outputTarget.slotIdx` no longer references a valid slot (e.g. the
@@ -744,7 +739,6 @@ export function bootApp(root: HTMLElement): void {
       outputLabel.textContent =
         `instr ${oNum} / slot ${String(state.outputTarget.slotIdx + 1).padStart(2, '0')}${vlabel}`;
     }
-    updateUndoRedoButtons();
     sizeBar?.refresh();
   };
 
@@ -769,7 +763,6 @@ export function bootApp(root: HTMLElement): void {
       validateOutputTarget();
       renderMain();
       repaint();
-      updateUndoRedoButtons();
       return;
     }
     // Structure changes can rewire the clone graph; rebuild before we decide
@@ -795,7 +788,6 @@ export function bootApp(root: HTMLElement): void {
       e.instrIdx === state.activeIdx ||
       state.outputTarget.instrIdx === e.instrIdx ||
       allDependentsOf(cloneGraph, e.instrIdx).has(state.activeIdx);
-    updateUndoRedoButtons();
     if (!affectsActive) return;
     if (e.kind === 'structure') {
       // Layout change → full DOM rebuild (sidebar already repainted above).
@@ -805,11 +797,41 @@ export function bootApp(root: HTMLElement): void {
   });
 
   history.on(() => {
-    updateUndoRedoButtons();
   });
 
   // Help modal: open via ? button or unmodified '?' key; close via X / Esc.
   const help = wireHelp(root);
+
+  // ── Responsive top menu: collapse to a hamburger when the toolbar would
+  //    overflow. Measured against the expanded layout so it adapts to the
+  //    actual content width, not a guessed breakpoint.
+  const headerEl = root.querySelector('header') as HTMLElement;
+  const menuEl = root.querySelector('.menu') as HTMLElement;
+  const menuToggleEl = root.querySelector('#menu-toggle') as HTMLButtonElement;
+  const menuItemsEl = root.querySelector('.menu-items') as HTMLElement;
+  const setMenuOpen = (open: boolean): void => {
+    menuEl.classList.toggle('open', open);
+    menuToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  const checkMenuOverflow = (): void => {
+    menuEl.classList.remove('collapsed');          // expand to measure true content width
+    const overflow = menuItemsEl.scrollWidth > menuItemsEl.clientWidth + 1;
+    menuEl.classList.toggle('collapsed', overflow);
+    if (!overflow) setMenuOpen(false);             // never leave a dropdown stuck open when expanded
+  };
+  menuToggleEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setMenuOpen(!menuEl.classList.contains('open'));
+  });
+  // A button inside the dropdown closes it (selects stay — they open natively).
+  menuItemsEl.addEventListener('click', (e) => {
+    if (menuEl.classList.contains('collapsed') && (e.target as HTMLElement).closest('button')) setMenuOpen(false);
+  });
+  document.addEventListener('click', (e) => {
+    if (menuEl.classList.contains('open') && !menuEl.contains(e.target as Node)) setMenuOpen(false);
+  });
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => checkMenuOverflow()).observe(headerEl);
+  checkMenuOverflow();
 
   // Global keydown / beforeunload. Stored on window so Vite HMR re-mounts
   // don't accumulate duplicate listeners (which would fire savePatch
@@ -927,8 +949,6 @@ export function bootApp(root: HTMLElement): void {
   w.__funklangBeforeUnload = beforeUnloadHandler;
   window.addEventListener('beforeunload', beforeUnloadHandler);
 
-  undoBtn.addEventListener('click', () => history.undo());
-  redoBtn.addEventListener('click', () => history.redo());
 
   // Shared "I've just got a new patch" wiring — used by both the FSA
   // open path (which gives us a write-back handle) and the hidden input
@@ -1188,7 +1208,6 @@ export function bootApp(root: HTMLElement): void {
   });
 
   applyEdit({ kind: 'select' });   // initial paint of the blank editor
-  updateUndoRedoButtons();
 
   // Expose the model on window so E2E tests can drive moves and edits
   // without simulating DOM drag-and-drop (brittle in headless browsers).
