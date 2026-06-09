@@ -312,6 +312,24 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 13, outVar: 4, val1: 4, val2: 2, gain: 3 },
       ];
       break;
+    case 'sampleHold':
+    case 'sh':
+      // Sample_And_Hold 732-768. dan-script: sh(instance, var1(signal->VL),
+      //   gain(STR, the S&H trigger; varlit gain/gainVal)). val1 must be
+      //   non-zero (errIfVal1Zero) -> @VL is a register d0..d3.
+      //  - inputs[2]=gain: const '#' path -> @STI = #(n*n>>2) compile-time
+      //    constant; the move.w @STI store branch. Cover const value classes:
+      //      power-of-2 (64), non-power-of-2 (50), 128 (still '#', same path).
+      //  - variable gain operand (gain sel -> d0..d3, no '#') -> the
+      //    move.w/and.w/muls/asr.l d4 runtime-square path + move.w d4 store.
+      // Each slot bumps currentWordInstance += 2 (the @IN1/@IN2 word pair).
+      ins.slots = [
+        { ...emptySlot(), fn: 19, outVar: 1, val1: 2, gainVal: 64 },
+        { ...emptySlot(), fn: 19, outVar: 2, val1: 3, gainVal: 50 },
+        { ...emptySlot(), fn: 19, outVar: 3, val1: 4, gainVal: 128 },
+        { ...emptySlot(), fn: 19, outVar: 4, val1: 4, gain: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

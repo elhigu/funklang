@@ -872,6 +872,45 @@ export function reverb(st: AkGenState, output: string, inputs: string[]): string
   return empty.replaceAll('@OR', newValue);
 }
 
+/** Program.cs Sample_And_Hold 732-768. dan-script: sh(instance, var1(signal->VL),
+ *  gain(STR, the S&H trigger source; uses varlit gain/gainVal)). val1 must be
+ *  non-zero (errIfVal1Zero). Bumps currentWordInstance += 2. */
+export function sampleHold(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = String(st.currentWordInstance * 2);
+  const newValue3 = String(st.currentWordInstance * 2 + 2);
+  const newValue4 = remapVarToRegisterOrImmediate(inputs[1]!);
+  const text = remapVarToRegisterOrImmediate(inputs[2]!);
+  let newValue5 = '';
+  const num = text.includes('#');
+  let text2 = '';
+  if (!num) {
+    text2 += '\t\t\t\tmove.w\t@STR,d4\n';
+    text2 += '\t\t\t\tand.w\t#255,d4\n';
+    text2 += '\t\t\t\tmuls\td4,d4\n';
+    text2 += '\t\t\t\tasr.l\t#2,d4\n';
+  } else {
+    const num2 = Number.parseInt(inputs[2]!, 10);
+    newValue5 = '#' + ((num2 * num2) >> 2);
+  }
+  text2 += '\t\t\t\tsub.w\t#1,AK_OpInstance+@IN1(a5)\n';
+  text2 = text2 + '\t\t\t\tbge.s\t.SHNoStore_' + st.localLabel + '\n';
+  text2 += '\t\t\t\tmove.w\t@VL,AK_OpInstance+@IN2(a5)\n';
+  text2 = num
+    ? text2 + '\t\t\t\tmove.w\t@STI,AK_OpInstance+@IN1(a5)\n'
+    : text2 + '\t\t\t\tmove.w\td4,AK_OpInstance+@IN1(a5)\n';
+  text2 = text2 + '.SHNoStore_' + st.localLabel + '\n';
+  text2 += '\t\t\t\tmove.w\tAK_OpInstance+@IN2(a5),@OR\n';
+  text2 = text2.replaceAll('@IN1', newValue2);
+  text2 = text2.replaceAll('@IN2', newValue3);
+  text2 = text2.replaceAll('@STR', text);
+  text2 = text2.replaceAll('@STI', newValue5);
+  text2 = text2.replaceAll('@VL', newValue4);
+  text2 = text2.replaceAll('@OR', newValue);
+  st.currentWordInstance += 2;
+  return text2;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -890,7 +929,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'osc_sine(', gen: oscSine },
   { match: 'osc_pulse(', gen: oscPulse },
   { match: 'osc_noise(', gen: oscNoise },
-  { match: 'sh(', gen: stub('sh') },
+  { match: 'sh(', gen: sampleHold },
   { match: 'envd(', gen: envDecay },
   { match: 'enva(', gen: envAttack },
   { match: 'mul(', gen: mul },
