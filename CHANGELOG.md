@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`LICENSE`** — MIT for funklang's own code (bundled vasm + the AmigaKlang/
+  Aklang2Asm-derived parts stay under their own terms; see THIRD-PARTY-NOTICES).
+  `package.json` license/author/description/keywords filled in.
 - **Mobile / portrait support.** Added the `viewport` meta tag (which lets the
   existing editor container-queries and sidebar-collapse actually fire on a
   phone) and phone-tuned the surrounding chrome (footer, modals, touch targets).

@@ -15,6 +15,7 @@ import { pickSmartOutVar } from '../patch/smart-out-var';
 import { generateInstrumentName } from './name-generator';
 import { clampLoopOffset, loopLengthFor, minLoopOffset, maxLoopOffset } from '../patch/loop-rules';
 import { isValidCloneSource } from '../patch/clone-graph';
+import { classifyVarRef, varRefLabel, type VarRef } from '../patch/var-refs';
 import type { ParamDef } from '../schema/op-metadata';
 
 /** Lazy op-picker cost provider: exact bytes that adding `op` to `instrIdx`
@@ -357,12 +358,12 @@ interface VarSelectOpts {
    */
   allowNone: boolean;
   /**
-   * Set of variable indices (1..4) that have been written to by any
-   * earlier slot in the same instrument. Options outside this set get
-   * a "(unset)" suffix and, when SELECTED-but-unset, the whole control
-   * gets a red border so the user knows the input will be silence.
+   * Classify a variable (1..4) for this slot: 'normal' (written earlier),
+   * 'feedback' (written only by a later slot — a one-sample feedback loop,
+   * labelled "(feedback #N)" and NOT flagged red) or 'unset' (written by no
+   * slot — labelled "(unset)" and flagged red, since it's silence).
    */
-  availableVars?: ReadonlySet<number> | undefined;
+  classify: (v: number) => VarRef;
   title?: string | undefined;
   onChange: (v: number) => void;
 }
@@ -378,22 +379,21 @@ function makeVarSelect(opts: VarSelectOpts): HTMLSelectElement {
     { value: 3, text: 'v3' },
     { value: 4, text: 'v4' },
   ];
-  const avail = opts.availableVars;
   for (const o of labels) {
     const optEl = document.createElement('option');
     optEl.value = String(o.value);
-    // v1..v4 that aren't yet written get a "(unset)" suffix so the user
-    // knows picking them feeds silence into this slot.
-    const isUnset = o.value > 0 && !!avail && !avail.has(o.value);
-    optEl.textContent = isUnset ? `${o.text} (unset)` : o.text;
+    optEl.textContent = varRefLabel(o.text, opts.classify(o.value));
     if (o.value === opts.value) optEl.selected = true;
     sel.appendChild(optEl);
   }
-  // If the currently-selected source is unset, highlight the whole control
-  // so the warning is visible without opening the dropdown.
-  const currentlyUnset = opts.value > 0 && !!avail && !avail.has(opts.value);
-  sel.classList.toggle('var-unset', currentlyUnset);
-  if (currentlyUnset) sel.title = (sel.title ? sel.title + ' — ' : '') + `v${opts.value} is not written by any earlier slot`;
+  // Reflect the SELECTED source's status on the control itself so it's
+  // visible without opening the dropdown: red for truly-unset (silence),
+  // a distinct (non-red) feedback hint for a forward/feedback reference.
+  const st = opts.value > 0 ? opts.classify(opts.value) : { kind: 'normal' as const };
+  sel.classList.toggle('var-unset', st.kind === 'unset');
+  sel.classList.toggle('var-feedback', st.kind === 'feedback');
+  if (st.kind === 'unset') sel.title = (sel.title ? sel.title + ' — ' : '') + `v${opts.value} is not written by any slot (silence)`;
+  else if (st.kind === 'feedback') sel.title = (sel.title ? sel.title + ' — ' : '') + `v${opts.value} is feedback from phase ${st.feedbackRow} (previous-sample value)`;
   sel.addEventListener('change', () => {
     const v = parseInt(sel.value, 10);
     if (Number.isFinite(v)) opts.onChange(v);
@@ -481,26 +481,6 @@ function makeRefSelect(opts: RefSelectOpts): HTMLSelectElement {
  * Render a single ParamDef as a DOM element (which the slot-grid appends
  * into the per-row .params host). Each widget is wired to model.setSlotParam.
  */
-/**
- * The set of variables (1..4) written to by any slot BEFORE `slotIdx` in
- * the given instrument. A var-source dropdown picking a variable outside
- * this set is referencing silence — surfaced as `(unset)` + red border.
- */
-function writtenVarsBefore(
-  model: PatchModel,
-  instrIdx: number,
-  slotIdx: number,
-): Set<number> {
-  const ins = model.patch.instruments[instrIdx];
-  if (!ins) return new Set();
-  const out = new Set<number>();
-  for (let i = 0; i < slotIdx; i++) {
-    const s = ins.slots[i];
-    if (s && s.fn !== 0 && s.outVar > 0) out.add(s.outVar);
-  }
-  return out;
-}
-
 function renderParam(
   model: PatchModel,
   instrIdx: number,
@@ -555,10 +535,11 @@ function renderParam(
       label.className = 'pname';
       label.textContent = param.type.label;
       wrap.appendChild(label);
+      const ins = model.patch.instruments[instrIdx]!;
       const sel = makeVarSelect({
         value: slot[param.field] as number,
         allowNone: param.type.allowNone ?? true,
-        availableVars: writtenVarsBefore(model, instrIdx, slotIdx),
+        classify: (v) => classifyVarRef(ins, slotIdx, v),
         title: param.type.label,
         onChange: (v) => {
           writeValue(v);
@@ -585,9 +566,10 @@ function renderParam(
       label.textContent = param.type.label;
       wrap.appendChild(label);
 
-      // Selector dropdown: "const" | v1..v4. Variables not written by any
-      // earlier slot get a "(unset)" suffix, and when one is the current
-      // selection the whole dropdown gets a red border (.var-unset).
+      // Selector dropdown: "const" | v1..v4. A variable written by no slot
+      // gets "(unset)" + a red border (silence); one written only by a LATER
+      // slot gets "(feedback #N)" + a non-red hint (a deliberate feedback
+      // loop, not an error).
       const sel = document.createElement('select');
       sel.className = 'param-mode-select';
       sel.title = `${param.type.label}: source`;
@@ -599,19 +581,20 @@ function renderParam(
         { value: 4, text: 'v4' },
       ];
       const curSelector = slot[selFieldKey] as number;
-      const availV = writtenVarsBefore(model, instrIdx, slotIdx);
+      const insVoc = model.patch.instruments[instrIdx]!;
+      const classifyVoc = (v: number): VarRef => classifyVarRef(insVoc, slotIdx, v);
       for (const m of modes) {
         const optEl = document.createElement('option');
         optEl.value = String(m.value);
-        const isUnsetVar = m.value > 0 && !availV.has(m.value);
-        optEl.textContent = isUnsetVar ? `${m.text} (unset)` : m.text;
+        optEl.textContent = m.value === 0 ? m.text : varRefLabel(m.text, classifyVoc(m.value));
         if (m.value === curSelector) optEl.selected = true;
         sel.appendChild(optEl);
       }
-      if (curSelector > 0 && !availV.has(curSelector)) {
-        sel.classList.add('var-unset');
-        sel.title += ` — v${curSelector} is not written by any earlier slot`;
-      }
+      const curSt = curSelector > 0 ? classifyVoc(curSelector) : { kind: 'normal' as const };
+      sel.classList.toggle('var-unset', curSt.kind === 'unset');
+      sel.classList.toggle('var-feedback', curSt.kind === 'feedback');
+      if (curSt.kind === 'unset') sel.title += ` — v${curSelector} is not written by any slot (silence)`;
+      else if (curSt.kind === 'feedback') sel.title += ` — v${curSelector} is feedback from phase ${curSt.feedbackRow}`;
       sel.addEventListener('click', (e) => e.stopPropagation());
       sel.addEventListener('mousedown', (e) => e.stopPropagation());
       attachWheelStep(sel);
@@ -889,6 +872,10 @@ function renderRow(
     const v = parseInt(sel.value, 10);
     if (!Number.isFinite(v)) return;
     model.setSlotParam(instrIdx, slotIdx, 'outVar', v);
+    // Changing which variable a slot writes changes how OTHER slots' var
+    // sources read (a later writer turns an earlier "(unset)" into a
+    // "(feedback)" and vice-versa) — rebuild the grid so every label updates.
+    model.events.emit({ instrIdx, kind: 'structure' });
   });
   sel.addEventListener('click', (e) => e.stopPropagation());
   attachWheelStep(sel);

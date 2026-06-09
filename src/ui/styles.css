@@ -965,11 +965,18 @@
   .param-mode-select:focus,
   .param-enum-select:focus,
   .param-ref-select:focus { border-color: var(--amber); }
-  /* Dropdown points at a variable nothing earlier writes — warning. */
+  /* Dropdown points at a variable NO slot writes — silence, warn in red. */
   .param-var-select.var-unset,
   .param-mode-select.var-unset {
     color: var(--red);
     border-color: var(--red);
+  }
+  /* Dropdown points at a variable written only by a LATER slot — a deliberate
+     one-sample feedback loop. Not an error: hint in cyan, never red. */
+  .param-var-select.var-feedback,
+  .param-mode-select.var-feedback {
+    color: var(--cyan);
+    border-color: var(--cyan);
   }
 
   /* var-or-const: knob is dimmed when source is a variable rather than const */

@@ -85,6 +85,6 @@ Amiga toolchain used only for offline cross-checks (**Shrinkler** by Blueberry,
 ---
 
 ## funklang itself
-funklang's own code is © its author (Mikael Lepistö / elhigu). See the repository
-for its license; note that the vasm and AmigaKlang-derived portions remain under
-their respective terms above and are **not** relicensed by funklang.
+funklang's own code is © Mikael Lepistö (elhigu / funktion) and released under the
+**MIT License** (see `LICENSE`). The vasm and AmigaKlang-derived portions remain
+under their respective terms above and are **not** relicensed by funklang.

@@ -1,7 +1,8 @@
 {
   "name": "funklang",
   "version": "1.0.0",
-  "description": "",
+  "description": "Browser reimplementation of AmigaKlang — design Amiga synth instruments and export the real, byte-identical .bin in-browser.",
+  "homepage": "https://funklang.mkael.net",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -25,9 +26,9 @@
     "gate": "npm run typecheck && npm test && npm run e2e",
     "asm:bin": "nix-shell -p mono --run 'npx tsx groundtruth/harness/asm-bin.ts'"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["amiga", "demoscene", "synthesizer", "m68k", "amigaklang", "chiptune"],
+  "author": "Mikael Lepistö (elhigu / funktion)",
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "@playwright/test": "^1.60.0",

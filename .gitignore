@@ -1,0 +1,25 @@
+# funklang-scoped ignores (this file rides along when funklang/ is split out
+# into its own repo, so the standalone repo is self-contained).
+
+# build / install
+node_modules/
+dist/
+deploy/
+**/*.tsbuildinfo
+
+# patches/instruments — project rule: no .akp / .aki / .bin in git
+*.akp
+*.aki
+*.bin
+
+# groundtruth compile-harness scratch + locally-built refrender binary
+groundtruth/.scratch/
+tools/refrender/refrender
+
+# test output
+test-results/
+playwright-report/
+
+# editor / OS
+.vscode/
+.DS_Store
