@@ -70,6 +70,7 @@
     height: 100vh;
     width: 100vw;
     overflow: hidden;          /* belt-and-suspenders against page-level scrollbars */
+    position: relative;        /* anchor for the narrow-screen floating sidebar */
   }
 
   /* ─── header ────────────────────────────────────────────── */
@@ -233,7 +234,20 @@
     padding: 12px 14px 8px;
     letter-spacing: 0.8px;
     border-bottom: 1px solid var(--grid-dim);
+    /* It's a <button> so it can toggle the list on narrow screens, but in
+       the wide layout it should read as a plain section title. */
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    cursor: default;
   }
+  /* The active-instrument number shown when the rail is collapsed — hidden
+     in the wide layout; the media query below swaps it in. */
+  .sb-title-num { display: none; }
   .instr-list {
     list-style: none;
     flex: 1;
@@ -1503,3 +1517,40 @@
     font: 10px/1 monospace; opacity: 0.65; padding: 0 4px; font-variant-numeric: tabular-nums;
   }
   .slot-size[data-last-use="1"] { opacity: 0.95; color: #e9c46a; }
+
+  /* ─── narrow screens: collapse the instrument sidebar to a number ──────
+     Below this width the 240px sidebar would crowd the editor. Collapse it
+     to a thin rail that shows only the active instrument number; clicking
+     the header floats the full list OVER the main area (it doesn't reflow
+     the editor). The JS in app.ts only toggles `.sb-open`. */
+  @media (max-width: 720px) {
+    .app    { grid-template-columns: 40px minmax(0, 1fr); }
+    header  { grid-template-columns: 40px minmax(0, 1fr) auto; }
+
+    /* Brand shrinks to just its glowing dot so it aligns with the 40px rail. */
+    .brand      { padding: 0; gap: 0; justify-content: center; }
+    .brand span { display: none; }
+
+    /* Collapsed rail. */
+    .sidebar       { overflow: hidden; }
+    .sidebar-title { cursor: pointer; padding: 12px 4px 8px; text-align: center; }
+    .sb-title-full { display: none; }
+    .sb-title-num  { display: block; font-size: 13px; color: var(--amber); }
+    .instr-list    { display: none; }
+
+    /* Opened: float the full list over the editor, header→footer height. */
+    .sidebar.sb-open {
+      position: absolute;
+      top: 44px;
+      bottom: 30px;
+      left: 0;
+      width: 240px;
+      z-index: 50;
+      overflow-y: auto;
+      box-shadow: 6px 0 22px rgba(0, 0, 0, 0.55);
+    }
+    .sidebar.sb-open .sidebar-title { text-align: left; padding: 12px 14px 8px; }
+    .sidebar.sb-open .sb-title-full { display: inline; }
+    .sidebar.sb-open .sb-title-num  { display: none; }
+    .sidebar.sb-open .instr-list    { display: block; }
+  }

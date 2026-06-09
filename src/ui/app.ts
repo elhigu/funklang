@@ -123,8 +123,11 @@ export function bootApp(root: HTMLElement): void {
         </div>
       </header>
       ${helpOverlayHtml()}
-      <aside class="sidebar">
-        <div class="sidebar-title">PATCH · INSTRUMENTS</div>
+      <aside class="sidebar" id="sidebar">
+        <button class="sidebar-title" id="sidebar-toggle" aria-expanded="false" title="Instrument list. On narrow screens it collapses to the active number — click to float the full list over the editor.">
+          <span class="sb-title-full">PATCH · INSTRUMENTS</span>
+          <span class="sb-title-num" id="sb-active-num">01</span>
+        </button>
         <ul class="instr-list" id="instr-list"></ul>
       </aside>
       <main id="main-area"></main>
@@ -151,12 +154,34 @@ export function bootApp(root: HTMLElement): void {
   `;
 
   const listEl = root.querySelector('#instr-list') as HTMLElement;
+  const sidebarEl = root.querySelector('#sidebar') as HTMLElement;
+  const sidebarToggleEl = root.querySelector('#sidebar-toggle') as HTMLButtonElement;
+  const sbActiveNumEl = root.querySelector('#sb-active-num') as HTMLElement;
   const nameEl = root.querySelector('#file-name') as HTMLElement;
   const mainEl = root.querySelector('#main-area') as HTMLElement;
   const hidden = root.querySelector('#hidden-file-input') as HTMLInputElement;
   const selectionLabel = root.querySelector('#selection-label') as HTMLElement;
   const outputLabel = root.querySelector('#output-label') as HTMLElement;
   const outputMasterBtn = root.querySelector('#btn-output-master') as HTMLButtonElement;
+
+  // Narrow-screen sidebar: CSS (a width media query) collapses the
+  // instrument list to a rail showing just the active instrument number;
+  // clicking the header floats the full list over the editor. JS only
+  // toggles the open/closed class — the layout is entirely CSS.
+  const setSidebarOpen = (open: boolean): void => {
+    sidebarEl.classList.toggle('sb-open', open);
+    sidebarToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  sidebarToggleEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setSidebarOpen(!sidebarEl.classList.contains('sb-open'));
+  });
+  // A click anywhere outside the floating panel closes it.
+  document.addEventListener('click', (e) => {
+    if (sidebarEl.classList.contains('sb-open') && !sidebarEl.contains(e.target as Node)) {
+      setSidebarOpen(false);
+    }
+  });
 
   // Per-render caches of the slot-grid container and wave viewer so we can
   // call updateSlotWaves / viewer.setSample without rebuilding the DOM.
@@ -521,10 +546,13 @@ export function bootApp(root: HTMLElement): void {
       // Sidebar click also auto-plays (subject to the audio toggle), same
       // as wheel/arrow nav. Empty rows are clickable now too — the slot
       // grid renders an empty-state placeholder with a [+] button there.
-      onPick: (i) => selectInstrument(i, { play: true }),
+      // On a narrow screen, picking also dismisses the floating panel.
+      onPick: (i) => { selectInstrument(i, { play: true }); setSidebarOpen(false); },
       onDelete: removeInstrumentWithConfirm,
       onMove: moveInstrumentWithRemap,
     });
+    // Keep the collapsed-rail number in sync with the active instrument.
+    sbActiveNumEl.textContent = String(state.activeIdx + 1).padStart(2, '0');
     updateCloseButton();
   };
 

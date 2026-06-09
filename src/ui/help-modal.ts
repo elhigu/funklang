@@ -32,6 +32,7 @@ export function helpOverlayHtml(): string {
                 <tr><td>Mouse wheel over list</td><td>Step ± to previous / next non-empty instrument</td></tr>
                 <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Same — wraps around past the ends</td></tr>
                 <tr><td>Drag an instrument row</td><td>Reorder instruments in the sidebar. Clone/chordgen sources auto-rewire to follow the moved instrument; links that would violate Klang's "source must be a lower-numbered instrument" rule reset to instrument 01</td></tr>
+                <tr><td>Narrow screen</td><td>The sidebar collapses to a rail showing just the active instrument number. Click the header to float the full list over the editor; picking an instrument (or clicking outside) closes it again</td></tr>
               </tbody>
             </table>
 
