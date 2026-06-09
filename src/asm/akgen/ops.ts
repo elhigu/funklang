@@ -3,7 +3,7 @@
 // stubs that throw until ported.
 
 import type { AkGenState } from './state';
-import { remapVarToRegisterOrImmediate } from './helpers';
+import { remapVarToRegisterOrImmediate, getDecayValue } from './helpers';
 
 export type OpGen = (st: AkGenState, output: string, inputs: string[]) => string;
 
@@ -324,6 +324,57 @@ export function control(_st: AkGenState, output: string, inputs: string[]): stri
   return text3.replaceAll('@IR', text2);
 }
 
+/** Program.cs Env_Decay 770-818. inputs = [smp, decayIndex, sustain, gain]. */
+export function envDecay(st: AkGenState, output: string, inputs: string[]): string {
+  const newValue = remapVarToRegisterOrImmediate(output);
+  const newValue2 = String(st.currentEnvDInstance * 4);
+  const decayValue = getDecayValue(Number.parseInt(inputs[1]!, 10));
+  const num = Number.parseInt(inputs[2]!, 10) << 24;
+  const text = '#' + (Number.parseInt(inputs[2]!, 10) << 24);
+  const text2 = remapVarToRegisterOrImmediate(inputs[3]!);
+  const newValue3 = Object.prototype.hasOwnProperty.call(st.mulRightShifts, text2)
+    ? st.mulRightShifts[text2]!
+    : '';
+  let text3 = '';
+  if (!text2.includes('#')) {
+    text3 += '\t\t\t\tmove.w\t@GN,@TR1\n';
+    text3 += '\t\t\t\tand.w\t#255,@TR1\n';
+  }
+  text3 += '\t\t\t\tmove.l\tAK_EnvDValue+@IN(a5),d5\n';
+  text3 += '\t\t\t\tmove.l\td5,@OR\n';
+  text3 += '\t\t\t\tswap\t@OR\n';
+  text3 += '\t\t\t\tsub.l\t@DV,d5\n';
+  if (text !== '#0') {
+    text3 += '\t\t\t\tcmp.l\t@SV,d5\n';
+  }
+  text3 = text3 + '\t\t\t\tbgt.s   .EnvDNoSustain_' + st.localLabel + '\n';
+  text3 =
+    num > 127 || num < -128
+      ? text3 + '\t\t\t\tmove.l\t@SV,d5\n'
+      : text3 + '\t\t\t\tmoveq\t@SV,d5\n';
+  text3 = text3 + '.EnvDNoSustain_' + st.localLabel + '\n';
+  text3 += '\t\t\t\tmove.l\td5,AK_EnvDValue+@IN(a5)\n';
+  if (text2 !== '#128') {
+    if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, text2)) {
+      text3 += '\t\t\t\tasr.w\t@GS,@OR\n';
+    } else {
+      text3 += '\t\t\t\tmuls\t@TR1,@OR\n';
+      text3 += '\t\t\t\tasr.l\t#7,@OR\n';
+    }
+  }
+  text3 = text2.includes('#')
+    ? text3.replaceAll('@TR1', text2)
+    : text3.replaceAll('@TR1', 'd4');
+  text3 = text3.replaceAll('@IN', newValue2);
+  text3 = text3.replaceAll('@GN', text2);
+  text3 = text3.replaceAll('@GS', newValue3);
+  text3 = text3.replaceAll('@OR', newValue);
+  text3 = text3.replaceAll('@DV', decayValue);
+  text3 = text3.replaceAll('@SV', text);
+  st.currentEnvDInstance++;
+  return text3;
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
@@ -343,7 +394,7 @@ export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
   { match: 'osc_pulse(', gen: oscPulse },
   { match: 'osc_noise(', gen: oscNoise },
   { match: 'sh(', gen: stub('sh') },
-  { match: 'envd(', gen: stub('envd') },
+  { match: 'envd(', gen: envDecay },
   { match: 'enva(', gen: stub('enva') },
   { match: 'mul(', gen: mul },
   { match: 'add(', gen: add },

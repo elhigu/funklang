@@ -144,6 +144,23 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 14, outVar: 3, val1: 3 },
       ];
       break;
+    case 'envd':
+      // Env_Decay 770-818. dan-script: envd(smp, decayIdx, sustain, gain).
+      //  inputs[1]=val1Value (decay index -> GetDecayValue table), literal (val1 sel=0)
+      //  inputs[2]=val2Value (sustain, << 24 -> @SV), literal (val2 sel=0)
+      //  inputs[3]=gain (@GN), literal or variable
+      // Cover:
+      //  - gain power-of-2 (64 -> asr/GS path); sustain>0 (num>127 -> move.l; cmp.l emitted)
+      //  - gain non-power-of-2 (50 -> muls/TR1=#50 path); sustain>0
+      //  - gain 128 (-> scaling skipped); sustain=0 (text=="#0": no cmp.l; num=0 -> moveq)
+      //  - variable gain operand (no '#' -> move/and @GN,@TR1 d4 + muls path); sustain>0
+      ins.slots = [
+        { ...emptySlot(), fn: 8, outVar: 1, val1Value: 10, val2Value: 5, gainVal: 64 },
+        { ...emptySlot(), fn: 8, outVar: 2, val1Value: 20, val2Value: 7, gainVal: 50 },
+        { ...emptySlot(), fn: 8, outVar: 3, val1Value: 30, val2Value: 0, gainVal: 128 },
+        { ...emptySlot(), fn: 8, outVar: 4, val1Value: 40, val2Value: 3, gain: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
