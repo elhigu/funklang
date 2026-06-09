@@ -8,6 +8,15 @@ function getBar(k: { el: HTMLElement }): HTMLElement {
 function getVal(k: { el: HTMLElement }): HTMLElement {
   return k.el.querySelector('.kval') as HTMLElement;
 }
+// The bar drags via pointer events now; synthesise a mouse-type pointer event
+// (with pointerId/pointerType present even when jsdom lacks PointerEvent).
+function pevt(type: string, clientX = 0): Event {
+  const Ctor = (globalThis as unknown as { PointerEvent?: typeof MouseEvent }).PointerEvent ?? MouseEvent;
+  const e = new Ctor(type, { clientX, button: 0, bubbles: true, cancelable: true } as MouseEventInit);
+  if (!('pointerType' in e)) Object.defineProperty(e, 'pointerType', { value: 'mouse' });
+  if (!('pointerId' in e)) Object.defineProperty(e, 'pointerId', { value: 1 });
+  return e;
+}
 
 describe('makeKnob — wheel', () => {
   it('wheel = COARSE by default on a wide range (≥ 64)', () => {
@@ -135,10 +144,10 @@ describe('makeKnob — position-based drag', () => {
     const k = makeKnob({ label: 'g', value: 0, max: 255, onChange: cb });
     const bar = getBar(k);
     mockRect(bar, { left: 0, width: 200, right: 200 });
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 100));
     // ratio = 100/200 = 0.5 → 128 (round of 127.5)
     expect(k.getValue()).toBe(128);
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerup'));
   });
 
   it('dragging from one X to another updates the value continuously', () => {
@@ -146,11 +155,11 @@ describe('makeKnob — position-based drag', () => {
     const k = makeKnob({ label: 'g', value: 0, max: 255, onChange: cb });
     const bar = getBar(k);
     mockRect(bar, { left: 0, width: 200, right: 200 });
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 20, button: 0, bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 20));
     expect(k.getValue()).toBe(26);     // round(20/200 * 255) = 26
-    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 150, bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointermove', 150));
     expect(k.getValue()).toBe(191);    // round(150/200 * 255) = 191
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerup'));
   });
 
   it('clamps at the right edge', () => {
@@ -159,9 +168,9 @@ describe('makeKnob — position-based drag', () => {
     const bar = getBar(k);
     mockRect(bar, { left: 0, width: 200, right: 200 });
     // Click far past the right edge — should clamp to max (255).
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 9999, button: 0, bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 9999));
     expect(k.getValue()).toBe(255);
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerup'));
   });
 
   it('mousedown focuses the bar so ArrowUp fine-tunes from there', () => {
@@ -171,9 +180,9 @@ describe('makeKnob — position-based drag', () => {
     document.body.appendChild(k.el);
     const bar = getBar(k);
     mockRect(bar, { left: 0, width: 200, right: 200 });
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 100));
     expect(document.activeElement).toBe(bar);
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerup'));
     // Plain ArrowUp = ±step (1) from the clicked-to position (128 → 129).
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
     expect(k.getValue()).toBe(129);    // 128 + 1
@@ -263,8 +272,8 @@ describe('makeKnob — power scale (soft "log"-style taper)', () => {
     const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 100));
+    bar.dispatchEvent(pevt('pointerup'));
     expect(k.getValue()).toBe(2500);
   });
 
@@ -273,8 +282,8 @@ describe('makeKnob — power scale (soft "log"-style taper)', () => {
     const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'pow', scalePow: 3, onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 100));
+    bar.dispatchEvent(pevt('pointerup'));
     expect(k.getValue()).toBe(1250);    // 10000 * 0.5^3
   });
 
@@ -283,8 +292,8 @@ describe('makeKnob — power scale (soft "log"-style taper)', () => {
     const k = makeKnob({ label: 'freq', value: 0, max: 10000, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 200, button: 0, bubbles: true, cancelable: true }));
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 200));
+    bar.dispatchEvent(pevt('pointerup'));
     expect(k.getValue()).toBe(10000);
   });
 
@@ -293,8 +302,8 @@ describe('makeKnob — power scale (soft "log"-style taper)', () => {
     const k = makeKnob({ label: 'freq', value: 5000, max: 10000, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 0, button: 0, bubbles: true, cancelable: true }));
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 0));
+    bar.dispatchEvent(pevt('pointerup'));
     expect(k.getValue()).toBe(0);
   });
 
@@ -313,8 +322,8 @@ describe('makeKnob — power scale (soft "log"-style taper)', () => {
     const k = makeKnob({ label: 'x', value: 0, min: -100, max: 100, scale: 'pow', onChange: cb });
     const bar = getBarEl(k);
     mockRect(bar, 200);
-    bar.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, button: 0, bubbles: true, cancelable: true }));
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    bar.dispatchEvent(pevt('pointerdown', 100));
+    bar.dispatchEvent(pevt('pointerup'));
     expect(k.getValue()).toBe(0);   // linear midpoint of [-100, 100]
   });
 });

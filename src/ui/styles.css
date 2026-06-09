@@ -1358,6 +1358,10 @@
     flex: 1 1 0;
     min-width: 120px;
     height: 22px;
+    /* Own all touch gestures: no page scroll/zoom while dragging, and no
+       synthetic mouse events — the pointerdown handler routes touch to the
+       value tuner / drag itself. */
+    touch-action: none;
     /* The fill is rendered via a left-to-right gradient driven by a
        CSS variable that the JS updates as the value changes. The hard
        color stops at `--fill` give a crisp edge — no anti-alias smear. */

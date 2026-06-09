@@ -48,6 +48,13 @@ export interface KnobOptions {
   /** Legacy: ignored. */
   finePxPerUnit?: number | undefined;
   onChange: (v: number) => void;
+  /**
+   * Touch hook. When a finger (pointerType === 'touch') presses the bar and
+   * this is provided, the inline drag is suppressed and this is called
+   * instead — the caller opens the touch value tuner. Mouse/pen still drag
+   * the bar directly. Absent → touch falls through to the normal drag.
+   */
+  onTouchTune?: (() => void) | undefined;
 }
 
 export interface Knob {
@@ -215,24 +222,41 @@ export function makeKnob(opts: KnobOptions): Knob {
     const r = clamp((clientX - rect.left) / rect.width, 0, 1);
     return ratioToValue(r);
   };
+  // Pointer events unify mouse / pen / touch. Touch is special: a fingertip
+  // can't precisely drag a 22px bar, so when `onTouchTune` is provided a
+  // finger press opens the touch value tuner instead of dragging. Mouse and
+  // pen keep the exact drag-to-position behaviour.
   let dragging = false;
-  const onMouseMove = (e: MouseEvent): void => {
-    if (!dragging) return;
+  let dragPointerId: number | null = null;
+  const onPointerMove = (e: PointerEvent): void => {
+    if (!dragging || e.pointerId !== dragPointerId) return;
     emit(valueFromClientX(e.clientX));
   };
-  const onMouseUp = (): void => {
+  const endDrag = (e: PointerEvent): void => {
+    if (e.pointerId !== dragPointerId) return;
     dragging = false;
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
+    dragPointerId = null;
+    barEl.removeEventListener('pointermove', onPointerMove);
+    barEl.removeEventListener('pointerup', endDrag);
+    barEl.removeEventListener('pointercancel', endDrag);
   };
-  barEl.addEventListener('mousedown', (e) => {
+  barEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' && opts.onTouchTune) {
+      e.preventDefault();
+      opts.onTouchTune();
+      return;
+    }
     if (e.button !== 0) return;  // ignore right/middle
     e.preventDefault();
     barEl.focus();
     dragging = true;
+    dragPointerId = e.pointerId;
+    // Capture so move/up keep coming to the bar even if the pointer leaves it.
+    try { barEl.setPointerCapture(e.pointerId); } catch { /* jsdom */ }
     emit(valueFromClientX(e.clientX));
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    barEl.addEventListener('pointermove', onPointerMove);
+    barEl.addEventListener('pointerup', endDrag);
+    barEl.addEventListener('pointercancel', endDrag);
   });
 
   // contextmenu: reset to default
