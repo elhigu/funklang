@@ -20,6 +20,21 @@ function fixture(key: string): Patch {
       // No slots — exercises the empty-instrument framework branch.
       ins.slots = [];
       break;
+    case 'vol':
+      // Volume 465-498. inputs = [val1(source var), gain(GN)].
+      //  - power-of-2 gain (64 -> asr/GS path), out!=src (move emitted)
+      //  - non-power-of-2 gain (50 -> muls/TR1=#50 path), out!=src
+      //  - gain 128 (-> scaling skipped; only the move)
+      //  - variable gain operand (-> non-# path: move/and @GN,@TR1; TR1=d4)
+      //  - out == src (val1==outVar) -> the @OR==@VAL no-move branch
+      ins.slots = [
+        { ...emptySlot(), fn: 1, outVar: 1, val1: 2, gainVal: 64 },
+        { ...emptySlot(), fn: 1, outVar: 2, val1: 3, gainVal: 50 },
+        { ...emptySlot(), fn: 1, outVar: 3, val1: 4, gainVal: 128 },
+        { ...emptySlot(), fn: 1, outVar: 4, val1: 1, gain: 1 },
+        { ...emptySlot(), fn: 1, outVar: 1, val1: 1, gainVal: 50 },
+      ];
+      break;
     case 'osc_saw':
       // Three osc_saw across value classes:
       //  - power-of-2 gain (64 -> asr shift path)

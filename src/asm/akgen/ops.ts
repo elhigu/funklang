@@ -7,6 +7,39 @@ import { remapVarToRegisterOrImmediate } from './helpers';
 
 export type OpGen = (st: AkGenState, output: string, inputs: string[]) => string;
 
+/** Program.cs Volume 465-498. */
+export function volume(st: AkGenState, output: string, inputs: string[]): string {
+  const orVal = remapVarToRegisterOrImmediate(output);
+  const valText = remapVarToRegisterOrImmediate(inputs[0]!);
+  const gnText = remapVarToRegisterOrImmediate(inputs[1]!);
+  const gsVal = Object.prototype.hasOwnProperty.call(st.mulRightShifts, gnText)
+    ? st.mulRightShifts[gnText]!
+    : '';
+  let empty = '';
+  if (orVal !== valText) {
+    empty += '\t\t\t\tmove.w\t@VAL,@OR\n';
+  }
+  if (gnText !== '#128') {
+    if (Object.prototype.hasOwnProperty.call(st.mulRightShifts, gnText)) {
+      empty += '\t\t\t\tasr.w\t@GS,@OR\n';
+    } else {
+      if (!gnText.includes('#')) {
+        empty += '\t\t\t\tmove.w\t@GN,@TR1\n';
+        empty += '\t\t\t\tand.w\t#255,@TR1\n';
+      }
+      empty += '\t\t\t\tmuls\t@TR1,@OR\n';
+      empty += '\t\t\t\tasr.l\t#7,@OR\n';
+    }
+  }
+  empty = gnText.includes('#')
+    ? empty.replaceAll('@TR1', gnText)
+    : empty.replaceAll('@TR1', 'd4');
+  empty = empty.replaceAll('@VAL', valText);
+  empty = empty.replaceAll('@GN', gnText);
+  empty = empty.replaceAll('@GS', gsVal);
+  return empty.replaceAll('@OR', orVal);
+}
+
 /** Program.cs Osc_Saw 500-538. */
 export function oscSaw(st: AkGenState, output: string, inputs: string[]): string {
   const orVal = remapVarToRegisterOrImmediate(output);
@@ -243,7 +276,7 @@ function stub(name: string): OpGen {
  * another; we keep the original ordering.
  */
 export const OP_DISPATCH: Array<{ match: string; gen: OpGen }> = [
-  { match: 'vol(', gen: stub('vol') },
+  { match: 'vol(', gen: volume },
   { match: 'osc_saw(', gen: oscSaw },
   { match: 'osc_tri(', gen: oscTri },
   { match: 'osc_sine(', gen: oscSine },
