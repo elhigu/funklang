@@ -33,6 +33,19 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 2, outVar: 4, freqVal: 555, gain: 1 },
       ];
       break;
+    case 'osc_tri':
+      // Four osc_tri across value classes (Osc_Tri 539-580):
+      //  - power-of-2 gain (64 -> asr shift path)
+      //  - non-power-of-2 gain (50 -> muls path)
+      //  - gain 128 (-> text != "#128" guard skips scaling)
+      //  - variable gain operand (-> non-# path with d4/TR1)
+      ins.slots = [
+        { ...emptySlot(), fn: 3, outVar: 1, freqVal: 1000, gainVal: 64 },
+        { ...emptySlot(), fn: 3, outVar: 2, freqVal: 1234, gainVal: 50 },
+        { ...emptySlot(), fn: 3, outVar: 3, freqVal: 777, gainVal: 128 },
+        { ...emptySlot(), fn: 3, outVar: 4, freqVal: 555, gain: 1 },
+      ];
+      break;
     default:
       throw new Error(`unknown fixture '${key}'`);
   }
