@@ -1,4 +1,4 @@
-// funklang/sizelab/tools/gen-verification-patches.ts
+// funklang/groundtruth/tools/gen-verification-patches.ts
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { serializeAkp } from '../../src/fileio/akp';

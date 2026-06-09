@@ -1,4 +1,4 @@
-// funklang/sizelab/harness/wine-env.ts
+// funklang/groundtruth/harness/wine-env.ts
 import { join } from 'node:path';
 
 /** Linux absolute path → wine Z: drive Windows path. */

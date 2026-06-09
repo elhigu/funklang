@@ -1,4 +1,4 @@
-// funklang/sizelab/tools/verification-patches.ts
+// funklang/groundtruth/tools/verification-patches.ts
 // Shared in-memory builders for the P01-P07 verification patches. Used both by
 // the .akp generator (gen-verification-patches.ts) and the byte-exact test, so
 // they exercise the exact same patches without parsing the gitignored .akp files.

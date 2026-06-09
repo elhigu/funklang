@@ -1,4 +1,4 @@
-// funklang/sizelab/harness/build-sandbox.test.ts
+// funklang/groundtruth/harness/build-sandbox.test.ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

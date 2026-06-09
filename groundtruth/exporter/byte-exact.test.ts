@@ -1,4 +1,4 @@
-// funklang/sizelab/exporter/byte-exact.test.ts
+// funklang/groundtruth/exporter/byte-exact.test.ts
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

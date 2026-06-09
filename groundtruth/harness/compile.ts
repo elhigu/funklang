@@ -1,4 +1,4 @@
-// funklang/sizelab/harness/compile.ts
+// funklang/groundtruth/harness/compile.ts
 import { statSync, existsSync, rmSync, cpSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';

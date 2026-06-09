@@ -1,4 +1,4 @@
-// funklang/sizelab/harness/build-sandbox.ts
+// funklang/groundtruth/harness/build-sandbox.ts
 import { cpSync, existsSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
@@ -9,7 +9,7 @@ export interface Sandbox { dir: string; winePrefix: string; }
 // `dosdevices/z: -> /` symlink, and any tool that globs the repo (vitest, vite)
 // would follow it into `/` and crash on EACCES. The repo-parent reference area
 // is out-of-git and outside every project scanner's root.
-const SCRATCH = resolve(import.meta.dirname, '..', '..', '..', '..', 'reference', 'sizelab-scratch');
+const SCRATCH = resolve(import.meta.dirname, '..', '..', '..', '..', 'reference', 'groundtruth-scratch');
 const DEFAULT_SANDBOX = join(SCRATCH, 'sandbox');
 const DEFAULT_PREFIX = join(SCRATCH, 'wineprefix');
 const EXE_CREATOR = resolve(import.meta.dirname, '..', '..', '..', 'exe_creator');

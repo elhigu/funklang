@@ -1,4 +1,4 @@
-// funklang/sizelab/harness/wine-env.test.ts
+// funklang/groundtruth/harness/wine-env.test.ts
 import { describe, it, expect } from 'vitest';
 import { toWinePath, wineEnv, GNUMAKE_ARGV, SHRINKLER_ARGV } from './wine-env';
 

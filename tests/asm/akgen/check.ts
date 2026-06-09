@@ -5,7 +5,7 @@
 //   nix-shell -p mono --run 'npx tsx tests/asm/akgen/check.ts osc_saw'
 
 import { emptyPatch, emptySlot, type Patch } from '../../../src/patch/types';
-import { asmBinFromPatch } from '../../../sizelab/harness/asm-bin';
+import { asmBinFromPatch } from '../../../groundtruth/harness/asm-bin';
 import { emitAkGenerate } from '../../../src/asm/akgen';
 import { assembleM68k } from '../../../src/asm/vasm';
 

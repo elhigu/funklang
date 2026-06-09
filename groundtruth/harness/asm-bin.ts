@@ -4,7 +4,7 @@
 //
 // Needs `mono` on PATH (Aklang2Asm is a .NET assembly). vasm runs as WASM (no host
 // tool). Run e.g.:
-//   nix-shell -p mono --run 'npx tsx sizelab/harness/asm-bin.ts <patch.akp>'
+//   nix-shell -p mono --run 'npx tsx groundtruth/harness/asm-bin.ts <patch.akp>'
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';

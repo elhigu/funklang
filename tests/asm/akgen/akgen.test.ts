@@ -12,7 +12,7 @@ import { assembleM68k } from '../../../src/asm/vasm';
 import type { Patch } from '../../../src/patch/types';
 
 const DIR = join(__dirname, 'fixtures');
-const REAL = join(__dirname, '..', '..', '..', 'sizelab', 'corpus', 'real');
+const REAL = join(__dirname, '..', '..', '..', 'groundtruth', 'corpus', 'real');
 
 function frozen(name: string): Uint8Array {
   const j = JSON.parse(readFileSync(join(DIR, `${name}.json`), 'utf8')) as { base64: string };

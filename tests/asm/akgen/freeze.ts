@@ -6,13 +6,13 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixture } from './check';
 import { parseAkp } from '../../../src/fileio/akp';
-import { asmBinFromPatch } from '../../../sizelab/harness/asm-bin';
+import { asmBinFromPatch } from '../../../groundtruth/harness/asm-bin';
 import { emitAkGenerate } from '../../../src/asm/akgen';
 import { assembleM68k } from '../../../src/asm/vasm';
 import type { Patch } from '../../../src/patch/types';
 
 const DIR = join(import.meta.dirname, 'fixtures');
-const REAL = join(import.meta.dirname, '..', '..', '..', 'sizelab', 'corpus', 'real');
+const REAL = join(import.meta.dirname, '..', '..', '..', 'groundtruth', 'corpus', 'real');
 
 function realPatch(file: string): Patch {
   return parseAkp(new Uint8Array(readFileSync(join(REAL, file))));

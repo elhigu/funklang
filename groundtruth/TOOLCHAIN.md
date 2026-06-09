@@ -1,4 +1,4 @@
-# exe_creator toolchain notes (for sizelab builds + the GUI)
+# exe_creator toolchain notes (for groundtruth builds + the GUI)
 
 `exe_creator/` is **gitignored** (the original aklang tool, kept local), so the
 fix below is **not** tracked in the repo — it must be (re)applied to the local

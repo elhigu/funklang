@@ -79,7 +79,7 @@ vasmm68k_mot -Fbin -o exemusic.bin exemusic.asm
 ```
 
 `emitDanScript(patch)` (`src/codegen/emit-inst.ts`) produces `script.txt`. The
-harness `sizelab/harness/asm-bin.ts` (`npm run asm:bin`) automates exactly this
+harness `groundtruth/harness/asm-bin.ts` (`npm run asm:bin`) automates exactly this
 as the live oracle.
 
 ## Two routes (don't confuse them)

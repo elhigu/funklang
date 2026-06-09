@@ -1,4 +1,4 @@
-// funklang/sizelab/isolation.test.ts
+// funklang/groundtruth/isolation.test.ts
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,11 +13,11 @@ function walk(dir: string): string[] {
   return out;
 }
 
-describe('isolation: src/ must not import sizelab/', () => {
-  it('no file under src/ references sizelab', () => {
+describe('isolation: src/ must not import groundtruth/', () => {
+  it('no file under src/ references groundtruth', () => {
     const srcDir = join(__dirname, '..', 'src');
     const offenders = walk(srcDir).filter((f) =>
-      /from ['"].*sizelab/.test(readFileSync(f, 'utf8')),
+      /from ['"].*groundtruth/.test(readFileSync(f, 'utf8')),
     );
     expect(offenders).toEqual([]);
   });

@@ -1,4 +1,4 @@
-// funklang/sizelab/harness/export-bin.ts
+// funklang/groundtruth/harness/export-bin.ts
 //
 // Build a raw Amiga binary (the relocatable sample-generation blob, no player)
 // from a .akp patch. Needs wine on PATH, so run inside a wineWow shell:

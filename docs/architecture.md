@@ -65,7 +65,7 @@ rendering, touch tuner, autosave, file dialogs, `format.ts`, etc.
 
 ### `src/audio/` — `player.ts`: Web Audio playback of rendered samples.
 
-## `sizelab/` — dev-only build harness & oracle (never imported by `src/`)
+## `groundtruth/` — dev-only build harness & oracle (never imported by `src/`)
 `isolation.test.ts` enforces that boundary.
 - **`harness/`** — `asm-bin.ts` (the live oracle: patch → asm via the *real*
   `Aklang2Asm` under `mono` → vasm; used to freeze byte-exact fixtures),

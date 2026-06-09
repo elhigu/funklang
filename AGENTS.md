@@ -22,9 +22,9 @@ for the module map before making changes.
    `tests/dsp/bit-exact.test.ts`). Never "fix" generated output to look nicer if it
    breaks those fixtures — the goal is matching the original, warts included.
 
-3. **Shipped code must not import `sizelab/`.** `sizelab/` is the dev-only build
-   harness/oracle. `sizelab/isolation.test.ts` enforces this. Keep `src/` free of
-   `sizelab/` imports.
+3. **Shipped code must not import `groundtruth/`.** `groundtruth/` is the dev-only build
+   harness/oracle. `groundtruth/isolation.test.ts` enforces this. Keep `src/` free of
+   `groundtruth/` imports.
 
 4. **Update the in-app help on any UX change.** If you change a user-visible
    behaviour, update `src/ui/help-modal.ts` in the *same* commit.

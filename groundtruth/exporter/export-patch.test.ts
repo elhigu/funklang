@@ -29,7 +29,7 @@ describe('exportPatch', () => {
   });
 
   it('writeArtifacts writes every file (incl. the support/ subdir)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'sizelab-'));
+    const dir = mkdtempSync(join(tmpdir(), 'groundtruth-'));
     writeArtifacts(exportPatch(patch()), dir);
     for (const f of ['ilen.h', 'inst.h', 'Iset.h', 'support/Iswitch.h', 'Isamp.raw', 'empty.mod']) {
       expect(existsSync(join(dir, f)), f).toBe(true);

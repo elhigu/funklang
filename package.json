@@ -19,11 +19,11 @@
     "e2e:ui": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test --ui",
     "e2e:debug": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$(which chromium) playwright test --debug",
     "e2e:report": "playwright show-report",
-    "gen-verification-patches": "tsx sizelab/tools/gen-verification-patches.ts",
-    "compile:smoke": "nix-shell -p wineWowPackages.stable --run 'SIZELAB_COMPILE_SMOKE=1 vitest run sizelab/harness/compile.smoke.test.ts'",
-    "export:bin": "tsx sizelab/harness/export-bin.ts",
+    "gen-verification-patches": "tsx groundtruth/tools/gen-verification-patches.ts",
+    "compile:smoke": "nix-shell -p wineWowPackages.stable --run 'GROUNDTRUTH_COMPILE_SMOKE=1 vitest run groundtruth/harness/compile.smoke.test.ts'",
+    "export:bin": "tsx groundtruth/harness/export-bin.ts",
     "gate": "npm run typecheck && npm test && npm run e2e",
-    "asm:bin": "nix-shell -p mono --run 'npx tsx sizelab/harness/asm-bin.ts'"
+    "asm:bin": "nix-shell -p mono --run 'npx tsx groundtruth/harness/asm-bin.ts'"
   },
   "keywords": [],
   "author": "",

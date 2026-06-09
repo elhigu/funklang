@@ -4,11 +4,11 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseAkp } from '../../../src/fileio/akp';
-import { asmBinFromPatch } from '../../../sizelab/harness/asm-bin';
+import { asmBinFromPatch } from '../../../groundtruth/harness/asm-bin';
 import { emitAkGenerate } from '../../../src/asm/akgen';
 import { assembleM68k } from '../../../src/asm/vasm';
 
-const REAL = join(import.meta.dirname, '..', '..', '..', 'sizelab', 'corpus', 'real');
+const REAL = join(import.meta.dirname, '..', '..', '..', 'groundtruth', 'corpus', 'real');
 
 function firstDiff(a: Uint8Array, b: Uint8Array): number {
   const n = Math.max(a.length, b.length);

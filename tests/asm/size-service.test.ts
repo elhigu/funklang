@@ -12,7 +12,7 @@ import type { Patch } from '../../src/patch/types';
 import { exactSize, _clearSizeCache } from '../../src/asm/size-service';
 import { phaseCost, addOpCost } from '../../src/asm/size-ablation';
 
-const REAL = join(__dirname, '..', '..', 'sizelab', 'corpus', 'real');
+const REAL = join(__dirname, '..', '..', 'groundtruth', 'corpus', 'real');
 const patch = parseAkp(new Uint8Array(readFileSync(join(REAL, 'ext_P01.akp'))));
 
 function firstSlot(p: Patch): { i: number; s: number; fn: number } {
