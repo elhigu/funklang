@@ -1210,7 +1210,9 @@
   .op-picker-detail {
     margin-top: 12px;
     padding: 8px 10px;
-    min-height: 34px;
+    /* Reserve ~4 text lines so the modal doesn't resize as you hover ops with
+       longer/shorter descriptions. */
+    min-height: calc(4 * 1.4em + 16px);
     border: 1px solid var(--grid-dim);
     background: var(--bg-0);
     color: var(--fg-1);
