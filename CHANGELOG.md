@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **More phone tuning.** Selected instrument stays centered in the collapsed
+  rail (all 31 reachable); top waveform is shorter to free room for phases;
+  `dvh` + safe-area inset so the last phase's `[+]` clears Safari's bottom bar;
+  an always-visible ▶ play button in the top bar; auto-play forced on (the mute
+  toggle is hidden on phones).
 - **`LICENSE`** — MIT for funklang's own code (bundled vasm + the AmigaKlang/
   Aklang2Asm-derived parts stay under their own terms; see THIRD-PARTY-NOTICES).
   `package.json` license/author/description/keywords filled in.

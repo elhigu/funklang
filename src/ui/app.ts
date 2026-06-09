@@ -93,6 +93,7 @@ export function bootApp(root: HTMLElement): void {
       <header>
         <div class="brand"><div class="dot"></div><span>FUNKLANG.WEB</span></div>
         <div class="menu">
+          <button id="btn-mobile-play" class="mobile-play" aria-label="Play" title="Play the selected output">▶</button>
           <button id="menu-toggle" class="menu-toggle" aria-label="Menu" aria-expanded="false" title="Menu">☰</button>
           <div class="menu-items">
           <button id="btn-close" title="Close the current patch — gives you a blank project ready to edit. Disabled when nothing has been done.">CLOSE</button>
@@ -163,6 +164,19 @@ export function bootApp(root: HTMLElement): void {
   const outputLabel = root.querySelector('#output-label') as HTMLElement;
   const outputMasterBtn = root.querySelector('#btn-output-master') as HTMLButtonElement;
 
+  // Keep the selected instrument CENTERED in the collapsed rail (mobile), so
+  // all 31 are reachable as the selection moves. Adjusts only the sidebar's own
+  // scroll; the browser clamps scrollTop at the ends, so near the top/bottom the
+  // selection naturally sits high/low rather than forced to dead-center.
+  const centerActiveInstrument = (): void => {
+    if (!window.matchMedia?.('(max-width: 1000px)')?.matches) return;   // rail mode only
+    const active = sidebarEl.querySelector('.instr-row.active') as HTMLElement | null;
+    if (!active) return;
+    const a = active.getBoundingClientRect();
+    const s = sidebarEl.getBoundingClientRect();
+    sidebarEl.scrollTop += (a.top - s.top) - (s.height - a.height) / 2;
+  };
+
   // Narrow-screen sidebar: CSS collapses the list to a rail of instrument
   // numbers (selected emphasised). A vertical TOUCH drag on the rail rolls
   // the selection live — one non-empty instrument per row of travel, with
@@ -190,9 +204,8 @@ export function bootApp(root: HTMLElement): void {
     for (let k = 0; k < Math.abs(delta); k++) stepInstrument(dir, { play: true });
     sbDragStepped = rows;
     // Native scroll is disabled on the rail (touch-action:none) so the drag
-    // reaches us — keep the rolled-to number in view ourselves.
-    (sidebarEl.querySelector('.instr-row.active') as HTMLElement | null)
-      ?.scrollIntoView({ block: 'nearest' });
+    // reaches us — keep the rolled-to number centered ourselves.
+    centerActiveInstrument();
   });
   const sbDragEnd = (e: PointerEvent): void => { if (e.pointerId === sbDragPid) sbDragPid = -1; };
   sidebarEl.addEventListener('pointerup', sbDragEnd);
@@ -592,6 +605,7 @@ export function bootApp(root: HTMLElement): void {
       onDelete: removeInstrumentWithConfirm,
       onMove: moveInstrumentWithRemap,
     });
+    centerActiveInstrument();   // keep the selection centered in the mobile rail
     updateCloseButton();
   };
 
@@ -1089,6 +1103,9 @@ export function bootApp(root: HTMLElement): void {
   // Single audio toggle replaces PLAY/STOP/RETRIG. Green = on (changes
   // auto-replay, spacebar replays). Red = muted (re-renders still happen so
   // waveforms stay live, but nothing is sent to the speakers).
+  // Phone layout: the editor runs in the narrow single-column mode. Used to
+  // force autoplay on (no mute toggle on a phone) and surface a top-bar play.
+  const isMobile = (): boolean => !!window.matchMedia?.('(max-width: 600px)')?.matches;
   const audioToggle = root.querySelector('#btn-audio-toggle') as HTMLButtonElement;
   const updateAudioToggle = (): void => {
     audioToggle.classList.toggle('on',  state.audioEnabled);
@@ -1119,11 +1136,19 @@ export function bootApp(root: HTMLElement): void {
       player.play(sample, RATE);
       return;
     }
+    if (isMobile()) { state.audioEnabled = true; updateAudioToggle(); return; }  // forced on
     state.audioEnabled = !state.audioEnabled;
     if (!state.audioEnabled) player.stop();
     updateAudioToggle();
   });
   updateAudioToggle();
+
+  // Phone: autoplay is always on and a dedicated ▶ lives in the top bar (the
+  // mute toggle is hidden on mobile — see styles.css). Force-enable so every
+  // edit re-plays, and wire the header play button to replay on demand.
+  if (isMobile()) { state.audioEnabled = true; updateAudioToggle(); }
+  const mobilePlayBtn = root.querySelector('#btn-mobile-play') as HTMLButtonElement | null;
+  mobilePlayBtn?.addEventListener('click', () => playAuditionInternal({ force: true }));
 
   // Auto-blur BUTTON / SELECT after click so focus doesn't linger on UI
   // controls. Text inputs (knob inline editor, instr-header fields) and

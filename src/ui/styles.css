@@ -1809,14 +1809,39 @@
   }
   .help-intro a { color: var(--amber); }
 
+  /* The always-visible mobile play button lives in the header; hidden on
+     desktop (which uses the OUTPUT ▶ + Space). Shown in the phone block below. */
+  .mobile-play { display: none; }
+
   /* ─── portrait phones ─────────────────────────────────────────────────
      The editor itself already restacks via the `editor` container queries
      (≤860 / 760 / 480) and the sidebar collapses to a rail (≤1000). This block
-     only tightens the surrounding chrome — the footer and the modals — for
-     ~360–430px portrait screens. Everything is scoped to the media query, so
-     the desktop layout is untouched. (The viewport meta in index.html is what
-     lets any of these breakpoints fire on a phone in the first place.) */
+     tightens the surrounding chrome for ~360–430px portrait screens. Everything
+     is scoped to the media query, so the desktop layout is untouched. (The
+     viewport meta in index.html is what lets these breakpoints fire on a phone.) */
   @media (max-width: 600px) {
+    /* Use the DYNAMIC viewport height and lift above the home indicator, so the
+       footer + the last slot's [+] aren't hidden under Safari's bottom toolbar. */
+    .app { height: 100vh; height: calc(100dvh - env(safe-area-inset-bottom)); }
+    /* Headroom under the last phase so its [+] clears the very bottom edge. */
+    main > .slot-grid-host { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
+
+    /* Smaller top waveform → more room for the phases. */
+    .wave-viewer { padding: 4px 8px; }
+    .wave-viewer canvas { height: 60px; }
+    .wave-viewer-meta { margin-top: 1px; font-size: 9px; }
+
+    /* Always-on top-bar play; the mute toggle is hidden (autoplay is forced
+       on for phones — see app.ts). */
+    .mobile-play {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--bg-2); border: 1px solid var(--green);
+      color: var(--green); font: inherit; font-size: 15px;
+      min-width: 40px; min-height: 32px; padding: 0 10px; cursor: pointer;
+    }
+    .mobile-play:active { background: var(--bg-3); }
+    #btn-audio-toggle { display: none; }
+
     footer { gap: 8px; padding: 0 8px; font-size: 10px; }
     .footer-status { gap: 8px; min-width: 0; overflow: hidden; }
     .footer-status .selection,
