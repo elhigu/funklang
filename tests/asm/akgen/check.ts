@@ -445,6 +445,51 @@ function fixture(key: string): Patch {
         { ...emptySlot(), fn: 20, outVar: 4, gain: 7 },
       ];
       break;
+    case 'loopGen':
+    case 'loop_gen': {
+      // LoopGenerator 1637-1687. NOT an OpGen: invoked by the per-instrument
+      // interleave hook (Main, instrumentLoop=="Y") with the header repeat
+      // fields (loopOffset->repeat_offset, loopLength->repeat_length) and the
+      // 0-based instrument index. The exporter sets the header loop flag to 'Y'
+      // iff slots[15].fn === 22, and emits the repeat fields from
+      // loopOffset/loopLength. The method has exactly one branch driver:
+      //   num2 = repeat_offset >= 32768 ? add.l #@RO,a0 : lea @RO(a0),a0.
+      // Each instrument needs at least one real op so the framework runs the
+      // sample loop (an empty instrument skips loop-generator emission anyway).
+      //
+      // We use THREE instruments to cover both branches plus value classes of
+      // the repeat fields (the offset/length are substituted as immediates):
+      //  - inst 0: small loopOffset (lea branch), power-of-2 length (1024)
+      //  - inst 1: loopOffset >= 32768 (add.l branch), large sample, non-power
+      //    -of-2 length (1500)
+      //  - inst 2: loopOffset 0 (lea @0 branch), small non-power-of-2 length
+      // Distinct instrument indices also prove the per-index .LoopGen_<i>
+      // labels and the AK_SmpAddr+@IN(a5) offset (GetInstanceOffset(j,4)).
+      const mk = (
+        name: string,
+        sampleLength: number,
+        loopOffset: number,
+        loopLength: number,
+      ) => {
+        const i = emptySlot();
+        const inst = {
+          ...p.instruments[0]!,
+          name,
+          sampleLength,
+          loopOffset,
+          loopLength,
+          slots: [{ ...emptySlot(), fn: 2, outVar: 1, freqVal: 1000, gainVal: 64 }] as typeof p.instruments[0]['slots'],
+        };
+        // place the loop_gen marker into slot 15 (exporter keys the 'Y' flag here)
+        while (inst.slots.length < 16) inst.slots.push({ ...emptySlot() });
+        inst.slots[15] = { ...i, fn: 22, outVar: 1 };
+        return inst;
+      };
+      p.instruments[0] = mk('a', 4096, 256, 1024);
+      p.instruments[1] = mk('b', 70000, 40000, 1500);
+      p.instruments[2] = mk('c', 2048, 0, 300);
+      break;
+    }
     default:
       throw new Error(`unknown fixture '${key}'`);
   }

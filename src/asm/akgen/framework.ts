@@ -4,6 +4,7 @@
 
 import type { AkGenState } from './state';
 import { dividerCode } from './helpers';
+import { loopGenerator } from './ops';
 
 /** A parsed instrument from the dan-script. */
 export interface ParsedInstrument {
@@ -336,10 +337,4 @@ export function emitFramework(
   empty = empty.replaceAll('%MAXWORDINSTANCES%', String(st.maxWordInstance));
   empty = empty.replaceAll('%MAXENVDINSTANCES%', String(st.maxEnvdInstance));
   return empty;
-}
-
-// LoopGenerator stub — interleave hook (Program.cs 1637). Not yet ported;
-// throws if a patch actually uses a loop generator.
-function loopGenerator(_st: AkGenState, _repeatLength: string, _repeatOffset: string, _instrument: string): string {
-  throw new Error('akgen: LoopGenerator not implemented');
 }

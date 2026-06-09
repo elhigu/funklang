@@ -1196,6 +1196,71 @@ export function importedSample(st: AkGenState, output: string, inputs: string[])
   return empty.replaceAll('@BS', instanceOffset);
 }
 
+/**
+ * Program.cs LoopGenerator 1637-1687. Not an OpGen: invoked by the per-instrument
+ * interleave hook (Main, instrumentLoop=="Y") with the header repeat fields and
+ * the instrument index. `instrument` is the 0-based index (String(j)); the
+ * GetInstanceOffset(instrument,4) call yields its byte offset (always parses).
+ * Mutates st.fineProgressLength += repeat_length.
+ */
+export function loopGenerator(
+  st: AkGenState,
+  repeatLength: string,
+  repeatOffset: string,
+  instrument: string,
+): string {
+  const instanceOffset = getInstanceOffset(instrument, 4);
+  const num2 = Number.parseInt(repeatOffset, 10);
+  st.fineProgressLength += Number.parseInt(repeatLength, 10);
+  let empty = '';
+  empty += '\t\t\t\tmove.l\t#@RL,d7\n';
+  empty += '\t\t\t\tmove.l\tAK_SmpAddr+@IN(a5),a0\n';
+  empty =
+    num2 >= 32768
+      ? empty + '\t\t\t\tadd.l\t#@RO,a0\n'
+      : empty + '\t\t\t\tlea\t\t@RO(a0),a0\n';
+  empty += '\t\t\t\tmove.l\ta0,a1\n';
+  empty += '\t\t\t\tsub.l\td7,a1\n';
+  empty += '\t\t\t\tmoveq\t#0,d4\n';
+  empty += '\t\t\t\tmove.l\t#32767<<8,d5\n';
+  empty += '\t\t\t\tmove.l\td5,d0\n';
+  empty += '\t\t\t\tdivs\td7,d0\n';
+  empty = empty + '\t\t\t\tbvc.s\t.LoopGenVC_' + instrument + '\n';
+  empty += '\t\t\t\tmoveq\t#0,d0\n';
+  empty = empty + '.LoopGenVC_' + instrument + '\n';
+  empty += '\t\t\t\tmoveq\t#0,d6\n';
+  empty += '\t\t\t\tmove.w\td0,d6\n';
+  empty = empty + '.LoopGen_' + instrument + '\n';
+  empty += '\t\t\t\tmove.l\td4,d2\n';
+  empty += '\t\t\t\tasr.l\t#8,d2\n';
+  empty += '\t\t\t\tmove.l\td5,d3\n';
+  empty += '\t\t\t\tasr.l\t#8,d3\n';
+  empty += '\t\t\t\tmove.b\t(a0),d0\n';
+  empty += '\t\t\t\tmove.b\t(a1)+,d1\n';
+  empty += '\t\t\t\text.w\td0\n';
+  empty += '\t\t\t\text.w\td1\n';
+  empty += '\t\t\t\tmuls\td3,d0\n';
+  empty += '\t\t\t\tmuls\td2,d1\n';
+  empty += '\t\t\t\tadd.l\td1,d0\n';
+  empty += '\t\t\t\tadd.l\td0,d0\n';
+  empty += '\t\t\t\tswap\td0\n';
+  empty += '\t\t\t\tmove.b\td0,(a0)+\n';
+  empty += '\t\t\t\tadd.l\td6,d4\n';
+  empty += '\t\t\t\tsub.l\td6,d5\n';
+  empty += '\n';
+  empty += '\t\t\t\tifne\tAK_USE_PROGRESS\n';
+  empty += '\t\t\t\t\tifne\tAK_FINE_PROGRESS\n';
+  empty += '\t\t\t\t\t\taddq.l\t#1,(a3)\n';
+  empty += '\t\t\t\t\tendif\n';
+  empty += '\t\t\t\tendif\n';
+  empty += '\n';
+  empty += '\t\t\t\tsubq.l\t#1,d7\n';
+  empty = empty + '\t\t\t\tbne.s\t.LoopGen_' + instrument + '\n';
+  empty = empty.replaceAll('@IN', instanceOffset);
+  empty = empty.replaceAll('@RO', repeatOffset);
+  return empty.replaceAll('@RL', repeatLength);
+}
+
 function stub(name: string): OpGen {
   return () => {
     throw new Error(`akgen: op '${name}' not implemented`);
