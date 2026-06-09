@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { emptyPatch } from '../../src/patch/types';
-import { chipUsage } from '../../src/sizecalc/chip-ram';
+import { chipUsage } from '../../src/patch/chip-ram';
 
 describe('chipUsage', () => {
   it('an empty patch costs only the mod template', () => {

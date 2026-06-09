@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtBytes } from '../../src/sizecalc/format';
+import { fmtBytes } from '../../src/ui/format';
 
 describe('fmtBytes', () => {
   it('shows raw bytes below 1024', () => {
