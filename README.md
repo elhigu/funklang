@@ -96,6 +96,7 @@ are theirs; funklang is a reimplementation, not original synth research.
 
 - Live app: https://funklang.mkael.net
 - Pouët: https://www.pouet.net/prod.php?which=85351
+- AmigaKlang on GitHub: https://github.com/kieranhj/archieklang
 - Published site repo: https://github.com/elhigu/funklang.mkael.net
 
 funklang reimplementation by **Mikael Lepistö** (elhigu / funktion).
