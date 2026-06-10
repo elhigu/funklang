@@ -65,7 +65,7 @@ function bodyHtml(): string {
           <li><a href="https://funklang.mkael.net" target="_blank" rel="noopener">Live app — funklang.mkael.net</a></li>
           <li><a href="https://www.pouet.net/prod.php?which=85351" target="_blank" rel="noopener">AmigaKlang Pouët</a></li>
           <li><a href="https://github.com/kieranhj/archieklang" target="_blank" rel="noopener">AmigaKlang on GitHub</a></li>
-          <li><a href="https://github.com/elhigu/funklang.mkael.net" target="_blank" rel="noopener">Published site repo</a></li>
+          <li><a href="https://github.com/elhigu/funklang" target="_blank" rel="noopener">funklang source on GitHub</a></li>
         </ul>
         <p class="about-by">Reimplementation by <strong>Mikael Lepistö</strong> (elhigu / funktion).
         AmigaKlang © Jochen “Virgill” Feldkötter.</p>
