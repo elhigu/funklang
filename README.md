@@ -97,7 +97,7 @@ attribution and third-party terms (incl. the bundled vasm/Emscripten) are in
 ### Links
 
 - Live app: https://funklang.mkael.net
-- Pouët: https://www.pouet.net/prod.php?which=85351
+- AmigaKlang Pouët: https://www.pouet.net/prod.php?which=85351
 - AmigaKlang on GitHub: https://github.com/kieranhj/archieklang
 - Published site repo: https://github.com/elhigu/funklang.mkael.net
 
