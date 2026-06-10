@@ -18,6 +18,7 @@ import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
 import { wireSizeStatusbar, type SizeStatusbar } from './size-statusbar';
 import { wireStatusBar } from './status-bar';
+import { wireExampleLoader } from './example-loader';
 import { mountCodeExportModal } from './code-export-modal';
 import { bytesToInt16 } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
@@ -1055,6 +1056,17 @@ export function bootApp(root: HTMLElement): void {
     const f = hidden.files?.[0];
     if (!f) return;
     adoptPatch(f.name, new Uint8Array(await f.arrayBuffer()), undefined);
+  });
+
+  // Help-modal "LOAD EXAMPLE": fetch an archieklang patch from GitHub and adopt
+  // it via the same path as OPEN PATCH (no write-back handle — it's remote).
+  // A bad/unsupported file throws inside adoptPatch; the loader catches it and
+  // flags the row rather than crashing the editor, so onAfterLoad (closing the
+  // help modal) only runs on a clean load.
+  wireExampleLoader(root, {
+    onLoad: (name, bytes) => adoptPatch(name, bytes, undefined),
+    onAfterLoad: () => help.hide(),
+    status: statusBar,
   });
 
   // Re-entrancy guard for OPEN PATCH. A double-click inside the OS file
