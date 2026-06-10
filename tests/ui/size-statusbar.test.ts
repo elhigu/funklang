@@ -69,6 +69,39 @@ describe('size status bar', () => {
     expect(peek.mock.calls.length).toBeGreaterThan(before);
   });
 
+  it('shows raw byte counts (no kB) and labels the packed figure "shrinkled"', async () => {
+    peek.mockReturnValue({ ok: true, size: 2024 });
+    const model = new PatchModel(emptyPatch());
+    wireSizeStatusbar(root, model);
+    await new Promise((r) => setTimeout(r, 0));
+    // The code/shrinkled figures are exact byte counts — no "2.0 kB" rounding.
+    const sizeSeg = btn.textContent!.split('·')[0]!;     // drop the chip segment
+    expect(sizeSeg).not.toMatch(/kB/);
+    expect(btn.textContent).toMatch(/2024 B/);
+    expect(btn.textContent).toMatch(/751 B/);
+    expect(btn.textContent).toMatch(/shrinkled/);
+    expect(btn.textContent).not.toMatch(/packed/);
+  });
+
+  it('reports assembling + shrinkling to the status light', async () => {
+    peek.mockReturnValue(undefined);                     // force an async assemble
+    const begun: string[] = [];
+    let live = 0;
+    const status = {
+      begin(label: string) {
+        begun.push(label);
+        live++;
+        return () => { live--; };
+      },
+    };
+    const model = new PatchModel(emptyPatch());
+    wireSizeStatusbar(root, model, status);
+    await new Promise((r) => setTimeout(r, 300));         // past the debounce + async work
+    expect(begun).toContain('ASSEMBLING');
+    expect(begun).toContain('SHRINKLING');
+    expect(live).toBe(0);                                 // every task ended
+  });
+
   it('opens the breakdown modal on click', () => {
     peek.mockReturnValue({ ok: true, size: 2024 });
     const model = new PatchModel(emptyPatch());

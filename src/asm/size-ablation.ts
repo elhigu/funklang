@@ -14,7 +14,7 @@ import type { Patch, Slot } from '../patch/types';
 import { emptySlot, N_SLOTS_MAX } from '../patch/types';
 import { applyInsertDefaults, resetSlotForOp, opByCode } from '../schema/op-metadata';
 import { pickSmartOutVar } from '../patch/smart-out-var';
-import { exactSize } from './size-service';
+import { packedSize } from './size-service';
 
 function clonePatch(p: Patch): Patch {
   return structuredClone(p);
@@ -66,28 +66,32 @@ export function patchWithAddedOp(patch: Patch, instrIdx: number, op: number): Pa
 
 export interface DeltaResult {
   ok: boolean;
-  /** Signed byte delta (freed for phaseCost, added for addOpCost). */
+  /** Signed RAW (uncompressed) byte delta (freed for phaseCost, added for addOpCost). */
   bytes?: number;
+  /** Signed Shrinkler-PACKED byte delta — the shipped-cost change. */
+  packed?: number;
   error?: string;
 }
 
-/** Exact bytes that deleting one phase frees, in the current patch context. */
-export async function phaseCost(patch: Patch, instrIdx: number, slotIdx: number): Promise<DeltaResult> {
-  const [full, without] = await Promise.all([
-    exactSize(patch),
-    exactSize(patchWithoutSlot(patch, instrIdx, slotIdx)),
-  ]);
-  if (!full.ok || !without.ok) return { ok: false, error: full.error ?? without.error ?? 'unavailable' };
-  return { ok: true, bytes: full.size! - without.size! };
+/** Signed raw + packed delta of one variant vs the base patch. */
+async function delta(patch: Patch, variant: Patch | null): Promise<DeltaResult> {
+  if (!variant) return { ok: false, error: 'no variant' };
+  const [full, v] = await Promise.all([packedSize(patch), packedSize(variant)]);
+  if (!full.ok || !v.ok) return { ok: false, error: full.error ?? v.error ?? 'unavailable' };
+  return { ok: true, bytes: v.raw! - full.raw!, packed: v.packed! - full.packed! };
 }
 
-/** Exact bytes that adding `op` to `instrIdx` would cost, in the current context. */
+/** Bytes (raw + packed) that deleting one phase frees, in the current context.
+ *  Returned as positive "freed" amounts. */
+export async function phaseCost(patch: Patch, instrIdx: number, slotIdx: number): Promise<DeltaResult> {
+  const d = await delta(patch, patchWithoutSlot(patch, instrIdx, slotIdx));
+  // delta = size(without) − size(full) ≤ 0; report the freed amount as positive.
+  return d.ok ? { ok: true, bytes: -d.bytes!, packed: -d.packed! } : d;
+}
+
+/** Bytes (raw + packed) that adding `op` to `instrIdx` would cost. */
 export async function addOpCost(patch: Patch, instrIdx: number, op: number): Promise<DeltaResult> {
-  const variant = patchWithAddedOp(patch, instrIdx, op);
-  if (!variant) return { ok: false, error: 'no free slot in instrument' };
-  const [full, withOp] = await Promise.all([exactSize(patch), exactSize(variant)]);
-  if (!full.ok || !withOp.ok) return { ok: false, error: full.error ?? withOp.error ?? 'unavailable' };
-  return { ok: true, bytes: withOp.size! - full.size! };
+  return delta(patch, patchWithAddedOp(patch, instrIdx, op));
 }
 
 /** Patch with the op at (instrIdx, slotIdx) replaced by `op` — mirrors the real
@@ -101,13 +105,9 @@ export function patchWithReplacedOp(patch: Patch, instrIdx: number, slotIdx: num
   return c;
 }
 
-/** Exact SIGNED byte delta of changing the slot's op to `op` (negative when the
- *  new op is smaller, e.g. reverb → add), in the current patch context. */
+/** SIGNED raw + packed byte delta of changing the slot's op to `op` (negative
+ *  when the new op is smaller, e.g. reverb → add), in the current patch context. */
 export async function replaceOpCost(patch: Patch, instrIdx: number, slotIdx: number, op: number): Promise<DeltaResult> {
-  const variant = patchWithReplacedOp(patch, instrIdx, slotIdx, op);
-  if (!variant) return { ok: false, error: 'no such slot' };
-  const [full, withOp] = await Promise.all([exactSize(patch), exactSize(variant)]);
-  if (!full.ok || !withOp.ok) return { ok: false, error: full.error ?? withOp.error ?? 'unavailable' };
-  return { ok: true, bytes: withOp.size! - full.size! };
+  return delta(patch, patchWithReplacedOp(patch, instrIdx, slotIdx, op));
 }
 

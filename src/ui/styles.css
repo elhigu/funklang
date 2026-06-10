@@ -129,7 +129,10 @@
   .menu.collapsed > .menu-items {
     position: absolute;
     top: 100%;
-    right: 0;
+    /* Anchor the dropdown to the hamburger (left edge of the .menu column),
+       not the column's right edge — otherwise it floats off in the top-right
+       corner, nowhere near the ☰ that opened it. */
+    left: 0;
     z-index: 60;
     flex-direction: column;
     align-items: stretch;
@@ -1072,7 +1075,11 @@
     font-size: 10px;
     letter-spacing: 0.5px;
   }
-  .footer-right .blink { animation: blink 1.2s infinite; color: var(--amber); }
+  /* Idle: a steady, dimmed dot. The badge only blinks while real background
+     work is running (assembling/shrinking the .bin, or audio playing). */
+  .footer-right .blink { color: var(--amber-dim); }
+  .footer-right.busy .blink { color: var(--amber); animation: blink 0.7s infinite; }
+  .footer-right.busy .status-label { color: var(--amber); }
   @keyframes blink { 0%,49%{opacity:1;} 50%,100%{opacity:0;} }
 
   /* Corner [+] insert buttons. One in the bottom-left of every slot row
@@ -1541,7 +1548,11 @@
   }
   .size-status:hover { text-decoration: underline; }
   .size-status .size-dim { opacity: 0.55; }
-  .size-status .size-warn { color: #e76f51; }
+  .size-status .size-warn { color: var(--red); }
+  /* Colour-code the two figures: amber = exact assembled size, green = the
+     smaller Shrinkler-packed (shrinkled) size that actually ships. */
+  .size-status .size-raw { color: var(--amber); }
+  .size-status .size-packed { color: var(--green); }
 
   /* Spinner shown while the exact .bin size is being assembled (footer, size
      breakdown rows, op-picker cost chips). */

@@ -56,4 +56,23 @@ describe('Player', () => {
     p.setMaster(0.5);
     // No throw, master changed
   });
+
+  it('notifies onStateChange when playback starts and stops', () => {
+    const p = new Player();
+    const states: boolean[] = [];
+    p.onStateChange = (playing) => states.push(playing);
+    p.play(new Int16Array(64), 22050);
+    p.stop();
+    expect(states).toEqual([true, false]);
+  });
+
+  it('notifies onStateChange(false) when the source ends naturally', () => {
+    const p = new Player();
+    const states: boolean[] = [];
+    p.onStateChange = (playing) => states.push(playing);
+    p.play(new Int16Array(64), 22050);
+    (p as any).currentSrc.onended();          // simulate the buffer finishing
+    expect(states).toEqual([true, false]);
+    expect(p.isPlaying()).toBe(false);
+  });
 });

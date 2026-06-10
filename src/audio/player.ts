@@ -10,6 +10,16 @@ export class Player {
   private currentSrc: AudioBufferSourceNode | undefined = undefined;
   private playing = false;
 
+  /** Fired whenever audible playback starts (true) or stops (false). Lets the
+   *  UI surface "audio is sounding" in the footer status light. */
+  onStateChange?: (playing: boolean) => void;
+
+  private setPlaying(p: boolean): void {
+    if (this.playing === p) return;
+    this.playing = p;
+    this.onStateChange?.(p);
+  }
+
   private ensure(): AudioContext {
     if (!this.ctx) {
       const C = getACtor();
@@ -38,13 +48,13 @@ export class Player {
     src.connect(this.gain!);
     src.onended = () => {
       if (this.currentSrc === src) {
-        this.playing = false;
         this.currentSrc = undefined;
+        this.setPlaying(false);
       }
     };
     src.start();
     this.currentSrc = src;
-    this.playing = true;
+    this.setPlaying(true);
   }
 
   stop(): void {
@@ -52,6 +62,6 @@ export class Player {
       try { this.currentSrc.stop(); } catch { /* already stopped */ }
       this.currentSrc = undefined;
     }
-    this.playing = false;
+    this.setPlaying(false);
   }
 }

@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   WebAssembly and run in the size worker, so the footer shows the
   Shrinkler-packed `.bin` size (after `→`) next to the raw size — the rough
   shipped cost. Size-identical to native Shrinkler. (`src/asm/shrinkler/`)
+  The **size breakdown** and the **op picker** now show the shrinkled delta too
+  (raw → shrinkled) per phase / per op, not just the raw `.bin` delta.
 - The op picker explains, in its description strip, **why** an op is disabled
   (e.g. loop_gen must be last / only one allowed).
 - **More phone tuning.** Selected instrument stays centered in the collapsed

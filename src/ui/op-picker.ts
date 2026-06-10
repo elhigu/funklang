@@ -43,9 +43,10 @@ function groupedDefs(): Array<{ title: string; defs: OpDef[] }> {
 
 /** Optional per-op size delta (SIGNED bytes) for choosing this op in the current
  *  patch: positive when it grows the .bin, negative when it shrinks it (e.g.
- *  changing reverb → add). Each op is inlined per use, so the figure is this op's
+ *  changing reverb → add). `cost` is raw .bin bytes, `packed` is the Shrinkler-
+ *  packed (shipped) delta. Each op is inlined per use, so the figure is this op's
  *  own cost here — it does NOT get cheaper just because the op is used elsewhere. */
-export interface OpAddCost { cost: number }
+export interface OpAddCost { cost: number; packed: number }
 
 /** `costOf` is called for EVERY op when the picker opens (each call assembles a
  *  variant of the patch, dispatched in parallel; cards show a spinner until
@@ -124,10 +125,11 @@ export function pickOp(
             .then((c) => {
               cost.classList.remove('size-spin');
               if (!c) { cost.textContent = ''; return; }
-              // Signed: negative when picking this op shrinks the patch.
-              const sign = c.cost < 0 ? '−' : '+';
-              cost.textContent = `${sign}${fmtBytes(Math.abs(c.cost))}`;
-              cost.title = 'Net change to the .bin if you choose this op (each op is inlined per use).';
+              // Signed: negative when picking this op shrinks the patch. Shows
+              // raw .bin delta → Shrinkler-packed (shipped) delta.
+              const fmt = (n: number): string => `${n < 0 ? '−' : '+'}${fmtBytes(Math.abs(n))}`;
+              cost.innerHTML = `${fmt(c.cost)} <span class="size-dim">→ ${fmt(c.packed)}</span>`;
+              cost.title = `code ${fmt(c.cost)}, shrinkled ${fmt(c.packed)} — net change if you choose this op (each op is inlined per use).`;
             })
             .catch(() => { cost.classList.remove('size-spin'); cost.textContent = ''; });
         }

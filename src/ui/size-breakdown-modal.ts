@@ -10,7 +10,7 @@
 import type { Patch } from '../patch/types';
 import { fmtBytes } from './format';
 import { chipUsage } from '../patch/chip-ram';
-import { exactSize } from '../asm/size-service';
+import { packedSize } from '../asm/size-service';
 import { phaseCost } from '../asm/size-ablation';
 import { opByCode } from '../schema/op-metadata';
 
@@ -71,10 +71,10 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
     overlay.innerHTML = `
       <div class="size-breakdown-inner" role="document">
         <header><h2>SIZE BREAKDOWN</h2><button id="size-breakdown-close" aria-label="Close">✕</button></header>
-        <p class="size-breakdown-note">Exact .bin code size, assembled in-browser. Each phase shows how many bytes <strong>deleting it</strong> would free. Every op is inlined per use, so each phase costs the same regardless of how many times that op appears.</p>
+        <p class="size-breakdown-note">Exact .bin size assembled in-browser, with the Shrinkler-<strong>shrinkled</strong> (shipped) size after <code>→</code>. Each phase shows the bytes <strong>deleting it</strong> would free (raw → shrinkled). Every op is inlined per use, so each phase costs the same regardless of how many times that op appears. <code>clone</code>/<code>imported</code> emit no code — their cost is sample/chip bytes, so they free ~0.</p>
         <section>
           <table>
-            <tr><td><strong>total .bin code</strong></td><td class="num" id="bd-total">${spin}</td></tr>
+            <tr><td><strong>total .bin</strong></td><td class="num" id="bd-total">${spin}</td></tr>
             <tr><td>chip-RAM (resident)</td><td class="num">${fmtBytes(chip.residentTotal)}</td></tr>
             <tr><td>· generated samples</td><td class="num">${fmtBytes(chip.sampleBytes)}</td></tr>
             <tr><td>· imported samples</td><td class="num">${fmtBytes(chip.importBytes)}</td></tr>
@@ -82,27 +82,31 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
           </table>
         </section>
         <section>
-          <h3>Per phase — bytes freed by deleting it</h3>
+          <h3>Per phase — bytes freed by deleting it (raw → shrinkled)</h3>
           <table><tr><th>instrument / phase</th><th class="num">freed</th></tr>${instrRows}</table>
         </section>
       </div>`;
     (overlay.querySelector('#size-breakdown-close') as HTMLButtonElement).addEventListener('click', close);
     overlay.classList.remove('hidden');
 
-    // Total size.
-    void exactSize(patch).then((r) => {
+    // Total size (raw → shrinkled).
+    void packedSize(patch).then((r) => {
       if (gen !== generation) return;
       const cell = overlay.querySelector('#bd-total');
-      if (cell) cell.textContent = r.ok ? `${fmtBytes(r.size!)} (${r.size} B)` : 'unavailable';
+      if (cell) cell.innerHTML = r.ok
+        ? `${r.raw} B <span class="size-dim">→ ${r.packed} B shrinkled</span>`
+        : 'unavailable';
     });
 
-    // Per-phase ablation deltas.
+    // Per-phase ablation deltas (raw freed → shrinkled freed).
     for (const phases of byInstr.values()) {
       for (const p of phases) {
         void phaseCost(patch, p.instr, p.slot).then((r) => {
           if (gen !== generation) return;
           const cell = overlay.querySelector(`#${phaseId(p)}`);
-          if (cell) cell.textContent = r.ok ? `−${fmtBytes(r.bytes!)}` : '—';
+          if (cell) cell.innerHTML = r.ok
+            ? `−${fmtBytes(r.bytes!)} <span class="size-dim">→ −${fmtBytes(r.packed!)}</span>`
+            : '—';
         });
       }
     }

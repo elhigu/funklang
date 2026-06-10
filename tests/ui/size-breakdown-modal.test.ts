@@ -6,10 +6,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('../../src/asm/size-service', () => ({
-  exactSize: vi.fn(async () => ({ ok: true, size: 2024 })),
+  packedSize: vi.fn(async () => ({ ok: true, raw: 2024, packed: 751 })),
 }));
 vi.mock('../../src/asm/size-ablation', () => ({
-  phaseCost: vi.fn(async () => ({ ok: true, bytes: 128 })),
+  phaseCost: vi.fn(async () => ({ ok: true, bytes: 128, packed: 40 })),
 }));
 
 import { emptyPatch, emptySlot } from '../../src/patch/types';
@@ -34,7 +34,7 @@ describe('breakdown modal', () => {
     p.instruments[0]!.slots = [{ ...emptySlot(), fn: 2, outVar: 1 }];
     modal.open(p);
     expect(overlay.classList.contains('hidden')).toBe(false);
-    expect(overlay.textContent).toContain('total .bin code');
+    expect(overlay.textContent).toContain('total .bin');
     expect(overlay.textContent).toContain('osc_saw');     // the phase row
     expect(overlay.textContent!.toLowerCase()).toContain('freed');
     expect(overlay.querySelector('.size-spin')).not.toBeNull(); // cells start spinning

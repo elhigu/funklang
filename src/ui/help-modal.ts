@@ -73,15 +73,20 @@ export function helpOverlayHtml(): string {
 
             <h3>Size &amp; CODE export</h3>
             <p>The footer shows the patch's <strong>exact</strong> exported <code>.bin</code>
-            size, the Shrinkler-<strong>packed</strong> size (after <code>→</code>, the rough
-            shipped cost), and resident chip-RAM — all computed in-browser (a byte-for-byte
-            port of <code>Aklang2Asm</code> + vasm-WebAssembly, then Shrinkler-WASM). A
-            <span class="size-spin">⟳</span> spins while a new patch assembles; results cache.
-            Click the footer for a per-phase breakdown; the op picker shows each op's exact
-            size delta. <strong>CODE</strong> (top menu) downloads the <code>.asm</code>, the
-            C generators, and the exact <code>.bin</code>. Patches the generator can't build
-            (e.g. variable <code>enva</code>, or a required input left unwired) read
-            <em>size unavailable</em>.</p>
+            size in bytes (<span class="size-raw">amber</span>), and after <code>→</code> the
+            <strong>shrinkled</strong> size (<span class="size-packed">green</span>, the
+            Shrinkler-packed bytes that actually ship), plus resident chip-RAM — all computed
+            in-browser (a byte-for-byte port of <code>Aklang2Asm</code> + vasm-WebAssembly,
+            then Shrinkler-WASM). A <span class="size-spin">⟳</span> spins while a new patch
+            assembles; results cache. Click the footer for a per-phase breakdown; the op
+            picker shows each op's exact size delta. <strong>CODE</strong> (top menu)
+            downloads the <code>.asm</code>, the C generators, and the exact <code>.bin</code>.
+            Patches the generator can't build (e.g. variable <code>enva</code>, or a required
+            input left unwired) read <em>size unavailable</em>.</p>
+            <p>The bottom-right badge is an activity light: it blinks
+            <strong>ASSEMBLING</strong> / <strong>SHRINKLING</strong> while the .bin is being
+            built or packed, <strong>PLAYING</strong> while audio sounds, and rests at a
+            steady <strong>READY</strong> when idle.</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>

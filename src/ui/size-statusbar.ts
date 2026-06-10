@@ -13,6 +13,7 @@ import { fmtBytes } from './format';
 import { chipUsage } from '../patch/chip-ram';
 import { exactSize, packedSize, peekSize, type SizeResult } from '../asm/size-service';
 import { mountBreakdownModal } from './size-breakdown-modal';
+import type { StatusBar } from './status-bar';
 
 const DEBOUNCE_MS = 250;
 
@@ -24,6 +25,7 @@ export interface SizeStatusbar {
 export function wireSizeStatusbar(
   root: HTMLElement,
   model: PatchModel,
+  status?: StatusBar,
 ): SizeStatusbar {
   const btn = root.querySelector('#size-status') as HTMLButtonElement;
   const modal = mountBreakdownModal(root);
@@ -37,12 +39,14 @@ export function wireSizeStatusbar(
     btn.title = 'Assembling the exact .bin size…';
   };
 
-  // Paint a result, with `packedHtml` for the "→ … packed" segment (raw shows
-  // immediately; the slower packed figure fills in after).
+  // Paint a result, with `packedHtml` for the "→ … shrinkled" segment (the exact
+  // assembled size shows immediately; the slower Shrinkler figure fills in after).
+  // Both figures are exact byte counts — no kB rounding — and colour-coded: the
+  // raw size amber, the shrinkled (shipped) size green.
   const paint = (r: SizeResult, packedHtml: string): void => {
     if (r.ok) {
-      btn.innerHTML = `size ${fmtBytes(r.size!)} <span class="size-dim">(${r.size} B)</span>${packedHtml} · ${chipPart()}`;
-      btn.title = 'Exact .bin size (assembled in-browser); → is the Shrinkler-packed size. Click for a per-phase breakdown.';
+      btn.innerHTML = `size <span class="size-raw">${r.size} B</span>${packedHtml} · ${chipPart()}`;
+      btn.title = 'Exact .bin size (assembled in-browser); → is the Shrinkler-packed (shrinkled) shipped size. Click for a per-phase breakdown.';
     } else {
       btn.innerHTML = `<span class="size-warn">size unavailable</span> · ${chipPart()}`;
       btn.title = `This patch can't be assembled (${r.error ?? 'unsupported op'}) — an instrument is flagged red. Chip-RAM is still exact.`;
@@ -52,10 +56,12 @@ export function wireSizeStatusbar(
   // Paint the raw size now, then request + fill the Shrinkler-packed size.
   const paintResult = (my: number, r: SizeResult): void => {
     if (!r.ok) { paint(r, ''); return; }
-    paint(r, ` → <span class="size-spin" aria-label="packing">⟳</span>`);   // packed pending
+    paint(r, ` → <span class="size-spin" aria-label="shrinkling">⟳</span>`);   // packed pending
+    const endShrink = status?.begin('SHRINKLING');
     void packedSize(model.patch).then((p) => {
+      endShrink?.();
       if (my !== token) return;
-      paint(r, p.ok ? ` → ${fmtBytes(p.packed!)} <span class="size-dim">packed</span>` : '');
+      paint(r, p.ok ? ` → <span class="size-packed">${p.packed} B</span> <span class="size-dim">shrinkled</span>` : '');
     });
   };
 
@@ -66,7 +72,9 @@ export function wireSizeStatusbar(
     if (peek) { paintResult(my, peek); return; }  // cached or codegen-fail → instant
     paintPending();
     timer = setTimeout(() => {
+      const endAsm = status?.begin('ASSEMBLING');
       void exactSize(model.patch).then((r) => {
+        endAsm?.();
         if (my === token) paintResult(my, r);     // ignore superseded edits
       });
     }, DEBOUNCE_MS);

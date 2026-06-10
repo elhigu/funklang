@@ -23,7 +23,7 @@ import type { ParamDef } from '../schema/op-metadata';
  *  Null when the op can't be assembled into the patch. */
 function opCostProvider(model: PatchModel, instrIdx: number): (op: number) => Promise<OpAddCost | null> {
   return (op) =>
-    addOpCost(model.patch, instrIdx, op).then((r) => (r.ok ? { cost: r.bytes! } : null));
+    addOpCost(model.patch, instrIdx, op).then((r) => (r.ok ? { cost: r.bytes!, packed: r.packed! } : null));
 }
 
 /** Cost provider for CHANGING an existing slot's op: the SIGNED net byte delta
@@ -31,7 +31,7 @@ function opCostProvider(model: PatchModel, instrIdx: number): (op: number) => Pr
  *  (e.g. reverb → add), unlike inserting which only ever adds. */
 function opChangeCostProvider(model: PatchModel, instrIdx: number, slotIdx: number): (op: number) => Promise<OpAddCost | null> {
   return (op) =>
-    replaceOpCost(model.patch, instrIdx, slotIdx, op).then((r) => (r.ok ? { cost: r.bytes! } : null));
+    replaceOpCost(model.patch, instrIdx, slotIdx, op).then((r) => (r.ok ? { cost: r.bytes!, packed: r.packed! } : null));
 }
 
 /** Last filled (non-empty) slot model-index in an instrument, or -1. */

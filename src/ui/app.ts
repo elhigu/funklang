@@ -17,6 +17,7 @@ import { helpOverlayHtml, wireHelp } from './help-modal';
 import { renderInstrHeader } from './instr-header';
 import { renderSlotGrid, updateSlotWaves, findExpandedCloneGrids } from './slot-grid';
 import { wireSizeStatusbar, type SizeStatusbar } from './size-statusbar';
+import { wireStatusBar } from './status-bar';
 import { mountCodeExportModal } from './code-export-modal';
 import { bytesToInt16 } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
@@ -140,7 +141,7 @@ export function bootApp(root: HTMLElement): void {
           <span class="k">output →</span>
           <span class="output" id="output-label">—</span>
         </div>
-        <div class="footer-right"><span class="blink">●</span><span>READY</span></div>
+        <div class="footer-right" title="System activity — blinks while the .bin assembles/shrinks or audio plays, steady READY when idle"><span class="blink">●</span><span class="status-label">READY</span></div>
       </footer>
       <aside id="revert-panel" class="revert-panel hidden" aria-hidden="true">
         <div class="revert-head">
@@ -815,7 +816,17 @@ export function bootApp(root: HTMLElement): void {
     playAuditionInternal();
   });
 
-  sizeBar = wireSizeStatusbar(root, model);
+  // Footer activity light. The size bar reports its worker assembly/shrink
+  // here, and audio playback registers below, so the corner badge reflects
+  // whatever background work is actually running.
+  const statusBar = wireStatusBar(root);
+  let endPlaying: (() => void) | null = null;
+  player.onStateChange = (playing): void => {
+    if (playing) { if (!endPlaying) endPlaying = statusBar.begin('PLAYING'); }
+    else { endPlaying?.(); endPlaying = null; }
+  };
+
+  sizeBar = wireSizeStatusbar(root, model, statusBar);
 
   model.events.on((e) => {
     // Undo/redo synthesises a 'reset' event — rebuild everything from scratch.
