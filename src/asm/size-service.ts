@@ -1,17 +1,19 @@
 // src/asm/size-service.ts
 //
-// Exact .bin size for a patch. The slow part (vasm-WASM assembly) runs in a Web
-// Worker so the UI thread never blocks; results are memoised by the generated
-// asm (the deterministic input to vasm) and identical in-flight requests are
-// de-duplicated. Patches the asm generator can't handle — e.g. variable `enva`,
-// which the original Aklang2Asm also rejects — resolve to `{ ok:false }`; callers
-// show "size unavailable" rather than a guess.
+// Exact .bin size for a patch (and its Shrinkler-packed size). The slow parts —
+// vasm-WASM assembly, and optionally Shrinkler crunching — run in a Web Worker so
+// the UI thread never blocks; results are memoised by the generated asm (the
+// deterministic input) and identical in-flight requests are de-duplicated.
+// Patches the asm generator can't handle — e.g. variable `enva`, which the
+// original Aklang2Asm also rejects — resolve to `{ ok:false }`; callers show
+// "size unavailable" rather than a guess.
 //
 // In environments without Web Workers (vitest/node) it transparently falls back
-// to assembling on the calling thread, so the cache/dedupe logic is testable.
+// to running on the calling thread, so the cache/dedupe logic is testable.
 import type { Patch } from '../patch/types';
 import { emitAkGenerate } from './akgen';
 import { assembleM68k } from './vasm';
+import { shrinkle } from './shrinkler';
 
 export interface SizeResult {
   ok: boolean;
@@ -21,10 +23,18 @@ export interface SizeResult {
   error?: string;
 }
 
-interface PendingEntry {
-  resolve: (r: SizeResult) => void;
-  asm: string;
+export interface PackedResult {
+  ok: boolean;
+  /** Raw (uncompressed) .bin size. */
+  raw?: number;
+  /** Shrinkler-packed size (data mode), the rough shipped cost. */
+  packed?: number;
+  error?: string;
 }
+
+/** Raw worker reply (id-tagged); `packed` present only for packed requests. */
+interface Reply { ok: boolean; size?: number; packed?: number; error?: string }
+interface PendingEntry { resolve: (r: Reply) => void; asm: string; packed: boolean }
 
 let worker: Worker | null = null;
 let workerBroken = false;
@@ -32,24 +42,29 @@ let seq = 0;
 const pending = new Map<number, PendingEntry>();
 const cache = new Map<string, SizeResult>();
 const inflight = new Map<string, Promise<SizeResult>>();
+const packedCache = new Map<string, PackedResult>();
+const packedInflight = new Map<string, Promise<PackedResult>>();
 
-// Bound the memo cache: editing + the per-op-hover/per-phase ablations produce a
-// fresh asm key each time, so an unbounded Map would grow for the whole session.
-// Map keeps insertion order, so evicting the first key is FIFO eviction.
+// Bound the memo caches: editing + per-op/per-phase ablations produce a fresh asm
+// key each time, so an unbounded Map would grow for the whole session. Map keeps
+// insertion order, so evicting the first key is FIFO eviction.
 const CACHE_MAX = 512;
-function cacheSet(asm: string, r: SizeResult): void {
-  cache.set(asm, r);
-  if (cache.size > CACHE_MAX) {
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) cache.delete(oldest);
+function boundedSet<V>(map: Map<string, V>, key: string, val: V): void {
+  map.set(key, val);
+  if (map.size > CACHE_MAX) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
   }
 }
 
-async function assembleDirect(asm: string): Promise<SizeResult> {
+/** Main-thread fallback (no Worker): assemble, and optionally crunch. */
+async function runDirect(asm: string, packed: boolean): Promise<Reply> {
   const r = await assembleM68k(asm, { format: 'bin' });
-  return r.ok
-    ? { ok: true, size: r.bytes!.length }
-    : { ok: false, error: r.error ?? 'assembly failed' };
+  if (!r.ok) return { ok: false, error: r.error ?? 'assembly failed' };
+  const size = r.bytes!.length;
+  if (!packed) return { ok: true, size };
+  const s = await shrinkle(r.bytes!);
+  return s.ok ? { ok: true, size, packed: s.size! } : { ok: true, size, error: s.error ?? 'pack failed' };
 }
 
 function getWorker(): Worker | null {
@@ -58,20 +73,20 @@ function getWorker(): Worker | null {
   try {
     worker = new Worker(new URL('./size-worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent): void => {
-      const { id, ok, size, error } = e.data as { id: number } & SizeResult;
-      const entry = pending.get(id);
+      const r = e.data as { id: number } & Reply;
+      const entry = pending.get(r.id);
       if (!entry) return;
-      pending.delete(id);
-      entry.resolve(ok ? { ok: true, size: size! } : { ok: false, error: error ?? 'assembly failed' });
+      pending.delete(r.id);
+      entry.resolve(r);
     };
-    // If the worker dies, fail over to main-thread assembly for everything that
-    // was in flight, and stop using the worker for future requests.
+    // If the worker dies, fail over to main-thread for everything in flight, and
+    // stop using the worker for future requests.
     worker.onerror = (): void => {
       workerBroken = true;
       worker = null;
       const stranded = Array.from(pending.values());
       pending.clear();
-      for (const entry of stranded) void assembleDirect(entry.asm).then(entry.resolve);
+      for (const entry of stranded) void runDirect(entry.asm, entry.packed).then(entry.resolve);
     };
     return worker;
   } catch {
@@ -80,12 +95,17 @@ function getWorker(): Worker | null {
   }
 }
 
-function assembleViaWorker(w: Worker, asm: string): Promise<SizeResult> {
+function runViaWorker(w: Worker, asm: string, packed: boolean): Promise<Reply> {
   return new Promise((resolve) => {
     const id = ++seq;
-    pending.set(id, { resolve, asm });
-    w.postMessage({ id, asm });
+    pending.set(id, { resolve, asm, packed });
+    w.postMessage({ id, asm, packed });
   });
+}
+
+function run(asm: string, packed: boolean): Promise<Reply> {
+  const w = getWorker();
+  return w ? runViaWorker(w, asm, packed) : runDirect(asm, packed);
 }
 
 /** Exact .bin size for `patch`. Memoised + de-duplicated by generated asm. */
@@ -101,18 +121,36 @@ export async function exactSize(patch: Patch): Promise<SizeResult> {
   const running = inflight.get(asm);
   if (running) return running;
 
-  const w = getWorker();
-  const p = (w ? assembleViaWorker(w, asm) : assembleDirect(asm))
-    .then((r) => {
-      cacheSet(asm, r);
-      inflight.delete(asm);
-      return r;
-    })
-    .catch((err): SizeResult => {
-      inflight.delete(asm);
-      return { ok: false, error: String(err) };
-    });
+  const p = run(asm, false)
+    .then((r): SizeResult => (r.ok ? { ok: true, size: r.size! } : { ok: false, error: r.error ?? 'assembly failed' }))
+    .then((r) => { boundedSet(cache, asm, r); inflight.delete(asm); return r; })
+    .catch((err): SizeResult => { inflight.delete(asm); return { ok: false, error: String(err) }; });
   inflight.set(asm, p);
+  return p;
+}
+
+/** Exact .bin size + its Shrinkler-packed size. Memoised separately (the packed
+ *  pass is slower, so it's only requested for the headline total, not ablations). */
+export async function packedSize(patch: Patch): Promise<PackedResult> {
+  let asm: string;
+  try {
+    asm = emitAkGenerate(patch);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message || 'codegen failed' };
+  }
+  const cached = packedCache.get(asm);
+  if (cached) return cached;
+  const running = packedInflight.get(asm);
+  if (running) return running;
+
+  const p = run(asm, true)
+    .then((r): PackedResult =>
+      r.ok && r.packed !== undefined
+        ? { ok: true, raw: r.size!, packed: r.packed }
+        : { ok: false, error: r.error ?? 'pack failed' })
+    .then((r) => { boundedSet(packedCache, asm, r); packedInflight.delete(asm); return r; })
+    .catch((err): PackedResult => { packedInflight.delete(asm); return { ok: false, error: String(err) }; });
+  packedInflight.set(asm, p);
   return p;
 }
 
@@ -135,4 +173,6 @@ export function peekSize(patch: Patch): SizeResult | undefined {
 export function _clearSizeCache(): void {
   cache.clear();
   inflight.clear();
+  packedCache.clear();
+  packedInflight.clear();
 }

@@ -46,9 +46,26 @@ describe('isInstrumentValid — var-source / var-or-const wiring', () => {
     expect(isInstrumentValid(p, 0)).toBe(true);
   });
 
-  it('var-source value 0 ("—") is always allowed, never invalid', () => {
+  it('OPTIONAL var-source value 0 ("—") is allowed (vol: allowNone)', () => {
     const p = patchWith((p) => {
       p.instruments[0]!.slots.push({ ...emptySlot(), fn: 1, outVar: 1, val1: 0 });
+    });
+    expect(isInstrumentValid(p, 0)).toBe(true);
+  });
+
+  it('REQUIRED var-source left unset is invalid (reverb needs an input)', () => {
+    // reverb (fn=13) val1 is a required var-source (allowNone:false). With it
+    // unset the patch can't even assemble/size, so the instrument is red.
+    const p = patchWith((p) => {
+      p.instruments[0]!.slots.push({ ...emptySlot(), fn: 13, outVar: 1, val1: 0 });
+    });
+    expect(isInstrumentValid(p, 0)).toBe(false);
+  });
+
+  it('REQUIRED var-source wired to a written var is valid', () => {
+    const p = patchWith((p) => {
+      p.instruments[0]!.slots.push({ ...emptySlot(), fn: 2, outVar: 1, freqVal: 1000, gainVal: 80 });
+      p.instruments[0]!.slots.push({ ...emptySlot(), fn: 13, outVar: 1, val1: 1 });   // reverb reads v1
     });
     expect(isInstrumentValid(p, 0)).toBe(true);
   });

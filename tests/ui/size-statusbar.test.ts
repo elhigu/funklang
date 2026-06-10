@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 vi.mock('../../src/asm/size-service', () => ({
   peekSize: vi.fn(),
   exactSize: vi.fn(async () => ({ ok: true, size: 2024 })),
+  packedSize: vi.fn(async () => ({ ok: true, raw: 2024, packed: 751 })),
 }));
 
 import { emptyPatch, emptySlot } from '../../src/patch/types';
@@ -30,13 +31,16 @@ describe('size status bar', () => {
     peek.mockReset();
   });
 
-  it('shows the exact size + chip total when the size is already cached', () => {
+  it('shows the exact size + chip total when cached, then fills the packed size', async () => {
     peek.mockReturnValue({ ok: true, size: 2024 });
     const model = new PatchModel(emptyPatch());
     wireSizeStatusbar(root, model);
     expect(btn.textContent).toMatch(/size/);
     expect(btn.textContent).toMatch(/2024 B/);
     expect(btn.textContent).toMatch(/chip/);
+    // The Shrinkler-packed size fills in asynchronously (spinner until then).
+    await new Promise((r) => setTimeout(r, 0));
+    expect(btn.textContent).toMatch(/751/);            // packed
     expect(btn.querySelector('.size-spin')).toBeNull();
   });
 

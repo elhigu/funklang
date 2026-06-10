@@ -83,7 +83,11 @@ export function pickOp(
     detail.className = 'op-picker-detail';
     const DETAIL_HINT = 'Hover an operator for details.';
     detail.textContent = DETAIL_HINT;
-    const showDetail = (def: OpDef): void => {
+    // When an op is disabled in this context, the strip explains WHY (e.g. the
+    // loop_gen placement / uniqueness rules) rather than its description.
+    const showDetail = (def: OpDef, disabledReason: string | null): void => {
+      detail.classList.toggle('op-picker-detail-blocked', disabledReason != null);
+      if (disabledReason) { detail.textContent = `${def.name} — ✕ ${disabledReason}`; return; }
       detail.textContent = def.description ? `${def.name} — ${def.description}` : def.name;
     };
 
@@ -137,8 +141,8 @@ export function pickOp(
           btn.classList.add('op-picker-card-unsupported');
           if (disabledReason) btn.title = disabledReason;
         }
-        btn.addEventListener('mouseenter', () => showDetail(def));
-        btn.addEventListener('focus', () => showDetail(def));
+        btn.addEventListener('mouseenter', () => showDetail(def, disabledReason));
+        btn.addEventListener('focus', () => showDetail(def, disabledReason));
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           if (isDisabled) return;   // disabled cards are never selectable

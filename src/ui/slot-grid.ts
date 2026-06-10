@@ -410,7 +410,6 @@ function makeVarSelect(opts: VarSelectOpts): HTMLSelectElement {
   const sel = document.createElement('select');
   sel.className = 'param-var-select';
   if (opts.title) sel.title = opts.title;
-  void opts.allowNone;       // intentionally ignored; see comment above
   const labels: ReadonlyArray<{ value: number; text: string }> = [
     { value: 0, text: '—' },
     { value: 1, text: 'v1' },
@@ -426,12 +425,15 @@ function makeVarSelect(opts: VarSelectOpts): HTMLSelectElement {
     sel.appendChild(optEl);
   }
   // Reflect the SELECTED source's status on the control itself so it's
-  // visible without opening the dropdown: red for truly-unset (silence),
-  // a distinct (non-red) feedback hint for a forward/feedback reference.
+  // visible without opening the dropdown: red for truly-unset (silence) or a
+  // REQUIRED input left "—" (the op won't even assemble), a distinct (non-red)
+  // feedback hint for a forward/feedback reference.
+  const requiredUnset = opts.value === 0 && opts.allowNone === false;
   const st = opts.value > 0 ? opts.classify(opts.value) : { kind: 'normal' as const };
-  sel.classList.toggle('var-unset', st.kind === 'unset');
+  sel.classList.toggle('var-unset', st.kind === 'unset' || requiredUnset);
   sel.classList.toggle('var-feedback', st.kind === 'feedback');
-  if (st.kind === 'unset') sel.title = (sel.title ? sel.title + ' — ' : '') + `v${opts.value} is not written by any slot (silence)`;
+  if (requiredUnset) sel.title = (sel.title ? sel.title + ' — ' : '') + 'this op needs an input variable (the patch will not assemble until it is wired)';
+  else if (st.kind === 'unset') sel.title = (sel.title ? sel.title + ' — ' : '') + `v${opts.value} is not written by any slot (silence)`;
   else if (st.kind === 'feedback') sel.title = (sel.title ? sel.title + ' — ' : '') + `v${opts.value} is feedback from phase ${st.feedbackRow} (previous-sample value)`;
   sel.addEventListener('change', () => {
     const v = parseInt(sel.value, 10);

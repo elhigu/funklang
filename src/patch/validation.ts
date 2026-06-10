@@ -34,9 +34,14 @@ function slotIsValid(slot: Slot, instrIdx: number, written: ReadonlySet<number>)
     switch (p.type.kind) {
       case 'var-source': {
         const v = slot[p.field] as number;
-        // Value 0 reads as "—" (no source connected); UI treats it as a
-        // soft warning, not a red error, so the sidebar follows suit.
-        if (v > 0 && !written.has(v)) return false;
+        if (v === 0) {
+          // A REQUIRED input (allowNone:false — reverb, add, the filters, …) must
+          // be wired: the generator can't produce code without it (the patch
+          // won't even assemble / size), so an unset one is a hard error.
+          if (p.type.allowNone === false) return false;
+          break;                          // optional input left "—" is fine
+        }
+        if (!written.has(v)) return false; // points at a variable no slot writes
         break;
       }
       case 'var-or-const': {

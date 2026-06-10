@@ -11,7 +11,7 @@ import { emptyPatch } from '../../src/patch/types';
 import type { Patch } from '../../src/patch/types';
 import { emptySlot } from '../../src/patch/types';
 import { resetSlotForOp } from '../../src/schema/op-metadata';
-import { exactSize, _clearSizeCache } from '../../src/asm/size-service';
+import { exactSize, packedSize, _clearSizeCache } from '../../src/asm/size-service';
 import { phaseCost, addOpCost, replaceOpCost } from '../../src/asm/size-ablation';
 
 const REAL = join(__dirname, '..', '..', 'groundtruth', 'corpus', 'real');
@@ -34,6 +34,14 @@ describe('exactSize', () => {
     const r = await exactSize(patch);
     expect(r.ok).toBe(true);
     expect(r.size!).toBeGreaterThan(0);
+  });
+
+  it('packedSize returns a Shrinkler-packed size smaller than the raw .bin', async () => {
+    const r = await packedSize(patch);
+    expect(r.ok).toBe(true);
+    expect(r.raw!).toBeGreaterThan(0);
+    expect(r.packed!).toBeGreaterThan(0);
+    expect(r.packed!).toBeLessThan(r.raw!);
   });
 
   it('memoises identical patches (returns the cached result)', async () => {

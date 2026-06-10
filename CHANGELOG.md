@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Packed size.** Shrinkler (Blueberry's Amiga cruncher) is now compiled to
+  WebAssembly and run in the size worker, so the footer shows the
+  Shrinkler-packed `.bin` size (after `→`) next to the raw size — the rough
+  shipped cost. Size-identical to native Shrinkler. (`src/asm/shrinkler/`)
+- The op picker explains, in its description strip, **why** an op is disabled
+  (e.g. loop_gen must be last / only one allowed).
 - **More phone tuning.** Selected instrument stays centered in the collapsed
   rail (all 31 reachable); top waveform is shorter to free room for phases;
   `dvh` + safe-area inset so the last phase's `[+]` clears Safari's bottom bar;
@@ -42,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   desktop and mobile alike (Space or the top-bar ▶ replay on demand).
 
 ### Fixed
+- A REQUIRED input left unwired (e.g. reverb/add/filters with no var-source) now
+  flags the instrument red and the dropdown red — that patch can't assemble at
+  all, so the size correctly reads "unavailable" rather than silently failing.
 - Removed the misleading "· shared" tag from op costs. This build inlines each op
   at every use (no shared subroutines), so an op is *not* cheaper when already in
   the patch — e.g. each reverb costs ~485 B every time. The cost shown is simply

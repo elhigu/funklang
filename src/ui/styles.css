@@ -1272,6 +1272,8 @@
     font-size: 11px;
     line-height: 1.4;
   }
+  /* When the hovered op can't be picked here, the strip explains why, in red. */
+  .op-picker-detail-blocked { color: var(--red); border-color: var(--red); }
   .op-picker-card-unsupported {
     opacity: 0.45;
     cursor: not-allowed !important;

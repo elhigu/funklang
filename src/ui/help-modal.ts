@@ -57,8 +57,8 @@ export function helpOverlayHtml(): string {
 
             <h3>Validation (red = needs fixing)</h3>
             <table class="help-kbd"><tbody>
-              <tr><td>Red instrument row</td><td>A slot has an unwired var-source (a v1–v4 no slot writes) / bad clone source — fix the red dropdown</td></tr>
-              <tr><td>Red dropdown / (unset)</td><td>That v1–v4 is written by NO slot — it's silence. (clone source must be a lower-numbered instrument)</td></tr>
+              <tr><td>Red instrument row</td><td>A slot has an unwired var-source (a v1–v4 no slot writes), a REQUIRED input left "—" (e.g. reverb/filters/add — the patch won't even assemble), or a bad clone source — fix the red dropdown</td></tr>
+              <tr><td>Red dropdown / (unset)</td><td>That v1–v4 is written by NO slot — it's silence; or a required input is "—". (clone source must be a lower-numbered instrument)</td></tr>
               <tr><td>Cyan dropdown / (feedback #N)</td><td>That v1–v4 is written only by a LATER slot (phase N). The variable bank persists across samples, so the read picks up phase N's value from the PREVIOUS sample — a deliberate one-sample feedback loop, not an error</td></tr>
               <tr><td>Loop edge (top wave-view)</td><td>Drag the pink left edge to retune the loop offset (snaps to the valid even position)</td></tr>
             </tbody></table>
@@ -73,14 +73,15 @@ export function helpOverlayHtml(): string {
 
             <h3>Size &amp; CODE export</h3>
             <p>The footer shows the patch's <strong>exact</strong> exported <code>.bin</code>
-            size + resident chip-RAM — the real byte count, assembled in-browser (a
-            byte-for-byte port of <code>Aklang2Asm</code> + vasm-WebAssembly). A
+            size, the Shrinkler-<strong>packed</strong> size (after <code>→</code>, the rough
+            shipped cost), and resident chip-RAM — all computed in-browser (a byte-for-byte
+            port of <code>Aklang2Asm</code> + vasm-WebAssembly, then Shrinkler-WASM). A
             <span class="size-spin">⟳</span> spins while a new patch assembles; results cache.
-            Click the footer for a per-phase breakdown (bytes each phase frees if deleted);
-            the op picker shows each op's exact add-cost on hover. <strong>CODE</strong> (top
-            menu) downloads the <code>.asm</code>, the C generators, and the exact
-            <code>.bin</code>. Patches the generator can't build (e.g. variable
-            <code>enva</code>) read <em>size unavailable</em>.</p>
+            Click the footer for a per-phase breakdown; the op picker shows each op's exact
+            size delta. <strong>CODE</strong> (top menu) downloads the <code>.asm</code>, the
+            C generators, and the exact <code>.bin</code>. Patches the generator can't build
+            (e.g. variable <code>enva</code>, or a required input left unwired) read
+            <em>size unavailable</em>.</p>
 
             <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
           </div>

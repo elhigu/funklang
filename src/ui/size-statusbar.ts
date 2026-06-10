@@ -11,7 +11,7 @@
 import type { PatchModel } from '../patch/model';
 import { fmtBytes } from './format';
 import { chipUsage } from '../patch/chip-ram';
-import { exactSize, peekSize, type SizeResult } from '../asm/size-service';
+import { exactSize, packedSize, peekSize, type SizeResult } from '../asm/size-service';
 import { mountBreakdownModal } from './size-breakdown-modal';
 
 const DEBOUNCE_MS = 250;
@@ -37,25 +37,37 @@ export function wireSizeStatusbar(
     btn.title = 'Assembling the exact .bin size…';
   };
 
-  const paintResult = (r: SizeResult): void => {
+  // Paint a result, with `packedHtml` for the "→ … packed" segment (raw shows
+  // immediately; the slower packed figure fills in after).
+  const paint = (r: SizeResult, packedHtml: string): void => {
     if (r.ok) {
-      btn.innerHTML = `size ${fmtBytes(r.size!)} <span class="size-dim">(${r.size} B)</span> · ${chipPart()}`;
-      btn.title = 'Exact .bin code size (assembled in-browser). Click for a per-phase breakdown.';
+      btn.innerHTML = `size ${fmtBytes(r.size!)} <span class="size-dim">(${r.size} B)</span>${packedHtml} · ${chipPart()}`;
+      btn.title = 'Exact .bin size (assembled in-browser); → is the Shrinkler-packed size. Click for a per-phase breakdown.';
     } else {
       btn.innerHTML = `<span class="size-warn">size unavailable</span> · ${chipPart()}`;
-      btn.title = `This patch can't be assembled by the asm generator (${r.error ?? 'unsupported op'}). Chip-RAM is still exact.`;
+      btn.title = `This patch can't be assembled (${r.error ?? 'unsupported op'}) — an instrument is flagged red. Chip-RAM is still exact.`;
     }
+  };
+
+  // Paint the raw size now, then request + fill the Shrinkler-packed size.
+  const paintResult = (my: number, r: SizeResult): void => {
+    if (!r.ok) { paint(r, ''); return; }
+    paint(r, ` → <span class="size-spin" aria-label="packing">⟳</span>`);   // packed pending
+    void packedSize(model.patch).then((p) => {
+      if (my !== token) return;
+      paint(r, p.ok ? ` → ${fmtBytes(p.packed!)} <span class="size-dim">packed</span>` : '');
+    });
   };
 
   const refresh = (): void => {
     const my = ++token;
     if (timer) { clearTimeout(timer); timer = null; }
     const peek = peekSize(model.patch);
-    if (peek) { paintResult(peek); return; }  // cached or codegen-fail → instant
+    if (peek) { paintResult(my, peek); return; }  // cached or codegen-fail → instant
     paintPending();
     timer = setTimeout(() => {
       void exactSize(model.patch).then((r) => {
-        if (my === token) paintResult(r);     // ignore superseded edits
+        if (my === token) paintResult(my, r);     // ignore superseded edits
       });
     }, DEBOUNCE_MS);
   };

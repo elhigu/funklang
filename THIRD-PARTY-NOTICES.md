@@ -34,9 +34,23 @@ If you spot an attribution error or want a usage clarified, please open an issue
   authoritative license text see the `COPYRIGHT`/manual in the upstream vasm
   distribution (http://sun.hasenbraten.de/vasm/).
 
+### Shrinkler (data cruncher) — compiled to WebAssembly
+- **Author/Copyright:** © Aske Simon Christensen (*Blueberry*).
+  Home: https://github.com/askeksa/Shrinkler
+- **Where:** `src/asm/shrinkler/shrinkler.{wasm,mjs}` (also bundled into the
+  deployed site). Used in data mode (`-d -b`) to report the patch's **packed**
+  `.bin` size.
+- **Provenance:** an **unmodified** build of the upstream Shrinkler C++ source,
+  recompiled to WebAssembly with Emscripten (`em++ … cruncher/Shrinkler.cpp`).
+- **License:** Shrinkler may be compiled, used, copied, modified, merged and
+  distributed (in whole or part), incl. in **binary form**, provided binary
+  distributions are **not misattributed** (you must not claim you wrote it). This
+  notice provides that attribution. (doshunks.h within Shrinkler is © 1989–1993
+  Commodore-Amiga, Inc.) Full terms: the `LICENSE.txt` in the upstream repo.
+
 ### Emscripten runtime
-- **Where:** the generated `src/asm/vasm/vasm-m68k.mjs` embeds Emscripten-generated
-  runtime/glue code.
+- **Where:** the generated `vasm-m68k.mjs` and `shrinkler.mjs` embed
+  Emscripten-generated runtime/glue code.
 - **License:** Emscripten is licensed under the **MIT License** (and the University
   of Illinois/NCSA Open Source License), © the Emscripten authors.
   Home: https://emscripten.org/ — full text: https://github.com/emscripten-core/emscripten/blob/main/LICENSE
@@ -78,9 +92,9 @@ code is **not** distributed with the app: **Vite**, **Vitest**, **TypeScript**,
 **Playwright**, **jsdom**, **tsx**. See each package's `LICENSE` in `node_modules/`.
 
 The original Windows tool's runtime libraries (e.g. **NAudio**, MS-PL/MIT) and the
-Amiga toolchain used only for offline cross-checks (**Shrinkler** by Blueberry,
-**m68k-amiga-elf-gcc**, the original `aklang2asm.exe`) live outside this repo
-(gitignored) and are **not** redistributed.
+Amiga toolchain used only for offline cross-checks (**m68k-amiga-elf-gcc**, the
+original `aklang2asm.exe`) live outside this repo (gitignored) and are **not**
+redistributed. (Shrinkler IS now shipped as WASM — see the bundled section above.)
 
 ---
 
