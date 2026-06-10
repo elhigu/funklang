@@ -6,7 +6,7 @@ import type { PatchModel } from '../patch/model';
 import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot, DEFAULT_SAMPLE_LENGTH } from '../patch/types';
 import type { Slot, Instrument } from '../patch/types';
 import { pickOp, OP_NAME, type OpAddCost } from './op-picker';
-import { addOpCost, patchHasOp } from '../asm/size-ablation';
+import { addOpCost, replaceOpCost, patchHasOp, patchHasOpElsewhere } from '../asm/size-ablation';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
@@ -25,6 +25,15 @@ function opCostProvider(model: PatchModel, instrIdx: number): (op: number) => Pr
   return (op) =>
     addOpCost(model.patch, instrIdx, op).then((r) =>
       r.ok ? { cost: r.bytes!, alreadyPresent: patchHasOp(model.patch, op) } : null);
+}
+
+/** Cost provider for CHANGING an existing slot's op: the SIGNED net byte delta
+ *  of replacing this slot's op with `op` — negative when the new op is smaller
+ *  (e.g. reverb → add), unlike inserting which only ever adds. */
+function opChangeCostProvider(model: PatchModel, instrIdx: number, slotIdx: number): (op: number) => Promise<OpAddCost | null> {
+  return (op) =>
+    replaceOpCost(model.patch, instrIdx, slotIdx, op).then((r) =>
+      r.ok ? { cost: r.bytes!, alreadyPresent: patchHasOpElsewhere(model.patch, op, instrIdx, slotIdx) } : null);
 }
 
 /** Last filled (non-empty) slot model-index in an instrument, or -1. */
@@ -926,7 +935,7 @@ function renderRow(
     const ins = model.patch.instruments[instrIdx];
     if (!ins) return;
     const disabled = loopGenDisabled(ins, slotIdx);
-    const code = await pickOp(opCostProvider(model, instrIdx), disabled);
+    const code = await pickOp(opChangeCostProvider(model, instrIdx, slotIdx), disabled);
     if (code == null || code === slot.fn) return;
     // Defensive: the picker greys loop_gen out when it can't go here, but never
     // apply a disallowed loop_gen change even if that's bypassed.

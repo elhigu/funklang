@@ -28,8 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the reimplemented AmigaKlang/Aklang2Asm work.
 
 ### Changed
-- The op picker now **prefills every op's exact add-cost** when it opens (was
-  computed lazily on hover).
+- The op picker now **prefills every op's exact size delta** when it opens (was
+  computed lazily on hover). When **changing** an existing slot's op it shows the
+  signed delta of *replacing* it — so e.g. reverb → add reads as a **negative**
+  value (the patch shrinks); inserting a new op is still add-only (≥0).
 - Trimmed the help modal (it had grown very verbose).
 - Renamed `sizelab/` → `groundtruth/` (it's the oracle/fixtures/verification layer
   now, not the deleted size estimator).

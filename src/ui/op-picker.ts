@@ -41,8 +41,10 @@ function groupedDefs(): Array<{ title: string; defs: OpDef[] }> {
     .filter((g) => g.defs.length > 0);
 }
 
-/** Optional per-op add-cost (bytes this op adds to the CURRENT patch). When the
- *  op is already used elsewhere its shared routine is already paid, so it's cheaper. */
+/** Optional per-op size delta (SIGNED bytes) for choosing this op in the current
+ *  patch: positive when it grows the .bin, negative when it shrinks it (e.g.
+ *  changing reverb → add). `alreadyPresent` flags that the op's routine is already
+ *  paid by another slot, so only its per-use code differs. */
 export interface OpAddCost { cost: number; alreadyPresent: boolean }
 
 /** `costOf` is called for EVERY op when the picker opens (each call assembles a
@@ -118,10 +120,12 @@ export function pickOp(
             .then((c) => {
               cost.classList.remove('size-spin');
               if (!c) { cost.textContent = ''; return; }
-              cost.textContent = `+${fmtBytes(c.cost)}${c.alreadyPresent ? ' · shared' : ''}`;
+              // Signed: negative when picking this op shrinks the patch.
+              const sign = c.cost < 0 ? '−' : '+';
+              cost.textContent = `${sign}${fmtBytes(Math.abs(c.cost))}${c.alreadyPresent ? ' · shared' : ''}`;
               cost.title = c.alreadyPresent
-                ? 'This op is already used in the patch — only its per-use connection code is added.'
-                : 'Adds this op’s code + one use.';
+                ? 'This op is already used elsewhere — only its per-use code differs.'
+                : 'Net change to the .bin if you choose this op.';
             })
             .catch(() => { cost.classList.remove('size-spin'); cost.textContent = ''; });
         }

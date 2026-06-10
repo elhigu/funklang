@@ -10,14 +10,30 @@
 // Variants are produced on a structural clone of the patch, so the live patch
 // is never mutated. Results ride the size-service cache (keyed by generated
 // asm), so re-opening the breakdown or re-hovering an op is instant.
-import type { Patch } from '../patch/types';
+import type { Patch, Slot } from '../patch/types';
 import { emptySlot, N_SLOTS_MAX } from '../patch/types';
-import { applyInsertDefaults } from '../schema/op-metadata';
+import { applyInsertDefaults, resetSlotForOp, opByCode } from '../schema/op-metadata';
 import { pickSmartOutVar } from '../patch/smart-out-var';
 import { exactSize } from './size-service';
 
 function clonePatch(p: Patch): Patch {
   return structuredClone(p);
+}
+
+/** Wire any REQUIRED var-source inputs (currently unset) to v1, so a freshly
+ *  added/changed op assembles for sizing. An op's code size is independent of
+ *  WHICH variable it reads, so v1 gives a representative cost (the real edit may
+ *  leave it unwired, which is the user's to fix — but it would never assemble). */
+function wireRequiredInputs(slot: Slot): Slot {
+  const op = opByCode(slot.fn);
+  if (op) {
+    for (const p of op.params) {
+      if (p.type.kind === 'var-source' && (slot[p.field] as number) === 0) {
+        slot[p.field] = 1 as Slot[typeof p.field];
+      }
+    }
+  }
+  return slot;
 }
 
 /** Patch with the op at (instrIdx, slotIdx) blanked (fn=0 → omitted by codegen). */
@@ -42,7 +58,7 @@ export function patchWithAddedOp(patch: Patch, instrIdx: number, op: number): Pa
   // SKIPS slots whose outVar is 0 (`arrayvar==0 → continue`), so an outVar-0
   // slot would assemble identically to the original and report +0 bytes.
   const outVar = pickSmartOutVar(ins, at) || 1;
-  const slot = applyInsertDefaults({ ...emptySlot(), fn: op, outVar }, op);
+  const slot = wireRequiredInputs(applyInsertDefaults({ ...emptySlot(), fn: op, outVar }, op));
   if (free >= 0) ins.slots[free] = slot;
   else ins.slots.push(slot);
   return c;
@@ -72,6 +88,33 @@ export async function addOpCost(patch: Patch, instrIdx: number, op: number): Pro
   const [full, withOp] = await Promise.all([exactSize(patch), exactSize(variant)]);
   if (!full.ok || !withOp.ok) return { ok: false, error: full.error ?? withOp.error ?? 'unavailable' };
   return { ok: true, bytes: withOp.size! - full.size! };
+}
+
+/** Patch with the op at (instrIdx, slotIdx) replaced by `op` — mirrors the real
+ *  op-change (resetSlotForOp keeps the output var, resets params to defaults). */
+export function patchWithReplacedOp(patch: Patch, instrIdx: number, slotIdx: number, op: number): Patch | null {
+  const c = clonePatch(patch);
+  const ins = c.instruments[instrIdx];
+  const slot = ins?.slots[slotIdx];
+  if (!ins || !slot) return null;
+  ins.slots[slotIdx] = wireRequiredInputs(resetSlotForOp(slot, op));
+  return c;
+}
+
+/** Exact SIGNED byte delta of changing the slot's op to `op` (negative when the
+ *  new op is smaller, e.g. reverb → add), in the current patch context. */
+export async function replaceOpCost(patch: Patch, instrIdx: number, slotIdx: number, op: number): Promise<DeltaResult> {
+  const variant = patchWithReplacedOp(patch, instrIdx, slotIdx, op);
+  if (!variant) return { ok: false, error: 'no such slot' };
+  const [full, withOp] = await Promise.all([exactSize(patch), exactSize(variant)]);
+  if (!full.ok || !withOp.ok) return { ok: false, error: full.error ?? withOp.error ?? 'unavailable' };
+  return { ok: true, bytes: withOp.size! - full.size! };
+}
+
+/** True iff a slot OTHER than (instrIdx, slotIdx) already uses `op`. */
+export function patchHasOpElsewhere(patch: Patch, op: number, instrIdx: number, slotIdx: number): boolean {
+  return patch.instruments.some((ins, i) =>
+    ins.slots.some((s, j) => s.fn === op && !(i === instrIdx && j === slotIdx)));
 }
 
 /** True iff any slot in the patch already uses `op`. */

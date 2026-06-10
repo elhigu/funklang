@@ -9,8 +9,10 @@ import { join } from 'node:path';
 import { parseAkp } from '../../src/fileio/akp';
 import { emptyPatch } from '../../src/patch/types';
 import type { Patch } from '../../src/patch/types';
+import { emptySlot } from '../../src/patch/types';
+import { resetSlotForOp } from '../../src/schema/op-metadata';
 import { exactSize, _clearSizeCache } from '../../src/asm/size-service';
-import { phaseCost, addOpCost } from '../../src/asm/size-ablation';
+import { phaseCost, addOpCost, replaceOpCost } from '../../src/asm/size-ablation';
 
 const REAL = join(__dirname, '..', '..', 'groundtruth', 'corpus', 'real');
 const patch = parseAkp(new Uint8Array(readFileSync(join(REAL, 'ext_P01.akp'))));
@@ -64,5 +66,21 @@ describe('ablation', () => {
     const r = await addOpCost(patch, i, fn);
     expect(r.ok).toBe(true);
     expect(r.bytes!).toBeGreaterThan(0);
+  });
+
+  it('replaceOpCost is NEGATIVE when changing a big op to a smaller one (reverb → add)', async () => {
+    // Changing an existing slot's op can shrink the patch — the picker must be
+    // able to show negatives, unlike insertion which only ever adds.
+    const p = emptyPatch();
+    const ins = p.instruments[0]!;
+    ins.sampleLength = 12288;            // >2 so the instrument is emitted
+    ins.name = 'test';
+    ins.slots = [
+      { ...resetSlotForOp(emptySlot(), 2), outVar: 1 },          // osc_saw writes v1
+      { ...resetSlotForOp(emptySlot(), 13), outVar: 1, val1: 1 }, // reverb (large), reads v1
+    ];
+    const r = await replaceOpCost(p, 0, 1, 9);             // reverb → add (small)
+    expect(r.ok).toBe(true);
+    expect(r.bytes!).toBeLessThan(0);
   });
 });
