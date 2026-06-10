@@ -4,6 +4,22 @@ function getACtor(): ACtor {
   return w.AudioContext ?? w.webkitAudioContext;
 }
 
+// iOS silences Web Audio routed to the built-in speaker while the hardware
+// mute/silent switch is on — headphones still play, which is exactly the
+// "no sound unless I plug in headphones" symptom on iPhones. Declaring a
+// 'playback' audio session (Safari 16.4+, the WebAudio audio-session API)
+// tells iOS this is media playback that should ignore the mute switch and use
+// the speaker. Feature-detected, so it's a harmless no-op on Android, desktop,
+// and older iOS.
+function declarePlaybackSession(): void {
+  const nav = navigator as Navigator & { audioSession?: { type: string } };
+  try {
+    if (nav.audioSession) nav.audioSession.type = 'playback';
+  } catch {
+    /* unsupported / read-only — ignore */
+  }
+}
+
 export class Player {
   private ctx?: AudioContext;
   private gain?: GainNode;
@@ -24,6 +40,7 @@ export class Player {
     if (!this.ctx) {
       const C = getACtor();
       if (!C) throw new Error('Web Audio API not available');
+      declarePlaybackSession();      // route to the speaker even with the iOS mute switch on
       this.ctx = new C();
       this.gain = this.ctx.createGain();
       this.gain.connect(this.ctx.destination);

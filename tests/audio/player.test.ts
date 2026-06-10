@@ -75,4 +75,25 @@ describe('Player', () => {
     expect(states).toEqual([true, false]);
     expect(p.isPlaying()).toBe(false);
   });
+
+  // iOS routes Web Audio to headphones only while the hardware mute switch is on;
+  // declaring a 'playback' audio session makes it ignore the switch and use the
+  // speaker. We set it on context creation when the API is available.
+  it('declares a "playback" audio session on iOS (Safari 16.4+) when available', () => {
+    const audioSession = { type: 'auto' };
+    Object.defineProperty(navigator, 'audioSession', { value: audioSession, configurable: true });
+    try {
+      const p = new Player();
+      p.play(new Int16Array(8), 22050);
+      expect(audioSession.type).toBe('playback');
+    } finally {
+      delete (navigator as any).audioSession;
+    }
+  });
+
+  it('does not throw when navigator.audioSession is unavailable', () => {
+    delete (navigator as any).audioSession;
+    const p = new Player();
+    expect(() => p.play(new Int16Array(8), 22050)).not.toThrow();
+  });
 });
