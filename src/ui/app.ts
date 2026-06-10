@@ -136,13 +136,13 @@ export function bootApp(root: HTMLElement): void {
       </aside>
       <main id="main-area"></main>
       <footer>
+        <span class="footer-version" title="Build version">v${appVersion}</span>
         <button id="size-status" class="size-status" title="Click for size breakdown">—</button>
         <div class="output-select-wrap" title="Which signal is sent to the audio output">
           <span class="output-select-label">OUTPUT</span>
           <button id="btn-output-master" class="output-master active" title="Route the active instrument's final v1 output to playback. Grayed out when a per-slot 🔊 is the current output.">MASTER&nbsp;V1</button>
         </div>
         <div class="footer-right" title="System activity — blinks while the .bin assembles/shrinks or audio plays, steady READY when idle"><span class="blink">●</span><span class="status-label">READY</span></div>
-        <span class="footer-version" title="Build version">v${appVersion}</span>
       </footer>
       <aside id="revert-panel" class="revert-panel hidden" aria-hidden="true">
         <div class="revert-head">
