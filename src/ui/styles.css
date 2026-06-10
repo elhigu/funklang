@@ -103,13 +103,6 @@
     box-shadow: 0 0 8px var(--amber);
     opacity: 1;
   }
-  /* Pulse only while autoplayback mode is on (audio toggle = green).
-     When muted, the dot stays solid. */
-  .brand.audio-on .dot { animation: pulse 1.4s infinite; }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-  }
   .menu {
     display: flex;
     align-items: center;
@@ -690,32 +683,6 @@
     opacity: 0.55;
   }
   .output-master:hover { opacity: 1; color: var(--magenta); border-color: var(--magenta); }
-
-  /* Single audio on/off toggle next to OUTPUT — replaces PLAY/STOP/RETRIG.
-     Rendered as a triangle (▶) like a transport play button; colour
-     indicates state. Square border (not circular) reads more like a
-     button than a status dot. */
-  .audio-toggle {
-    background: var(--bg-2);
-    border: 1px solid var(--grid);
-    width: 26px; height: 22px;
-    padding: 0 0 0 2px;             /* nudge ▶ optical centre */
-    margin-left: 4px;
-    font-size: 13px;
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-    transition: color 120ms linear, border-color 120ms linear, box-shadow 120ms linear;
-  }
-  .audio-toggle.on  {
-    color: var(--green); border-color: var(--green);
-    text-shadow: 0 0 6px rgba(123,225,123,0.55);
-  }
-  .audio-toggle.off {
-    color: var(--red);   border-color: var(--red);
-    text-shadow: 0 0 6px rgba(255,74,91,0.45);
-  }
-  .audio-toggle:hover { background: var(--bg-3); }
 
   /* Help button + modal */
   .help-btn {
@@ -1840,7 +1807,6 @@
       min-width: 40px; min-height: 32px; padding: 0 10px; cursor: pointer;
     }
     .mobile-play:active { background: var(--bg-3); }
-    #btn-audio-toggle { display: none; }
 
     footer { gap: 8px; padding: 0 8px; font-size: 10px; }
     .footer-status { gap: 8px; min-width: 0; overflow: hidden; }

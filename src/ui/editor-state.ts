@@ -28,8 +28,6 @@ export interface EditorState {
   outputTarget: OutputTarget;
   /** Note used when auditioning (persisted to localStorage). */
   previewNote: string;
-  /** True while autoplayback-on-edit is active. */
-  audioEnabled: boolean;
   /** Display name of the open patch ('' when unsaved/blank). */
   patchFileName: string;
   /** FSA handle if the file was opened via File System Access; else undefined. */
@@ -46,7 +44,6 @@ export function createEditorState(previewNote: string): EditorState {
     selection: { instrIdx: 0, slotIdx: null },
     outputTarget: { instrIdx: 0, slotIdx: null },
     previewNote,
-    audioEnabled: true,
     patchFileName: '',
     patchFileHandle: undefined,
   };

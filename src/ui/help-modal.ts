@@ -22,10 +22,9 @@ export function helpOverlayHtml(): string {
 
             <h3>Playback</h3>
             <table class="help-kbd"><tbody>
-              <tr><td><kbd>Space</kbd></td><td>Replay the selected output (even if muted)</td></tr>
+              <tr><td>Every edit</td><td>Auto-plays the selected output (always on)</td></tr>
+              <tr><td><kbd>Space</kbd> / top-bar ▶</td><td>Replay the selected output on demand</td></tr>
               <tr><td>🔊 on a slot</td><td>Make that slot the playback output + audition it</td></tr>
-              <tr><td>▶ next to OUTPUT</td><td>Toggle auto-play on every edit (green) / off (red)</td></tr>
-              <tr><td>Phone</td><td>Auto-play is always on; the ▶ in the top bar replays the current output</td></tr>
             </tbody></table>
 
             <h3>Instruments (sidebar)</h3>

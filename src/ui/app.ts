@@ -116,7 +116,6 @@ export function bootApp(root: HTMLElement): void {
           <div class="output-select-wrap" title="Which signal is sent to the audio output">
             <span class="output-select-label">OUTPUT</span>
             <button id="btn-output-master" class="output-master active" title="Route the active instrument's final v1 output to playback. Grayed out when a per-slot 🔊 is the current output.">MASTER&nbsp;V1</button>
-            <button id="btn-audio-toggle" class="audio-toggle on" title="Audio on — click to mute (changes still re-render). Spacebar replays.">▶</button>
           </div>
           <button id="btn-help" class="help-btn" title="Keyboard shortcuts (?)">?</button>
           </div>
@@ -404,7 +403,7 @@ export function bootApp(root: HTMLElement): void {
         runRender();
         // Force-play so clicking the 🔊 always auditions the new target,
         // even when autoplayback-on-change is muted.
-        playAuditionInternal({ force: true });
+        playAuditionInternal();
       },
       onTuneParam: openTunerFor,
     });
@@ -495,7 +494,7 @@ export function bootApp(root: HTMLElement): void {
     state.activeIdx = want;
     state.selection = { instrIdx: want, slotIdx: null };
     state.outputTarget = { instrIdx: want, slotIdx: null };
-    applyEdit({ kind: 'select' }, { audition: opts.play });   // audition gated by state.audioEnabled
+    applyEdit({ kind: 'select' }, { audition: opts.play });   // play when the caller asked to audition
   };
 
   /**
@@ -710,18 +709,8 @@ export function bootApp(root: HTMLElement): void {
     gridHostEl.prepend(banner);
   };
 
-  // Cache the brand-dot element so we can drive its "autoplayback active"
-  // pulse animation off state.audioEnabled. The CSS pulse runs only while the
-  // `.audio-on` class is present on the brand container.
-  const brandEl = root.querySelector('.brand') as HTMLElement | null;
-  const reflectAudioOnDot = (): void => {
-    if (brandEl) brandEl.classList.toggle('audio-on', state.audioEnabled);
-  };
-
-  /** Internal core; callers can bypass the state.audioEnabled gate via `force`. */
-  const playAuditionInternal = (opts: { force?: boolean } = {}): void => {
-    if (!state.audioEnabled && !opts.force) return;
-
+  // Audition always plays on every change — there is no mute/autoplay toggle.
+  const playAuditionInternal = (): void => {
     // When state.outputTarget.instrIdx differs from state.activeIdx (e.g. user clicked
     // 🔊 inside an expanded clone block), render THAT instrument so we
     // can pull its sample / slotTap rather than the active one's.
@@ -745,7 +734,7 @@ export function bootApp(root: HTMLElement): void {
     player.play(sample, noteRateHz(state.previewNote));
   };
 
-  /** Auto-replay-on-change path — gated by the audio toggle. */
+  /** Auto-replay-on-change path. */
   const playAudition = (): void => playAuditionInternal();
 
   /**
@@ -782,17 +771,12 @@ export function bootApp(root: HTMLElement): void {
     if (opts.audition) playAudition();
   };
 
-  /**
-   * Replay whatever's already rendered (does not re-run DSP). Used by spacebar.
-   * `force` bypasses the state.audioEnabled gate — spacebar is an explicit user
-   * action, so it always plays even when "autoplayback on changes" is muted.
-   */
-  const retriggerAudio = (opts: { force?: boolean } = {}): void => {
-    if (!state.audioEnabled && !opts.force) return;
+  /** Replay whatever's already rendered (does not re-run DSP). Used by spacebar. */
+  const retriggerAudio = (): void => {
     if (!lastRender) {
       runRender();
     }
-    playAuditionInternal({ force: !!opts.force });
+    playAuditionInternal();
   };
 
   const updateLabels = (): void => {
@@ -828,7 +812,7 @@ export function bootApp(root: HTMLElement): void {
     refreshOutputMasterBtn();
     updateLabels();
     runRender();
-    playAuditionInternal({ force: true });
+    playAuditionInternal();
   });
 
   sizeBar = wireSizeStatusbar(root, model);
@@ -968,7 +952,7 @@ export function bootApp(root: HTMLElement): void {
     // user action, always honored.
     if ((ev.key === ' ' || ev.code === 'Space') && !inField) {
       ev.preventDefault();
-      retriggerAudio({ force: true });
+      retriggerAudio();
       return;
     }
 
@@ -1100,55 +1084,11 @@ export function bootApp(root: HTMLElement): void {
     state.outputTarget = { instrIdx: 0, slotIdx: null };
     applyEdit({ kind: 'reset' });
   });
-  // Single audio toggle replaces PLAY/STOP/RETRIG. Green = on (changes
-  // auto-replay, spacebar replays). Red = muted (re-renders still happen so
-  // waveforms stay live, but nothing is sent to the speakers).
-  // Phone layout: the editor runs in the narrow single-column mode. Used to
-  // force autoplay on (no mute toggle on a phone) and surface a top-bar play.
-  const isMobile = (): boolean => !!window.matchMedia?.('(max-width: 600px)')?.matches;
-  const audioToggle = root.querySelector('#btn-audio-toggle') as HTMLButtonElement;
-  const updateAudioToggle = (): void => {
-    audioToggle.classList.toggle('on',  state.audioEnabled);
-    audioToggle.classList.toggle('off', !state.audioEnabled);
-    audioToggle.title = state.audioEnabled
-      ? 'Audio on — click to mute (changes still re-render). Spacebar replays.'
-      : 'Audio muted — click to unmute.';
-    reflectAudioOnDot();
-  };
-  audioToggle.addEventListener('click', (ev) => {
-    // Shift-click = diagnostic test tone: routes a 0.8s 440 Hz sine wave
-    // through the same Player path that real audition uses. If you can
-    // SEE the tab speaker icon active while playing but HEAR nothing,
-    // this confirms whether the Player / Web Audio chain itself is
-    // producing output (vs the silence being caused by sample data,
-    // tab-mute, sink routing, etc.). Logs Player state to the console.
-    if (ev.shiftKey) {
-      const RATE = 22050;
-      const LEN_S = 0.8;
-      const N = (RATE * LEN_S) | 0;
-      const sample = new Int16Array(N);
-      const freq = 440;
-      for (let i = 0; i < N; i++) {
-        sample[i] = Math.round(Math.sin((i / RATE) * 2 * Math.PI * freq) * 16000);
-      }
-      // eslint-disable-next-line no-console
-      console.log('[funklang] test tone: 440 Hz sine, 0.8s, peak ±16000');
-      player.play(sample, RATE);
-      return;
-    }
-    if (isMobile()) { state.audioEnabled = true; updateAudioToggle(); return; }  // forced on
-    state.audioEnabled = !state.audioEnabled;
-    if (!state.audioEnabled) player.stop();
-    updateAudioToggle();
-  });
-  updateAudioToggle();
-
-  // Phone: autoplay is always on and a dedicated ▶ lives in the top bar (the
-  // mute toggle is hidden on mobile — see styles.css). Force-enable so every
-  // edit re-plays, and wire the header play button to replay on demand.
-  if (isMobile()) { state.audioEnabled = true; updateAudioToggle(); }
+  // Audition always plays on every change — there is no mute/autoplay toggle.
+  // A dedicated ▶ play button (shown only on phones; desktop uses Space) replays
+  // the current output on demand.
   const mobilePlayBtn = root.querySelector('#btn-mobile-play') as HTMLButtonElement | null;
-  mobilePlayBtn?.addEventListener('click', () => playAuditionInternal({ force: true }));
+  mobilePlayBtn?.addEventListener('click', () => playAuditionInternal());
 
   // Auto-blur BUTTON / SELECT after click so focus doesn't linger on UI
   // controls. Text inputs (knob inline editor, instr-header fields) and

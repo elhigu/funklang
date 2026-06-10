@@ -45,11 +45,11 @@ function groupedDefs(): Array<{ title: string; defs: OpDef[] }> {
  *  op is already used elsewhere its shared routine is already paid, so it's cheaper. */
 export interface OpAddCost { cost: number; alreadyPresent: boolean }
 
-/** `costOf` is resolved LAZILY on hover/focus (each call assembles a variant of
- *  the patch), so the picker opens instantly and only the op you look at gets
- *  priced. Resolve to null when the op can't be assembled into the patch.
- *  `disabledOf` greys an op out in the current context: return a reason string
- *  (shown as the card's tooltip) to disable it, or null to allow it. */
+/** `costOf` is called for EVERY op when the picker opens (each call assembles a
+ *  variant of the patch, dispatched in parallel; cards show a spinner until
+ *  their cost resolves). Resolve to null when the op can't be assembled into the
+ *  patch. `disabledOf` greys an op out in the current context: return a reason
+ *  string (shown as the card's tooltip) to disable it, or null to allow it. */
 export function pickOp(
   costOf?: (op: number) => Promise<OpAddCost | null>,
   disabledOf?: (op: number) => string | null,
@@ -106,31 +106,24 @@ export function pickOp(
         // the last slot). Unsupported ops are always disabled.
         const disabledReason = def.unsupported ? null : (disabledOf?.(def.code) ?? null);
         const isDisabled = def.unsupported || disabledReason != null;
-        // Exact add-cost, computed lazily the first time this op is hovered/
-        // focused (each lookup assembles a variant of the patch). Until then the
-        // slot is blank; while assembling it spins.
-        let loadCost: (() => void) | null = null;
+        // Exact add-cost, prefilled for every op as soon as the picker opens
+        // (each is one assembly, dispatched in parallel through the size worker
+        // and filled in as it resolves; a spinner shows meanwhile).
         if (costOf && !isDisabled) {
           const cost = document.createElement('span');
-          cost.className = 'op-picker-cost';
+          cost.className = 'op-picker-cost size-spin';
+          cost.textContent = '⟳';
           btn.appendChild(cost);
-          let started = false;
-          loadCost = (): void => {
-            if (started) return;
-            started = true;
-            cost.classList.add('size-spin');
-            cost.textContent = '⟳';
-            void costOf(def.code)
-              .then((c) => {
-                cost.classList.remove('size-spin');
-                if (!c) { cost.textContent = ''; return; }
-                cost.textContent = `+${fmtBytes(c.cost)}${c.alreadyPresent ? ' · shared' : ''}`;
-                cost.title = c.alreadyPresent
-                  ? 'This op is already used in the patch — only its per-use connection code is added.'
-                  : 'Adds this op’s code + one use.';
-              })
-              .catch(() => { cost.classList.remove('size-spin'); cost.textContent = ''; });
-          };
+          void costOf(def.code)
+            .then((c) => {
+              cost.classList.remove('size-spin');
+              if (!c) { cost.textContent = ''; return; }
+              cost.textContent = `+${fmtBytes(c.cost)}${c.alreadyPresent ? ' · shared' : ''}`;
+              cost.title = c.alreadyPresent
+                ? 'This op is already used in the patch — only its per-use connection code is added.'
+                : 'Adds this op’s code + one use.';
+            })
+            .catch(() => { cost.classList.remove('size-spin'); cost.textContent = ''; });
         }
         if (def.description) {
           // Carried for the detail strip + as a native tooltip fallback.
@@ -142,8 +135,8 @@ export function pickOp(
           btn.classList.add('op-picker-card-unsupported');
           if (disabledReason) btn.title = disabledReason;
         }
-        btn.addEventListener('mouseenter', () => { showDetail(def); loadCost?.(); });
-        btn.addEventListener('focus', () => { showDetail(def); loadCost?.(); });
+        btn.addEventListener('mouseenter', () => showDetail(def));
+        btn.addEventListener('focus', () => showDetail(def));
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           if (isDisabled) return;   // disabled cards are never selectable

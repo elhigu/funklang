@@ -28,10 +28,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the reimplemented AmigaKlang/Aklang2Asm work.
 
 ### Changed
+- The op picker now **prefills every op's exact add-cost** when it opens (was
+  computed lazily on hover).
 - Trimmed the help modal (it had grown very verbose).
 - Renamed `sizelab/` → `groundtruth/` (it's the oracle/fixtures/verification layer
   now, not the deleted size estimator).
 - Corrected the vasm license wording (source-available freeware, not "free for use").
+
+### Removed
+- The audio mute / autoplay toggle. **Audio now always plays on every edit**, on
+  desktop and mobile alike (Space or the top-bar ▶ replay on demand).
+
+### Fixed
+- Op-picker add-costs showed `+0 B` for every op (the trial slot lacked an output
+  variable, so codegen skipped it). Now they reflect real byte deltas.
+- Instruments using a feedback variable (read of a var written by a later slot) are
+  no longer flagged red — only a variable no slot writes is invalid.
+- loop_gen is enforced as the single, last op across insert / op-change / drag.
 
 ## [1.0.0] — 2026-06-09
 

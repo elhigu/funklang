@@ -9,10 +9,9 @@ describe('createEditorState', () => {
     expect(s.outputTarget).toEqual({ instrIdx: 0, slotIdx: null });
   });
 
-  it('carries the supplied preview note and defaults audio on / file blank', () => {
+  it('carries the supplied preview note and a blank file', () => {
     const s = createEditorState('A-4');
     expect(s.previewNote).toBe('A-4');
-    expect(s.audioEnabled).toBe(true);
     expect(s.patchFileName).toBe('');
     expect(s.patchFileHandle).toBeUndefined();
   });
