@@ -11,6 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-06-10
+
+### Added
+- **ABOUT / credits modal.** A new `ABOUT` item in the top menu opens a modal
+  with the build version, a curated credits/links block, and the changelog
+  rendered live from `CHANGELOG.md`. It also notes that other output routes
+  (Amiga `.exe`, Atari `.prg`) are done by loading the `.akp` in the original
+  AmigaKlang.
+- **Touch waveform zoom/pan.** Two-finger drag on the top waveform now zooms
+  (up/down, around the gesture centroid) and pans (side-to-side) — previously
+  the waveform had no touch zoom/pan at all.
+
+### Changed
+- The **PLAY button is now always visible**, right-aligned in the header with a
+  `▶ PLAY` label (it was a phone-only ▶ in the menu).
+
+### Removed
+- The footer's **selected-instrument / output readout** — it overflowed and
+  broke the footer layout in narrow windows, and duplicated what the sidebar and
+  OUTPUT chip already show.
+
+### Fixed
+- **Mobile audio (iOS).** Declared a `'playback'` audio session so sound plays
+  through the phone speaker even with the hardware mute switch on — previously
+  audio was audible only with headphones plugged in.
+- The instrument length **knob bar no longer collapses to nothing** — it had
+  shrunk to ~0px (only the label + number showed); it's a proper draggable bar
+  again.
+
 ## [1.1.0] — 2026-06-10
 
 ### Added
