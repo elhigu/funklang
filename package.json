@@ -1,6 +1,6 @@
 {
   "name": "funklang",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Browser reimplementation of AmigaKlang — design Amiga synth instruments and export the real, byte-identical .bin in-browser.",
   "homepage": "https://funklang.mkael.net",
   "main": "index.js",

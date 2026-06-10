@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-06-10
+
 ### Added
 - **Packed size.** Shrinkler (Blueberry's Amiga cruncher) is now compiled to
   WebAssembly and run in the size worker, so the footer shows the
@@ -31,11 +33,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mobile / portrait support.** Added the `viewport` meta tag (which lets the
   existing editor container-queries and sidebar-collapse actually fire on a
   phone) and phone-tuned the surrounding chrome (footer, modals, touch targets).
-- Help modal links to example `.akp` patches (the archieklang patches folder).
+- **LOAD EXAMPLE.** The help modal's intro box now has a `LOAD EXAMPLE` button
+  that fetches the archieklang patches folder live from GitHub, lists the
+  patches, and loads the chosen one straight into the editor — no
+  download-then-OPEN PATCH round-trip. Lazy + session-cached; loading a remote
+  patch shows on the footer activity light.
+- **Footer activity light.** The bottom-right badge is now a real status light:
+  it blinks `ASSEMBLING` / `SHRINKLING` while the `.bin` is built or packed,
+  `PLAYING` while audio sounds, and rests at a steady `READY` when idle (it used
+  to just blink `READY` meaninglessly).
 - `THIRD-PARTY-NOTICES.md` — attribution + terms for vasm, the Emscripten runtime,
   and the reimplemented AmigaKlang/Aklang2Asm work.
 
 ### Changed
+- **Footer size readout.** The exact and packed `.bin` figures now show plain
+  byte counts (no redundant kB rounding), the packed figure is labelled
+  **shrinkled**, and the two are colour-coded (amber = exact, green = shrinkled).
 - New-instrument default sample length is now **8 KB** (was 12 KB).
 - The op picker now **prefills every op's exact size delta** when it opens (was
   computed lazily on hover). When **changing** an existing slot's op it shows the
@@ -51,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   desktop and mobile alike (Space or the top-bar ▶ replay on demand).
 
 ### Fixed
+- The collapsed top-menu (hamburger) dropdown now opens anchored to the ☰
+  button instead of floating off in the top-right corner.
 - A REQUIRED input left unwired (e.g. reverb/add/filters with no var-source) now
   flags the instrument red and the dropdown red — that patch can't assemble at
   all, so the size correctly reads "unavailable" rather than silently failing.
