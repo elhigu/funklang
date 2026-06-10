@@ -70,7 +70,7 @@ code-generation approach are the original authors' work.
   rendering core (verified sample-for-sample), the editor reimplements its UI, and
   the exported `.bin` follows its format. funklang is an independent reimplementation
   offered as a tribute; it is not endorsed by or affiliated with the author.
-- GitHub (Archimedes-family port reference): https://github.com/kieranhj/archieklang
+- GitHub: https://github.com/virgill1974/AmigaKlang
 - AmigaKlang Pouët: https://www.pouet.net/prod.php?which=85351
 
 ### Aklang2Asm

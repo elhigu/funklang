@@ -63,6 +63,6 @@ describe('help-modal', () => {
 
   it('links to example .akp patches', () => {
     const a = root.querySelector('.help-intro a') as HTMLAnchorElement | null;
-    expect(a?.getAttribute('href')).toContain('kieranhj/archieklang');
+    expect(a?.getAttribute('href')).toContain('virgill1974/AmigaKlang');
   });
 });

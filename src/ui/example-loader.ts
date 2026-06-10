@@ -1,8 +1,8 @@
 // src/ui/example-loader.ts
 //
 // The help modal's "LOAD EXAMPLE" control. The app ships no example patches
-// (they're deliberately not in the repo); instead this fetches the upstream
-// archieklang patches folder — the same one the intro paragraph links to —
+// (they're deliberately not in the repo); instead this fetches AmigaKlang's
+// examples/patches folder — the same one the intro paragraph links to —
 // live from GitHub, lists the .akp files, and on click pulls the chosen
 // patch's bytes and hands them to the editor's normal adopt path.
 //
@@ -13,7 +13,7 @@
 import type { StatusBar } from './status-bar';
 
 const CONTENTS_API =
-  'https://api.github.com/repos/kieranhj/archieklang/contents/patches';
+  'https://api.github.com/repos/virgill1974/AmigaKlang/contents/examples/patches';
 
 interface ExampleEntry { name: string; url: string }
 
@@ -57,7 +57,7 @@ export function wireExampleLoader(root: HTMLElement, opts: ExampleLoaderOpts): v
       row.className = 'example-row';
       row.type = 'button';
       row.textContent = stripAkp(e.name);
-      row.title = `Load ${e.name} from archieklang`;
+      row.title = `Load ${e.name} from AmigaKlang`;
       row.addEventListener('click', () => { void loadEntry(e, row); });
       list.appendChild(row);
     }

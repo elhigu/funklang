@@ -1,7 +1,7 @@
 // tests/ui/example-loader.test.ts
 // @vitest-environment jsdom
 //
-// The help modal's "LOAD EXAMPLE" control: lazily fetches the archieklang
+// The help modal's "LOAD EXAMPLE" control: lazily fetches AmigaKlang's
 // patches folder listing from the GitHub contents API, renders the patches as
 // rows, and on click fetches the chosen .akp bytes and hands them to the editor.
 // fetch is injected so these tests never touch the network.
@@ -51,7 +51,7 @@ describe('example loader', () => {
 
     btn.click();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fetchImpl.mock.calls[0][0]).toMatch(/api\.github\.com\/repos\/kieranhj\/archieklang\/contents\/patches/);
+    expect(fetchImpl.mock.calls[0][0]).toMatch(/api\.github\.com\/repos\/virgill1974\/AmigaKlang\/contents\/examples\/patches/);
     await flush();
 
     expect(list.classList.contains('hidden')).toBe(false);

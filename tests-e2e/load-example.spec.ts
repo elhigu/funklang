@@ -1,4 +1,4 @@
-// The help modal's "LOAD EXAMPLE" control fetches a patch from the archieklang
+// The help modal's "LOAD EXAMPLE" control fetches a patch from the AmigaKlang
 // GitHub folder and loads it straight into the editor. Both GitHub endpoints
 // are mocked here so the test never hits the network.
 
@@ -9,7 +9,7 @@ test('LOAD EXAMPLE fetches a patch from GitHub and loads it into the editor', as
   const akp = readFileSync('../loctro5 3 chippisamplea.akp');
 
   // The contents-API listing → one example with a (fake) raw download URL.
-  await page.route('**/api.github.com/repos/kieranhj/archieklang/contents/patches', (route) =>
+  await page.route('**/api.github.com/repos/virgill1974/AmigaKlang/contents/examples/patches', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',

@@ -18,13 +18,13 @@ export function helpOverlayHtml(): string {
             <div class="help-intro">
               <p>New here? <strong>LOAD&nbsp;EXAMPLE</strong> pulls a patch straight into the
               editor from
-              <a href="https://github.com/kieranhj/archieklang/tree/main/patches" target="_blank" rel="noopener">the archieklang patches folder</a>
+              <a href="https://github.com/virgill1974/AmigaKlang/tree/main/examples/patches" target="_blank" rel="noopener">AmigaKlang's example patches</a>
               (or download a <code>.akp</code> and use <strong>OPEN&nbsp;PATCH</strong>). Build
               sound from synthetic operators; samples already in a loaded <code>.akp</code>
               play and export too — importing <em>new</em> ones (wav/raw/mic) just isn't in
               the editor yet.</p>
               <div class="example-loader">
-                <button id="load-example-btn" class="load-example-btn" type="button" title="Browse and load an example patch from the archieklang GitHub folder">LOAD&nbsp;EXAMPLE ▾</button>
+                <button id="load-example-btn" class="load-example-btn" type="button" title="Browse and load an example patch from AmigaKlang's GitHub">LOAD&nbsp;EXAMPLE ▾</button>
                 <div id="example-list" class="example-list hidden"></div>
               </div>
             </div>

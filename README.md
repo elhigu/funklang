@@ -100,7 +100,7 @@ attribution and third-party terms (incl. the bundled vasm/Emscripten) are in
 
 - Live app: https://funklang.mkael.net
 - AmigaKlang Pouët: https://www.pouet.net/prod.php?which=85351
-- AmigaKlang on GitHub: https://github.com/kieranhj/archieklang
+- AmigaKlang on GitHub: https://github.com/virgill1974/AmigaKlang
 - Published site repo: https://github.com/elhigu/funklang.mkael.net
 
 funklang reimplementation by **Mikael Lepistö** (elhigu / funktion).

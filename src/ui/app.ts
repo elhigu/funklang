@@ -1043,7 +1043,7 @@ export function bootApp(root: HTMLElement): void {
     adoptPatch(f.name, new Uint8Array(await f.arrayBuffer()), undefined);
   });
 
-  // Help-modal "LOAD EXAMPLE": fetch an archieklang patch from GitHub and adopt
+  // Help-modal "LOAD EXAMPLE": fetch an AmigaKlang example patch from GitHub and adopt
   // it via the same path as OPEN PATCH (no write-back handle — it's remote).
   // A bad/unsupported file throws inside adoptPatch; the loader catches it and
   // flags the row rather than crashing the editor, so onAfterLoad (closing the
