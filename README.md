@@ -60,6 +60,22 @@ asm-vs-gcc distinction, are in **[docs/bin-format.md](docs/bin-format.md)**.
 - The Amiga `.exe` (Shrinkler-packed executable music) and Atari `.prg` export routes
   of the original tool are out of scope; funklang focuses on the demo `.bin`.
 
+## Bugs & feedback
+
+funklang is a young reimplementation, so **bug reports and feature requests are very
+welcome** — please open an issue:
+**<https://github.com/elhigu/funklang/issues>**
+
+Especially valuable are cases where funklang **doesn't match the original AmigaKlang** —
+a patch that sounds different, or an exported `.asm` / `.bin` that differs from what the
+real tool produces. The audio engine aims to be sample-for-sample and the assembly
+byte-for-byte against `Aklang2Asm`, so *any* such mismatch is a bug worth reporting —
+ideally with the `.akp` attached so it can be reproduced.
+
+It's also very likely there are **browser incompatibilities** and rough edges in
+**responsiveness and mobile / touch-screen support** that still need fine-tuning. Reports
+here help a lot — please include your browser, OS, and (for touch issues) the device.
+
 ## Development
 
 ```sh
