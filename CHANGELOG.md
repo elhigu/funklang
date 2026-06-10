@@ -11,7 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The footer shows the **build version** (e.g. `v1.2.0`) in its right corner.
+
 ### Changed
+- The top-menu **CODE** item is now **EXPORT**; **HELP** sits between EXPORT and
+  ABOUT.
 - The **OUTPUT / MASTER V1** routing control moved from the top menu to the
   footer (it's a per-instrument routing toggle, not a global menu action, and
   is now always visible — including on mobile).

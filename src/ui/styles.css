@@ -679,9 +679,8 @@
   }
   .output-master:hover { opacity: 1; color: var(--magenta); border-color: var(--magenta); }
 
-  /* Help modal. HELP is now a plain text menu item (was a "?" icon box) — it's
-     the last item in the row, so drop its trailing divider. */
-  .menu-items > button:last-child { border-right: none; }
+  /* No trailing divider on the last menu item (whatever it is). */
+  .menu-items > *:last-child { border-right: none; }
 
   .help-overlay {
     position: fixed;
@@ -1000,8 +999,8 @@
     background: var(--bg-1);
     border-top: 1px solid var(--grid);
     display: grid;
-    /* size readout (left, grows) · OUTPUT routing · activity light (right). */
-    grid-template-columns: 1fr auto auto;
+    /* size readout (left, grows) · OUTPUT routing · activity light · version. */
+    grid-template-columns: 1fr auto auto auto;
     align-items: center;
     padding: 0 14px;
     gap: 16px;
@@ -1034,6 +1033,14 @@
     color: var(--fg-2);
     font-size: 10px;
     letter-spacing: 0.5px;
+  }
+  /* Build version, pinned in the footer's far-right corner. */
+  .footer-version {
+    color: var(--fg-2);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   /* Idle: a steady, dimmed dot. The badge only blinks while real background
      work is running (assembling/shrinking the .bin, or audio playing). */
@@ -1560,6 +1567,9 @@
   .size-status {
     background: none; border: none; color: inherit; font: inherit; cursor: pointer;
     padding: 0 0.5rem; white-space: nowrap; font-variant-numeric: tabular-nums;
+    /* In its 1fr footer cell, truncate (…) when cramped so the OUTPUT control
+       and version stay visible instead of overflowing the bar. */
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
   }
   .size-status:hover { text-decoration: underline; }
   .size-status .size-dim { opacity: 0.55; }

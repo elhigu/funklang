@@ -91,6 +91,9 @@ export function bootApp(root: HTMLElement): void {
     .map((n) => `<option value="${n}"${n === state.previewNote ? ' selected' : ''}>${n}</option>`)
     .join('');
 
+  // Build version (vite `define`; "dev" outside a build) — shown in the footer.
+  const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+
   root.innerHTML = `
     <div class="app">
       <header>
@@ -103,7 +106,8 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-save">SAVE</button>
           <button id="btn-save-as">SAVE&nbsp;AS</button>
           <button id="btn-revert" title="Browse autosaves (snapshot every minute to localStorage)">REVERT&nbsp;AUTOSAVE</button>
-          <button id="btn-export-code" title="Generate m68k asm + C + the exact Amiga .bin for this patch — entirely in the browser">CODE</button>
+          <button id="btn-export-code" title="Generate m68k asm + C + the exact Amiga .bin for this patch — entirely in the browser">EXPORT</button>
+          <button id="btn-help" title="Keyboard shortcuts (?)">HELP</button>
           <button id="btn-about" title="Version, credits & changelog">ABOUT</button>
           <label class="base-toggle-wrap" title="Display numbers as decimal or hexadecimal everywhere">
             <span class="base-toggle-label">BASE</span>
@@ -116,7 +120,6 @@ export function bootApp(root: HTMLElement): void {
             <span class="note-select-label">NOTE</span>
             <select id="note-select">${noteOptions}</select>
           </label>
-          <button id="btn-help" title="Keyboard shortcuts (?)">HELP</button>
           </div>
         </div>
         <div class="file-info">
@@ -139,6 +142,7 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-output-master" class="output-master active" title="Route the active instrument's final v1 output to playback. Grayed out when a per-slot 🔊 is the current output.">MASTER&nbsp;V1</button>
         </div>
         <div class="footer-right" title="System activity — blinks while the .bin assembles/shrinks or audio plays, steady READY when idle"><span class="blink">●</span><span class="status-label">READY</span></div>
+        <span class="footer-version" title="Build version">v${appVersion}</span>
       </footer>
       <aside id="revert-panel" class="revert-panel hidden" aria-hidden="true">
         <div class="revert-head">

@@ -85,7 +85,7 @@ export function helpOverlayHtml(): string {
               <tr><td><kbd>?</kbd> or <kbd>Esc</kbd></td><td>Toggle / close this help</td></tr>
             </tbody></table>
 
-            <h3>Size &amp; CODE export</h3>
+            <h3>Size &amp; EXPORT</h3>
             <p>The footer shows the patch's <strong>exact</strong> exported <code>.bin</code>
             size in bytes (<span class="size-raw">amber</span>), and after <code>→</code> the
             <strong>shrinkled</strong> size (<span class="size-packed">green</span>, the
@@ -93,7 +93,7 @@ export function helpOverlayHtml(): string {
             in-browser (a byte-for-byte port of <code>Aklang2Asm</code> + vasm-WebAssembly,
             then Shrinkler-WASM). A <span class="size-spin">⟳</span> spins while a new patch
             assembles; results cache. Click the footer for a per-phase breakdown; the op
-            picker shows each op's exact size delta. <strong>CODE</strong> (top menu)
+            picker shows each op's exact size delta. <strong>EXPORT</strong> (top menu)
             downloads the <code>.asm</code>, the C generators, and the exact <code>.bin</code>.
             Patches the generator can't build (e.g. variable <code>enva</code>, or a required
             input left unwired) read <em>size unavailable</em>.</p>
