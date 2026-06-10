@@ -3,8 +3,8 @@
 # (which GitHub Pages serves at https://funklang.mkael.net).
 #
 # Layout:
-#   funklang/dist/    — vite output, owned by vite (emptied on every build)
-#   funklang/deploy/  — separate git repo whose 'main' is the published site
+#   dist/    — vite output, owned by vite (emptied on every build)
+#   deploy/  — separate git repo whose 'main' is the published site
 #
 # Run from anywhere; this script always operates relative to its own dir.
 
