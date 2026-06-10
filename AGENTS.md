@@ -29,6 +29,11 @@ for the module map before making changes.
 4. **Update the in-app help on any UX change.** If you change a user-visible
    behaviour, update `src/ui/help-modal.ts` in the *same* commit.
 
+   Likewise, keep the curated About/credits block in `src/ui/about-modal.ts`
+   current whenever credits, attribution, links, or the project scope change.
+   (The version and changelog there render from `package.json` / `CHANGELOG.md`
+   automatically — only the hand-written prose needs updating.)
+
 5. **Gate before you commit a feature.** `npm run typecheck` and `npm test` must
    pass. `npm run build` must succeed (it bundles the vasm-WASM worker). The full
    `npm run gate` also runs Playwright e2e (needs a Chromium with system libs).

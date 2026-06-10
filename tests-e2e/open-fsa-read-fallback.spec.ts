@@ -78,6 +78,10 @@ test('OPEN PATCH falls back to <input> when FSA picker succeeds but the read fai
   }, b64);
 
   await page.goto('/');
+  // OPEN PATCH lives in the top menu, which collapses into the hamburger at this
+  // viewport — open it first if needed.
+  const menuToggle = page.locator('#menu-toggle');
+  if (await menuToggle.isVisible()) await menuToggle.click();
   await page.locator('#btn-open').click();
 
   // The patch should land in the UI even though the FSA read failed.

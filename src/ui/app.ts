@@ -20,6 +20,7 @@ import { wireSizeStatusbar, type SizeStatusbar } from './size-statusbar';
 import { wireStatusBar } from './status-bar';
 import { wireExampleLoader } from './example-loader';
 import { mountCodeExportModal } from './code-export-modal';
+import { mountAboutModal } from './about-modal';
 import { bytesToInt16 } from './waveform';
 import { makeWaveViewer } from './wave-viewer';
 import type { WaveViewer } from './wave-viewer';
@@ -95,7 +96,6 @@ export function bootApp(root: HTMLElement): void {
       <header>
         <div class="brand"><div class="dot"></div><span>FUNKLANG.WEB</span></div>
         <div class="menu">
-          <button id="btn-mobile-play" class="mobile-play" aria-label="Play" title="Play the selected output">▶</button>
           <button id="menu-toggle" class="menu-toggle" aria-label="Menu" aria-expanded="false" title="Menu">☰</button>
           <div class="menu-items">
           <button id="btn-close" title="Close the current patch — gives you a blank project ready to edit. Disabled when nothing has been done.">CLOSE</button>
@@ -104,6 +104,7 @@ export function bootApp(root: HTMLElement): void {
           <button id="btn-save-as">SAVE&nbsp;AS</button>
           <button id="btn-revert" title="Browse autosaves (snapshot every minute to localStorage)">REVERT&nbsp;AUTOSAVE</button>
           <button id="btn-export-code" title="Generate m68k asm + C + the exact Amiga .bin for this patch — entirely in the browser">CODE</button>
+          <button id="btn-about" title="Version, credits & changelog">ABOUT</button>
           <label class="base-toggle-wrap" title="Display numbers as decimal or hexadecimal everywhere">
             <span class="base-toggle-label">BASE</span>
             <select id="display-base">
@@ -124,6 +125,7 @@ export function bootApp(root: HTMLElement): void {
         </div>
         <div class="file-info">
           <span class="file-name" id="file-name">(no patch)</span>
+          <button id="btn-play" class="header-play" aria-label="Play" title="Play the selected output (Space)"><span aria-hidden="true">▶</span><span class="play-label">PLAY</span></button>
         </div>
       </header>
       ${helpOverlayHtml()}
@@ -136,12 +138,6 @@ export function bootApp(root: HTMLElement): void {
       <main id="main-area"></main>
       <footer>
         <button id="size-status" class="size-status" title="Click for size breakdown">—</button>
-        <div class="footer-status">
-          <span class="k">selected →</span>
-          <span class="selection" id="selection-label">—</span>
-          <span class="k">output →</span>
-          <span class="output" id="output-label">—</span>
-        </div>
         <div class="footer-right" title="System activity — blinks while the .bin assembles/shrinks or audio plays, steady READY when idle"><span class="blink">●</span><span class="status-label">READY</span></div>
       </footer>
       <aside id="revert-panel" class="revert-panel hidden" aria-hidden="true">
@@ -161,8 +157,6 @@ export function bootApp(root: HTMLElement): void {
   const nameEl = root.querySelector('#file-name') as HTMLElement;
   const mainEl = root.querySelector('#main-area') as HTMLElement;
   const hidden = root.querySelector('#hidden-file-input') as HTMLInputElement;
-  const selectionLabel = root.querySelector('#selection-label') as HTMLElement;
-  const outputLabel = root.querySelector('#output-label') as HTMLElement;
   const outputMasterBtn = root.querySelector('#btn-output-master') as HTMLButtonElement;
 
   // Keep the selected instrument CENTERED in the collapsed rail (mobile), so
@@ -781,27 +775,10 @@ export function bootApp(root: HTMLElement): void {
     playAuditionInternal();
   };
 
+  // The footer's selected-instrument / output readout was removed (it broke the
+  // footer layout in narrow windows and duplicated what the sidebar + OUTPUT
+  // chip already show). Selection / output changes still refresh the size bar.
   const updateLabels = (): void => {
-    const sNum = String(state.selection.instrIdx + 1).padStart(2, '0');
-    if (state.selection.slotIdx == null) {
-      selectionLabel.textContent = `instr ${sNum} / —`;
-    } else {
-      const ins = model.patch.instruments[state.selection.instrIdx];
-      const slot = ins?.slots[state.selection.slotIdx];
-      const vlabel = slot && slot.outVar > 0 ? ` · v${slot.outVar}` : '';
-      selectionLabel.textContent =
-        `instr ${sNum} / slot ${String(state.selection.slotIdx + 1).padStart(2, '0')}${vlabel}`;
-    }
-    const oNum = String(state.outputTarget.instrIdx + 1).padStart(2, '0');
-    if (state.outputTarget.slotIdx == null) {
-      outputLabel.textContent = `instr ${oNum} / final`;
-    } else {
-      const ins = model.patch.instruments[state.outputTarget.instrIdx];
-      const slot = ins?.slots[state.outputTarget.slotIdx];
-      const vlabel = slot && slot.outVar > 0 ? ` · v${slot.outVar}` : '';
-      outputLabel.textContent =
-        `instr ${oNum} / slot ${String(state.outputTarget.slotIdx + 1).padStart(2, '0')}${vlabel}`;
-    }
     sizeBar?.refresh();
   };
 
@@ -878,6 +855,10 @@ export function bootApp(root: HTMLElement): void {
   // EXPORT CODE panel — in-browser m68k asm + C + exact .bin for the current patch.
   const codeExport = mountCodeExportModal(root);
   (root.querySelector('#btn-export-code') as HTMLButtonElement)?.addEventListener('click', () => codeExport.open(model.patch));
+
+  // ABOUT / CREDITS panel — version, curated credits/links, live changelog.
+  const about = mountAboutModal(root);
+  (root.querySelector('#btn-about') as HTMLButtonElement)?.addEventListener('click', () => about.open());
 
   // ── Responsive top menu: collapse to a hamburger when the toolbar would
   //    overflow. Measured against the expanded layout so it adapts to the
@@ -1108,10 +1089,10 @@ export function bootApp(root: HTMLElement): void {
     applyEdit({ kind: 'reset' });
   });
   // Audition always plays on every change — there is no mute/autoplay toggle.
-  // A dedicated ▶ play button (shown only on phones; desktop uses Space) replays
-  // the current output on demand.
-  const mobilePlayBtn = root.querySelector('#btn-mobile-play') as HTMLButtonElement | null;
-  mobilePlayBtn?.addEventListener('click', () => playAuditionInternal());
+  // A dedicated ▶ PLAY button on the right of the header (always visible; desktop
+  // also has Space) replays the current output on demand.
+  const playBtn = root.querySelector('#btn-play') as HTMLButtonElement | null;
+  playBtn?.addEventListener('click', () => playAuditionInternal());
 
   // Auto-blur BUTTON / SELECT after click so focus doesn't linger on UI
   // controls. Text inputs (knob inline editor, instr-header fields) and

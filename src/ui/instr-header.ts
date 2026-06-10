@@ -1,4 +1,4 @@
-// Per-instrument header: editable name + sampleLength (number + slider)
+// Per-instrument header: editable name + sampleLength (knob bar)
 // + slot-count badge + per-instrument IMPORT/EXPORT .AKI buttons.
 //
 // The loop region (loopOffset / loopLength) is no longer surfaced here.
@@ -101,11 +101,12 @@ export function renderInstrHeader(
   });
   attachCommitOnEnter(nameEl);
 
-  // Sample length is now a `makeKnob` — same widget the slot rows use.
-  // step=2 makes wheel / arrow / drag / numeric editor all snap to
-  // even values, so the Klang invariant is enforced at the UI layer
-  // and we get the hex/dec display, Enter-to-commit, drag-to-position
-  // and logarithmic coarse step for free.
+  // Sample length is a `makeKnob` — same widget the slot rows use. step=2
+  // makes wheel / arrow / drag / numeric editor all snap to even values, so
+  // the Klang invariant is enforced at the UI layer and we get the hex/dec
+  // display, Enter-to-commit, drag-to-position and logarithmic coarse step
+  // for free. (A redundant range slider was tried here and removed — the
+  // knob bar already is the slider.)
   const lenKnob = makeKnob({
     label: 'length',
     value: ins.sampleLength,

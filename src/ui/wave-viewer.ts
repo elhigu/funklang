@@ -62,6 +62,52 @@ interface DragState {
 // this zone, so the user can SEE that the edge is grabbable.
 const EDGE_PX = 12;
 
+/** Tightest zoom-in: never show fewer than this many samples. */
+const MIN_SPAN = 16;
+/** Vertical two-finger drag (px) per e-fold change of the visible span. */
+const ZOOM_PX = 120;
+
+export interface ViewWindow { start: number; end: number }
+
+/** Clamp a [start, end) window into [0, total], preserving its span where
+ *  possible by sliding it back in (mirrors the wheel-zoom clamp). */
+export function clampView(start: number, end: number, total: number): ViewWindow {
+  let s = Math.round(start);
+  let e = Math.round(end);
+  if (s < 0) { e -= s; s = 0; }
+  if (e > total) { s -= (e - total); e = total; }
+  if (s < 0) s = 0;
+  return { start: s, end: e };
+}
+
+/**
+ * Two-finger gesture → new view window. The centroid of the two touches drives
+ * both axes at once: vertical movement zooms (drag UP shrinks the span = zoom
+ * in; drag DOWN grows it = zoom out), keeping the sample under the gesture-start
+ * centroid fixed; horizontal movement pans (drag RIGHT moves the view earlier).
+ *
+ *  - `focusFrac`  fractional x (0..1) of the gesture-start centroid in the view
+ *  - `dxFrac`     horizontal centroid drag as a fraction of canvas width (+ = right)
+ *  - `dyPx`       vertical centroid drag in pixels (+ = down)
+ *  - `zoomPx`     pixels of vertical drag per e-fold of span
+ */
+export function transformTwoFinger(
+  startView: ViewWindow,
+  total: number,
+  focusFrac: number,
+  dxFrac: number,
+  dyPx: number,
+  zoomPx: number,
+): ViewWindow {
+  const startSpan = startView.end - startView.start;
+  const focus = startView.start + focusFrac * startSpan;
+  const maxSpan = Math.max(MIN_SPAN, total);
+  const newSpan = Math.max(MIN_SPAN, Math.min(maxSpan, Math.round(startSpan * Math.exp(dyPx / zoomPx))));
+  const start0 = focus - focusFrac * newSpan;     // keep the focus sample under the centroid
+  const panSamples = dxFrac * newSpan;            // drag right → view shifts earlier
+  return clampView(start0 - panSamples, start0 - panSamples + newSpan, total);
+}
+
 export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}): WaveViewer {
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -128,15 +174,12 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
     const focus = xToSample(e.clientX);
     const factor = e.deltaY < 0 ? 0.85 : 1.18; // zoom in / out
     const span = viewEnd - viewStart;
-    const newSpan = Math.max(16, Math.min(total(), Math.round(span * factor)));
+    const newSpan = Math.max(MIN_SPAN, Math.min(total(), Math.round(span * factor)));
     const ratio = (focus - viewStart) / Math.max(1, span);
-    let newStart = Math.round(focus - ratio * newSpan);
-    let newEnd = newStart + newSpan;
-    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
-    if (newEnd > total()) { newStart -= (newEnd - total()); newEnd = total(); }
-    if (newStart < 0) newStart = 0;
-    viewStart = newStart;
-    viewEnd = newEnd;
+    const start0 = focus - ratio * newSpan;
+    const v = clampView(start0, start0 + newSpan, total());
+    viewStart = v.start;
+    viewEnd = v.end;
     paint();
   }, { passive: false });
 
@@ -219,6 +262,39 @@ export function makeWaveViewer(root: HTMLElement, opts: WaveViewerOptions = {}):
   };
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
+
+  // ── Touch: two-finger drag zooms (vertical) / pans (horizontal). The canvas
+  //    sets `touch-action: none` (styles.css) so the browser doesn't steal the
+  //    gesture for page pinch-zoom. We track the centroid of the two touches
+  //    relative to where the gesture started, so the math is a pure transform.
+  let pinch: { startView: ViewWindow; focusFrac: number; startCx: number; startCy: number } | null = null;
+  const centroid = (t: TouchList): { x: number; y: number } => ({
+    x: (t[0]!.clientX + t[1]!.clientX) / 2,
+    y: (t[0]!.clientY + t[1]!.clientY) / 2,
+  });
+  canvas.addEventListener('touchstart', (e) => {
+    if (!sample || e.touches.length !== 2) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const c = centroid(e.touches);
+    const focusFrac = Math.max(0, Math.min(1, (c.x - rect.left) / Math.max(1, rect.width)));
+    pinch = { startView: { start: viewStart, end: viewEnd }, focusFrac, startCx: c.x, startCy: c.y };
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    if (!pinch || !sample || e.touches.length !== 2) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const c = centroid(e.touches);
+    const dxFrac = (c.x - pinch.startCx) / Math.max(1, rect.width);
+    const dyPx = c.y - pinch.startCy;
+    const v = transformTwoFinger(pinch.startView, total(), pinch.focusFrac, dxFrac, dyPx, ZOOM_PX);
+    viewStart = v.start;
+    viewEnd = v.end;
+    paint();
+  }, { passive: false });
+  const endPinch = (e: TouchEvent): void => { if (e.touches.length < 2) pinch = null; };
+  canvas.addEventListener('touchend', endPinch);
+  canvas.addEventListener('touchcancel', endPinch);
 
   return {
     setSample(s, region) {

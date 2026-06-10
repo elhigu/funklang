@@ -3,15 +3,13 @@
 //
 // Before the fix: clicking the 🔊 in a clone-block's row sets
 // outputTarget = { instrIdx: activeIdx, slotIdx: <source-slot-idx> } —
-// pointing at a slot index that may not even exist on the active
-// instrument. Audition then falls back to the active instrument's
-// final output. The MASTER V1 button stays "active", the footer
-// "output → …" label is wrong.
+// pointing at the active (cloner) instrument's own slot, which lights up a
+// ► output marker in the main grid.
 //
 // After the fix: outputTarget = { instrIdx: <source-instr-idx>,
-// slotIdx: <source-slot-idx> }. The MASTER V1 button dims, the
-// footer reflects the new target, and audition actually plays the
-// source slot's tap.
+// slotIdx: <source-slot-idx> }. The MASTER V1 button dims, no ► marker
+// appears in the active grid (the target is a different instrument), and
+// audition actually plays the source slot's tap.
 
 import { test, expect } from '@playwright/test';
 
@@ -52,15 +50,22 @@ test('clicking 🔊 inside an expanded clone block targets the SOURCE instrument
   await expect(innerSpeakerBtn).toBeAttached();
   await innerSpeakerBtn.click({ force: true });   // it's hover-revealed, but click should still fire
 
-  // The footer's "output → …" label should now mention the SOURCE
-  // instrument (instr 01 = "SRC"), not the active CLONER (instr 02).
-  const outputLabel = page.locator('#output-label');
-  await expect(outputLabel).toContainText('instr 01');
+  // Output now targets the SOURCE instrument's slot, not the active cloner.
+  // (The footer output label was removed, so we read the real UI.) The output
+  // ► marker only renders for the ACTIVE instrument's grid, so when the target
+  // is a different instrument it appears NOWHERE here. The bug instead pointed
+  // at the cloner's OWN slot 0 — which would light up a ► output marker in the
+  // active grid. Its absence (plus MASTER V1 dimming) is the fix.
+  await expect(page.locator('#main-area .slots .output-target')).toHaveCount(0);
 
-  // MASTER V1 button should dim now that a slot owns the output.
+  // MASTER V1 button should dim now that a per-slot output (not the active
+  // instrument's final) owns playback.
   await expect(page.locator('#btn-output-master')).toHaveClass(/dimmed/);
 
-  // Click MASTER V1 → back to active instrument's final.
+  // Click MASTER V1 → back to active instrument's final. (The top menu collapses
+  // into the hamburger at this viewport, so open it first if needed.)
+  const menuToggle = page.locator('#menu-toggle');
+  if (await menuToggle.isVisible()) await menuToggle.click();
   await page.locator('#btn-output-master').click();
   await expect(page.locator('#btn-output-master')).toHaveClass(/active/);
 });

@@ -51,6 +51,13 @@ export function helpOverlayHtml(): string {
               <tr><td>BASE (header)</td><td>Switch all numbers dec/hex (inputs accept either, e.g. <code>0x10</code>)</td></tr>
             </tbody></table>
 
+            <h3>Waveform (top view)</h3>
+            <table class="help-kbd"><tbody>
+              <tr><td>Wheel / drag</td><td>Zoom (around the cursor) / pan the view window</td></tr>
+              <tr><td>Two-finger drag (touch)</td><td>Up/down zooms, side-to-side pans the waveform</td></tr>
+              <tr><td>Drag the pink edge</td><td>Retune the loop offset (snaps to the valid even position)</td></tr>
+            </tbody></table>
+
             <h3>Slots (phases)</h3>
             <table class="help-kbd"><tbody>
               <tr><td>Click row / op name</td><td>Select the phase / change its op (op picker)</td></tr>
@@ -95,7 +102,8 @@ export function helpOverlayHtml(): string {
             built or packed, <strong>PLAYING</strong> while audio sounds, and rests at a
             steady <strong>READY</strong> when idle.</p>
 
-            <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.</p>
+            <p class="help-foot">Mac: use <kbd>⌘</kbd> wherever <kbd>Ctrl</kbd> is listed.
+            Version, credits &amp; changelog are under <strong>ABOUT</strong> (top menu).</p>
           </div>
         </div>
       </div>`;
