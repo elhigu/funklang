@@ -11,19 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-06-11
+
 ### Added
-- The footer shows the **build version** (e.g. `v1.2.0`) in its right corner.
+- The footer shows the **build version** (e.g. `v1.2.1`), left-aligned at the
+  start of the bar.
 
 ### Changed
 - The top-menu **CODE** item is now **EXPORT**; **HELP** sits between EXPORT and
-  ABOUT.
+  ABOUT and reads as text (was a `?` icon).
 - The **OUTPUT / MASTER V1** routing control moved from the top menu to the
-  footer (it's a per-instrument routing toggle, not a global menu action, and
-  is now always visible — including on mobile).
-- The help menu item now reads **HELP** (was a `?` icon), matching the other
-  text items.
-- About modal links: label the Pouët link **AmigaKlang Pouët**, and replace the
-  published-site repo link with the **funklang source + issue tracker** repo.
+  footer — a per-instrument toggle, now always visible (including on mobile).
+- Lighter, more legible status-bar text.
+- About modal links: label the Pouët link **AmigaKlang Pouët**, and link the
+  **funklang source + issue tracker** repo (dropped the published-site link).
+- Reworded the sample-import note: samples already in a loaded `.akp` are read,
+  played, and exported — only importing a *new* sample (wav/raw/mic) isn't built
+  in the editor yet.
+
+### Fixed
+- **AmigaKlang GitHub links** now point at the real source,
+  `github.com/virgill1974/AmigaKlang` (they pointed at an Archimedes-family
+  port). **LOAD EXAMPLE** fetches that repo's `examples/patches` folder.
 
 ## [1.2.0] — 2026-06-10
 
