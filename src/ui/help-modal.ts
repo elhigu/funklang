@@ -20,7 +20,9 @@ export function helpOverlayHtml(): string {
               editor from
               <a href="https://github.com/kieranhj/archieklang/tree/main/patches" target="_blank" rel="noopener">the archieklang patches folder</a>
               (or download a <code>.akp</code> and use <strong>OPEN&nbsp;PATCH</strong>). Build
-              sound from synthetic operators — funklang has no sample import.</p>
+              sound from synthetic operators; samples already in a loaded <code>.akp</code>
+              play and export too — importing <em>new</em> ones (wav/raw/mic) just isn't in
+              the editor yet.</p>
               <div class="example-loader">
                 <button id="load-example-btn" class="load-example-btn" type="button" title="Browse and load an example patch from the archieklang GitHub folder">LOAD&nbsp;EXAMPLE ▾</button>
                 <div id="example-list" class="example-list hidden"></div>
