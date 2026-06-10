@@ -305,7 +305,7 @@ async function tryInsertAt(model: PatchModel, instrIdx: number, atIdx: number): 
   const base: Slot = { ...emptySlot(), fn: code, outVar: smartOut };
   const slot = applyInsertDefaults(base, code);
   // If this is the first slot landing in the instrument, write the
-  // auto-name + 12 KB default length BEFORE the insertSlot call. The
+  // auto-name + 8 KB default length BEFORE the insertSlot call. The
   // insert emits a `structure` event which makes app.ts rebuild the
   // instrument header — that rebuild must see the new name + length
   // already in place, otherwise the header keeps its stale (empty)
@@ -374,11 +374,11 @@ function makeEmptyPlaceholder(model: PatchModel, instrIdx: number, disabled: boo
   ph.appendChild(btn);
   // Guide text so the user understands what the [+] does — adding the
   // first slot also auto-names the instrument (demoscene generator) and
-  // sets sampleLength to the 12 KB default.
+  // sets sampleLength to the 8 KB default.
   const hint = document.createElement('span');
   hint.className = 'empty-placeholder-hint';
   hint.dataset['emptyHint'] = '1';
-  hint.textContent = 'Add the first slot to initialize this instrument — picks a name and a 12 KB sample length.';
+  hint.textContent = 'Add the first slot to initialize this instrument — picks a name and an 8 KB sample length.';
   ph.appendChild(hint);
   return ph;
 }

@@ -15,10 +15,17 @@ export function helpOverlayHtml(): string {
             <button class="help-close" id="help-close" aria-label="Close">✕</button>
           </div>
           <div class="help-body">
-            <p class="help-intro">New here? Grab example patches from
-            <a href="https://github.com/kieranhj/archieklang/tree/main/patches" target="_blank" rel="noopener">the archieklang patches folder</a>
-            (download a <code>.akp</code>, then <strong>OPEN&nbsp;PATCH</strong>). Build sound
-            from synthetic operators — funklang has no sample import.</p>
+            <div class="help-intro">
+              <p>New here? <strong>LOAD&nbsp;EXAMPLE</strong> pulls a patch straight into the
+              editor from
+              <a href="https://github.com/kieranhj/archieklang/tree/main/patches" target="_blank" rel="noopener">the archieklang patches folder</a>
+              (or download a <code>.akp</code> and use <strong>OPEN&nbsp;PATCH</strong>). Build
+              sound from synthetic operators — funklang has no sample import.</p>
+              <div class="example-loader">
+                <button id="load-example-btn" class="load-example-btn" type="button" title="Browse and load an example patch from the archieklang GitHub folder">LOAD&nbsp;EXAMPLE ▾</button>
+                <div id="example-list" class="example-list hidden"></div>
+              </div>
+            </div>
 
             <h3>Playback</h3>
             <table class="help-kbd"><tbody>
@@ -48,7 +55,7 @@ export function helpOverlayHtml(): string {
             <table class="help-kbd"><tbody>
               <tr><td>Click row / op name</td><td>Select the phase / change its op (op picker)</td></tr>
               <tr><td>✕ · drag # · <kbd>+</kbd> corners</td><td>Delete · reorder · insert a slot before/after</td></tr>
-              <tr><td>Empty instrument</td><td>Click the <kbd>+</kbd> placeholder — the first slot auto-names it and sets a 12 KB length</td></tr>
+              <tr><td>Empty instrument</td><td>Click the <kbd>+</kbd> placeholder — the first slot auto-names it and sets an 8 KB length</td></tr>
               <tr><td>▶ on a clone slot</td><td>Expand the source instrument inline</td></tr>
               <tr><td>loop_gen</td><td>Always pinned to the last slot; only one per instrument</td></tr>
               <tr><td>mul const</td><td>Integer knob and the float sidecar share one value (val / 32767 ≈ −1..1)</td></tr>

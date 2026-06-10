@@ -492,7 +492,7 @@
 
   /* Length knob greyed when the instrument has never been touched
      (no slots, no name, no length). Adding the first slot auto-applies
-     the 12 KB default which re-enables it. */
+     the 8 KB default which re-enables it. */
   .length-pair.disabled { opacity: 0.5; }
   .length-pair .knob.knob-disabled { cursor: not-allowed; }
   /* The length-pair wraps the makeKnob output — keep it inline so the
@@ -1787,7 +1787,52 @@
     font-size: 12px;
     line-height: 1.5;
   }
+  .help-intro p { margin: 0; }
   .help-intro a { color: var(--amber); }
+
+  /* "LOAD EXAMPLE" control inside the intro box: a button that expands an
+     inline list of archieklang patches (inline so it can't clip in the
+     scrollable help modal). */
+  .example-loader { margin-top: 8px; }
+  .load-example-btn {
+    background: var(--bg-2);
+    border: 1px solid var(--grid);
+    color: var(--amber);
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .load-example-btn:hover { background: var(--bg-3); }
+  .example-list {
+    margin-top: 6px;
+    border: 1px solid var(--grid-dim);
+    background: var(--bg-1);
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .example-list.hidden { display: none; }
+  .example-row {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--grid-dim);
+    color: var(--fg-0);
+    font: inherit;
+    font-size: 12px;
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+  .example-row:last-child { border-bottom: none; }
+  .example-row:hover { background: var(--bg-2); color: var(--amber); }
+  .example-row.loading { opacity: 0.6; cursor: progress; }
+  .example-row.loading::after { content: ' ⟳'; display: inline-block; animation: size-spin-rot 0.8s linear infinite; }
+  .example-row.row-error { color: var(--red); }
+  .example-empty, .example-error { padding: 8px 10px; font-size: 11px; color: var(--fg-1); }
+  .example-error { color: var(--red); }
 
   /* The always-visible mobile play button lives in the header; hidden on
      desktop (which uses the OUTPUT ▶ + Space). Shown in the phone block below. */

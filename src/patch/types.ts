@@ -83,10 +83,9 @@ export function emptySlot(): Slot {
  * patch slots that have never been touched keep `sampleLength = 0` so the
  * sidebar shows them as empty.
  *
- * User-stated: "New instrument default length should be 12k bytes."
- * Clarified: "12k is 12*1024" → 12288.
+ * User-stated: new-instrument default length is 8k bytes (8*1024 = 8192).
  */
-export const DEFAULT_SAMPLE_LENGTH = 12 * 1024;
+export const DEFAULT_SAMPLE_LENGTH = 8 * 1024;
 
 export function emptyInstrument(name = ''): Instrument {
   return {

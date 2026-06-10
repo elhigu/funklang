@@ -45,7 +45,7 @@ export function renderInstrHeader(
   // "Empty / never-touched" = no slots, no name, no length. Length
   // controls (number field + slider) are disabled in that state so the
   // user can't put a sample length on an instrument that has nothing
-  // to sample yet — inserting the first slot auto-applies the 12 KB
+  // to sample yet — inserting the first slot auto-applies the 8 KB
   // default, which is what re-enables the controls.
   const isUntouched = filled === 0 && !ins.name && ins.sampleLength === 0;
   root.innerHTML = `

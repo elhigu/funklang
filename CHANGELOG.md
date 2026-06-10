@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the reimplemented AmigaKlang/Aklang2Asm work.
 
 ### Changed
+- New-instrument default sample length is now **8 KB** (was 12 KB).
 - The op picker now **prefills every op's exact size delta** when it opens (was
   computed lazily on hover). When **changing** an existing slot's op it shows the
   signed delta of *replacing* it — so e.g. reverb → add reads as a **negative**

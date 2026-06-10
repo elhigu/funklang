@@ -177,7 +177,7 @@ describe('slot-grid — corner insert buttons', () => {
     // Regression: app.ts rebuilds the instrument header on the
     // `structure` event. If sampleLength/name are written AFTER the
     // insertSlot, the header rebuild reads stale (empty) values and
-    // never shows the auto-applied 12 KB length or generated name.
+    // never shows the auto-applied 8 KB length or generated name.
     const p = emptyPatch();
     const model = new PatchModel(p);
     const observed: Array<{ kind: string; sampleLength: number; name: string }> = [];
@@ -189,7 +189,7 @@ describe('slot-grid — corner insert buttons', () => {
     (root.querySelector('[data-empty-insert]') as HTMLButtonElement).click();
     await new Promise((r) => setTimeout(r, 0));
     // Find the structure event from the insertSlot — when it fires,
-    // sampleLength must already be 12 KB and name must be non-empty.
+    // sampleLength must already be 8 KB and name must be non-empty.
     const structEvt = observed.find((e) => e.kind === 'structure');
     expect(structEvt).toBeDefined();
     expect(structEvt!.sampleLength).toBeGreaterThan(0);
