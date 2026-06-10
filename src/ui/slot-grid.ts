@@ -6,7 +6,7 @@ import type { PatchModel } from '../patch/model';
 import { N_SLOTS_EDITABLE, N_SLOTS_MAX, N_INSTRUMENTS, N_IMPORTS, emptySlot, DEFAULT_SAMPLE_LENGTH } from '../patch/types';
 import type { Slot, Instrument } from '../patch/types';
 import { pickOp, OP_NAME, type OpAddCost } from './op-picker';
-import { addOpCost, replaceOpCost, patchHasOp, patchHasOpElsewhere } from '../asm/size-ablation';
+import { addOpCost, replaceOpCost } from '../asm/size-ablation';
 import { makeKnob } from './knob';
 import { drawWaveform } from './waveform';
 import { attachWheelStep } from './wheel';
@@ -23,8 +23,7 @@ import type { ParamDef } from '../schema/op-metadata';
  *  Null when the op can't be assembled into the patch. */
 function opCostProvider(model: PatchModel, instrIdx: number): (op: number) => Promise<OpAddCost | null> {
   return (op) =>
-    addOpCost(model.patch, instrIdx, op).then((r) =>
-      r.ok ? { cost: r.bytes!, alreadyPresent: patchHasOp(model.patch, op) } : null);
+    addOpCost(model.patch, instrIdx, op).then((r) => (r.ok ? { cost: r.bytes! } : null));
 }
 
 /** Cost provider for CHANGING an existing slot's op: the SIGNED net byte delta
@@ -32,8 +31,7 @@ function opCostProvider(model: PatchModel, instrIdx: number): (op: number) => Pr
  *  (e.g. reverb → add), unlike inserting which only ever adds. */
 function opChangeCostProvider(model: PatchModel, instrIdx: number, slotIdx: number): (op: number) => Promise<OpAddCost | null> {
   return (op) =>
-    replaceOpCost(model.patch, instrIdx, slotIdx, op).then((r) =>
-      r.ok ? { cost: r.bytes!, alreadyPresent: patchHasOpElsewhere(model.patch, op, instrIdx, slotIdx) } : null);
+    replaceOpCost(model.patch, instrIdx, slotIdx, op).then((r) => (r.ok ? { cost: r.bytes! } : null));
 }
 
 /** Last filled (non-empty) slot model-index in an instrument, or -1. */

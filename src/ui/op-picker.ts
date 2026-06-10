@@ -43,9 +43,9 @@ function groupedDefs(): Array<{ title: string; defs: OpDef[] }> {
 
 /** Optional per-op size delta (SIGNED bytes) for choosing this op in the current
  *  patch: positive when it grows the .bin, negative when it shrinks it (e.g.
- *  changing reverb → add). `alreadyPresent` flags that the op's routine is already
- *  paid by another slot, so only its per-use code differs. */
-export interface OpAddCost { cost: number; alreadyPresent: boolean }
+ *  changing reverb → add). Each op is inlined per use, so the figure is this op's
+ *  own cost here — it does NOT get cheaper just because the op is used elsewhere. */
+export interface OpAddCost { cost: number }
 
 /** `costOf` is called for EVERY op when the picker opens (each call assembles a
  *  variant of the patch, dispatched in parallel; cards show a spinner until
@@ -122,10 +122,8 @@ export function pickOp(
               if (!c) { cost.textContent = ''; return; }
               // Signed: negative when picking this op shrinks the patch.
               const sign = c.cost < 0 ? '−' : '+';
-              cost.textContent = `${sign}${fmtBytes(Math.abs(c.cost))}${c.alreadyPresent ? ' · shared' : ''}`;
-              cost.title = c.alreadyPresent
-                ? 'This op is already used elsewhere — only its per-use code differs.'
-                : 'Net change to the .bin if you choose this op.';
+              cost.textContent = `${sign}${fmtBytes(Math.abs(c.cost))}`;
+              cost.title = 'Net change to the .bin if you choose this op (each op is inlined per use).';
             })
             .catch(() => { cost.classList.remove('size-spin'); cost.textContent = ''; });
         }

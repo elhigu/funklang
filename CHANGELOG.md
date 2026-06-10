@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   desktop and mobile alike (Space or the top-bar ▶ replay on demand).
 
 ### Fixed
+- Removed the misleading "· shared" tag from op costs. This build inlines each op
+  at every use (no shared subroutines), so an op is *not* cheaper when already in
+  the patch — e.g. each reverb costs ~485 B every time. The cost shown is simply
+  that op's own size in context.
 - Op-picker add-costs showed `+0 B` for every op (the trial slot lacked an output
   variable, so codegen skipped it). Now they reflect real byte deltas.
 - Instruments using a feedback variable (read of a var written by a later slot) are

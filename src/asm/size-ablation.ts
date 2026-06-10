@@ -3,9 +3,9 @@
 // Exact per-phase and per-op size deltas by ABLATION: assemble a variant patch
 // and diff its exact .bin size against the original. Because the asm build is
 // deterministic, size(full) − size(without one phase) is the EXACT number of
-// bytes that phase contributes in the current context — it automatically
-// accounts for shared op routines (removing a non-last use frees only the
-// connection; removing the last use frees the routine too).
+// bytes that phase contributes. Each op is inlined at every use (no shared
+// subroutines), so a phase's cost is its own code regardless of how many times
+// that op appears — a reverb is ~the same ~485 B every time.
 //
 // Variants are produced on a structural clone of the patch, so the live patch
 // is never mutated. Results ride the size-service cache (keyed by generated
@@ -111,13 +111,3 @@ export async function replaceOpCost(patch: Patch, instrIdx: number, slotIdx: num
   return { ok: true, bytes: withOp.size! - full.size! };
 }
 
-/** True iff a slot OTHER than (instrIdx, slotIdx) already uses `op`. */
-export function patchHasOpElsewhere(patch: Patch, op: number, instrIdx: number, slotIdx: number): boolean {
-  return patch.instruments.some((ins, i) =>
-    ins.slots.some((s, j) => s.fn === op && !(i === instrIdx && j === slotIdx)));
-}
-
-/** True iff any slot in the patch already uses `op`. */
-export function patchHasOp(patch: Patch, op: number): boolean {
-  return patch.instruments.some((ins) => ins.slots.some((s) => s.fn === op));
-}

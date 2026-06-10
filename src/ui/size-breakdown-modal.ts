@@ -4,9 +4,9 @@
 // total .bin size plus how many bytes deleting each phase would free — both by
 // real assembly (size-service / ablation), not estimation. Each figure shows a
 // spinner until its assembly resolves; results are cached so re-opening is
-// instant. The freed-bytes figure is contextual: removing a shared op's
-// non-last use frees only its connection, the last use frees the routine too —
-// the ablation captures that exactly.
+// instant. Each op is inlined per use (no shared subroutines), so a phase's
+// freed-bytes figure is simply that phase's own code — a reverb frees ~the same
+// whether or not other reverbs remain.
 import type { Patch } from '../patch/types';
 import { fmtBytes } from './format';
 import { chipUsage } from '../patch/chip-ram';
@@ -71,7 +71,7 @@ export function mountBreakdownModal(root: HTMLElement): BreakdownModal {
     overlay.innerHTML = `
       <div class="size-breakdown-inner" role="document">
         <header><h2>SIZE BREAKDOWN</h2><button id="size-breakdown-close" aria-label="Close">✕</button></header>
-        <p class="size-breakdown-note">Exact .bin code size, assembled in-browser. Each phase shows how many bytes <strong>deleting it</strong> would free in this patch (a shared op's routine is only freed when its last use is removed).</p>
+        <p class="size-breakdown-note">Exact .bin code size, assembled in-browser. Each phase shows how many bytes <strong>deleting it</strong> would free. Every op is inlined per use, so each phase costs the same regardless of how many times that op appears.</p>
         <section>
           <table>
             <tr><td><strong>total .bin code</strong></td><td class="num" id="bd-total">${spin}</td></tr>
