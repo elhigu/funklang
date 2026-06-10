@@ -62,10 +62,8 @@ test('clicking 🔊 inside an expanded clone block targets the SOURCE instrument
   // instrument's final) owns playback.
   await expect(page.locator('#btn-output-master')).toHaveClass(/dimmed/);
 
-  // Click MASTER V1 → back to active instrument's final. (The top menu collapses
-  // into the hamburger at this viewport, so open it first if needed.)
-  const menuToggle = page.locator('#menu-toggle');
-  if (await menuToggle.isVisible()) await menuToggle.click();
+  // Click MASTER V1 (now in the footer, always visible) → back to the active
+  // instrument's final.
   await page.locator('#btn-output-master').click();
   await expect(page.locator('#btn-output-master')).toHaveClass(/active/);
 });

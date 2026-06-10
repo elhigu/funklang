@@ -147,8 +147,7 @@
   /* In the dropdown, items stack as full-width rows. */
   .menu.collapsed > .menu-items > button,
   .menu.collapsed > .menu-items > .base-toggle-wrap,
-  .menu.collapsed > .menu-items > .note-select-wrap,
-  .menu.collapsed > .menu-items > .output-select-wrap {
+  .menu.collapsed > .menu-items > .note-select-wrap {
     width: 100%;
     height: auto;
     padding: 9px 14px;
@@ -649,6 +648,8 @@
     white-space: nowrap;
   }
   .output-select-label { color: var(--fg-2); }
+  /* In the footer the OUTPUT control drops the menu divider / full-height. */
+  footer .output-select-wrap { border-right: none; height: auto; padding: 0; }
   /* MASTER V1 toggle button. Replaces the per-slot dropdown the wrap
      used to hold — when active, the active instrument's final v1 is the
      playback target (which is the usual case). When a per-slot 🔊 takes
@@ -678,20 +679,9 @@
   }
   .output-master:hover { opacity: 1; color: var(--magenta); border-color: var(--magenta); }
 
-  /* Help button + modal */
-  .help-btn {
-    background: var(--bg-2);
-    border: 1px solid var(--grid);
-    color: var(--fg-1);
-    font: inherit;
-    font-weight: 600;
-    width: 22px; height: 22px;
-    margin-left: 6px;
-    padding: 0;
-    cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-  }
-  .help-btn:hover { background: var(--bg-3); color: var(--amber); border-color: var(--amber); }
+  /* Help modal. HELP is now a plain text menu item (was a "?" icon box) — it's
+     the last item in the row, so drop its trailing divider. */
+  .menu-items > button:last-child { border-right: none; }
 
   .help-overlay {
     position: fixed;
@@ -1010,10 +1000,8 @@
     background: var(--bg-1);
     border-top: 1px solid var(--grid);
     display: grid;
-    /* size readout on the left, activity light pinned right. (The old
-       selected/output middle column was removed — it overflowed narrow
-       windows.) */
-    grid-template-columns: 1fr auto;
+    /* size readout (left, grows) · OUTPUT routing · activity light (right). */
+    grid-template-columns: 1fr auto auto;
     align-items: center;
     padding: 0 14px;
     gap: 16px;

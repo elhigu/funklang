@@ -116,11 +116,7 @@ export function bootApp(root: HTMLElement): void {
             <span class="note-select-label">NOTE</span>
             <select id="note-select">${noteOptions}</select>
           </label>
-          <div class="output-select-wrap" title="Which signal is sent to the audio output">
-            <span class="output-select-label">OUTPUT</span>
-            <button id="btn-output-master" class="output-master active" title="Route the active instrument's final v1 output to playback. Grayed out when a per-slot 🔊 is the current output.">MASTER&nbsp;V1</button>
-          </div>
-          <button id="btn-help" class="help-btn" title="Keyboard shortcuts (?)">?</button>
+          <button id="btn-help" title="Keyboard shortcuts (?)">HELP</button>
           </div>
         </div>
         <div class="file-info">
@@ -138,6 +134,10 @@ export function bootApp(root: HTMLElement): void {
       <main id="main-area"></main>
       <footer>
         <button id="size-status" class="size-status" title="Click for size breakdown">—</button>
+        <div class="output-select-wrap" title="Which signal is sent to the audio output">
+          <span class="output-select-label">OUTPUT</span>
+          <button id="btn-output-master" class="output-master active" title="Route the active instrument's final v1 output to playback. Grayed out when a per-slot 🔊 is the current output.">MASTER&nbsp;V1</button>
+        </div>
         <div class="footer-right" title="System activity — blinks while the .bin assembles/shrinks or audio plays, steady READY when idle"><span class="blink">●</span><span class="status-label">READY</span></div>
       </footer>
       <aside id="revert-panel" class="revert-panel hidden" aria-hidden="true">

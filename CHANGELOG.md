@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The **OUTPUT / MASTER V1** routing control moved from the top menu to the
+  footer (it's a per-instrument routing toggle, not a global menu action, and
+  is now always visible — including on mobile).
+- The help menu item now reads **HELP** (was a `?` icon), matching the other
+  text items.
+- About modal links: label the Pouët link **AmigaKlang Pouët**, and replace the
+  published-site repo link with the **funklang source + issue tracker** repo.
+
 ## [1.2.0] — 2026-06-10
 
 ### Added
